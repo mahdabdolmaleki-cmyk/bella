@@ -1,0 +1,1299 @@
+@import "tailwindcss";
+
+@theme {
+  --color-night: #06120b;
+  --color-forest: #0b2417;
+  --color-moss: #123524;
+  --color-pine: #1a4630;
+  --color-gold: #d4af37;
+  --color-gold-soft: #e8cd85;
+  --color-gold-deep: #9a7b2a;
+  --color-cream: #f2e9d4;
+  --color-sage: #93ac9c;
+
+  --font-body: var(--font-vazir);
+  --font-display: var(--font-cormorant);
+  --font-script: var(--font-vibes);
+  --font-brand: var(--font-alexbrush);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-night);
+  color: var(--color-cream);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(212, 175, 55, 0.35);
+  color: #fff8e7;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #07150d;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(#8a6d22, #d4af37, #8a6d22);
+  border-radius: 8px;
+  border: 2px solid #07150d;
+}
+
+/* ---------- ambient helpers ---------- */
+.gold-ring {
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.45),
+    0 0 24px rgba(212, 175, 55, 0.18),
+    inset 0 0 18px rgba(212, 175, 55, 0.12);
+}
+
+.gold-text {
+  color: var(--color-gold);
+}
+
+.hairline {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(212, 175, 55, 0.55),
+    transparent
+  );
+}
+
+/* The hero glow. It used to end with a hard black radial at its bottom edge,
+   which drew a visible horizontal seam where the hero section stopped and the
+   plain page background began — the page looked split in two. The dark half is
+   gone and the whole layer is masked out towards the bottom, so it dissolves
+   into the page instead of ending against it. */
+.vignette {
+  background: radial-gradient(
+    120% 80% at 50% 0%,
+    rgba(26, 70, 48, 0.55),
+    transparent 62%
+  );
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 45%, transparent 100%);
+}
+
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+/* ---------- keyframes ---------- */
+@keyframes dust {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: var(--dust-o, 0.5);
+  }
+  88% {
+    opacity: var(--dust-o, 0.5);
+  }
+  100% {
+    transform: translateY(-46vh) translateX(var(--dust-x, 20px));
+    opacity: 0;
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glowpulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes spinslow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+.animate-bob {
+  animation: bob 5s ease-in-out infinite;
+}
+.animate-glowpulse {
+  animation: glowpulse 4s ease-in-out infinite;
+}
+.animate-spinslow {
+  animation: spinslow 26s linear infinite;
+}
+
+.shimmer-btn {
+  background-image: linear-gradient(
+    110deg,
+    #b8912c 0%,
+    #e8cd85 28%,
+    #fff3cf 42%,
+    #e8cd85 56%,
+    #b8912c 100%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 4.5s linear infinite;
+}
+
+/* ---------------- traveling gold light around a box's border ---------------- */
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.glow-border {
+  position: relative;
+}
+.glow-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 0%,
+    transparent 78%,
+    rgba(232, 205, 133, 0.95) 90%,
+    #fff3cf 94%,
+    rgba(232, 205, 133, 0.95) 98%,
+    transparent 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: border-angle-spin 3.6s linear infinite;
+  opacity: 0.9;
+}
+@keyframes border-angle-spin {
+  to {
+    --border-angle: 360deg;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  A11Y: every input used `focus:outline-none` with no replacement, so  */
+/*  keyboard users had no idea where they were on the page.              */
+/* ------------------------------------------------------------------ */
+:focus-visible {
+  outline: 2px solid var(--color-gold, #d4af37);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  A11Y: reduced motion only disabled two things before — the dust,    */
+/*  bobbing bottle, shimmer and glow kept animating.                    */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .glow-border::before,
+  .shimmer-btn::after,
+  .animate-bob,
+  .animate-glowpulse,
+  .animate-spinslow {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Frosted "glass" surface used by the home-page cards.               */
+/*  Tinted with a whisper of gold so it stays inside the Bella theme.  */
+/* ------------------------------------------------------------------ */
+.glass-card {
+  position: relative;
+  background-image: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.13) 0%,
+    rgba(255, 255, 255, 0.04) 38%,
+    rgba(212, 175, 55, 0.07) 100%
+  );
+  background-color: rgba(11, 36, 23, 0.32);
+  border: 1px solid rgba(232, 205, 133, 0.24);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 20px 45px -28px rgba(0, 0, 0, 0.95);
+  overflow: hidden;
+}
+
+/* Diagonal specular highlight, like light sliding across real glass. */
+.glass-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0) 42%,
+    rgba(255, 255, 255, 0) 62%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  opacity: 0.9;
+}
+
+.glass-card:hover {
+  border-color: rgba(232, 205, 133, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 26px 55px -26px rgba(0, 0, 0, 0.95);
+}
+
+/* The content of a glass card must sit above the ::after sheen. */
+.glass-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-card {
+    background-color: rgba(11, 36, 23, 0.85);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Lighter glass variants.                                            */
+/*  .glass-panel  — same material, but no clipping and no sheen, so it   */
+/*                  is safe for wrappers that hold absolutely          */
+/*                  positioned children (drawers, sticky bars, navs).  */
+/*  .glass-input  — tuned for form fields: darker, thinner blur.        */
+/* ------------------------------------------------------------------ */
+.glass-panel {
+  background-image: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.03) 45%,
+    rgba(212, 175, 55, 0.06) 100%
+  );
+  background-color: rgba(11, 36, 23, 0.34);
+  border: 1px solid rgba(232, 205, 133, 0.2);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 18px 40px -30px rgba(0, 0, 0, 0.9);
+}
+
+.glass-input {
+  background-color: rgba(6, 18, 11, 0.55);
+  background-image: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 60%
+  );
+  border: 1px solid rgba(232, 205, 133, 0.22);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  backdrop-filter: blur(10px) saturate(130%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.glass-input:focus,
+.glass-input:focus-within {
+  border-color: rgba(212, 175, 55, 0.75);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 3px rgba(212, 175, 55, 0.12);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-panel {
+    background-color: rgba(11, 36, 23, 0.9);
+  }
+  .glass-input {
+    background-color: rgba(6, 18, 11, 0.95);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Festival banner: a slow band of light sliding over the glass, plus */
+/*  a very gentle golden breathing of the border.                      */
+/* ------------------------------------------------------------------ */
+.festival-sheen {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 38%,
+    rgba(255, 245, 214, 0.5) 50%,
+    rgba(255, 255, 255, 0) 62%,
+    transparent 100%
+  );
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  animation: festival-sweep 3.6s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes festival-sweep {
+  0% {
+    background-position: 180% 0;
+  }
+  55%,
+  100% {
+    background-position: -80% 0;
+  }
+}
+
+.festival-banner {
+  border-color: rgba(212, 175, 55, 0.55);
+  animation: festival-glow 3.2s ease-in-out infinite;
+}
+
+@keyframes festival-glow {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      0 0 0 1px rgba(212, 175, 55, 0.1),
+      0 18px 45px -26px rgba(0, 0, 0, 0.95);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 0 0 1px rgba(212, 175, 55, 0.35),
+      0 22px 55px -22px rgba(212, 175, 55, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .festival-sheen,
+  .festival-banner {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Site-wide glass system.                                            */
+/*                                                                     */
+/*  .glass-panel already covers the big outer cards. These two fill    */
+/*  the gaps so every surface on the site is glass rather than a flat  */
+/*  tinted block:                                                      */
+/*                                                                     */
+/*  .glass-soft — inner tiles, rows, chips and nested boxes. Blur and  */
+/*                opacity are deliberately lower than .glass-panel so  */
+/*                a soft box nested inside a panel still reads as a    */
+/*                separate layer instead of turning into grey mud.     */
+/*  .glass-bar  — sticky headers, bottom navs and floating toasts.     */
+/*                Heavier blur and a more opaque base, because content */
+/*                scrolls underneath and text must stay readable.      */
+/* ------------------------------------------------------------------ */
+.glass-soft {
+  background-image: linear-gradient(
+    140deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 55%,
+    rgba(212, 175, 55, 0.045) 100%
+  );
+  background-color: rgba(11, 36, 23, 0.28);
+  -webkit-backdrop-filter: blur(9px) saturate(135%);
+  backdrop-filter: blur(9px) saturate(135%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.glass-bar {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  background-color: rgba(6, 18, 11, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 12px 30px -22px rgba(0, 0, 0, 0.95);
+}
+
+/* Devices without backdrop-filter (older Safari/Android) would render the
+   glass surfaces as nearly transparent and unreadable. Fall back to solid
+   tints there instead of leaving text floating over the page. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-panel {
+    background-color: rgba(11, 36, 23, 0.9);
+  }
+  .glass-soft {
+    background-color: rgba(11, 36, 23, 0.75);
+  }
+  .glass-bar {
+    background-color: rgba(6, 18, 11, 0.96);
+  }
+  .glass-input {
+    background-color: rgba(6, 18, 11, 0.92);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Self-hosted icon pack (see components/SiteIcon.tsx).               */
+/*  The SVG is used as a mask so the element's background-color paints */
+/*  the glyph — that is what makes per-icon colours possible.          */
+/* ------------------------------------------------------------------ */
+.site-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* Without mask support the element would be a plain coloured square, so drop
+   the fill and show the original SVG instead. */
+@supports not ((mask-image: url("/icons/star.svg")) or
+  (-webkit-mask-image: url("/icons/star.svg"))) {
+  .site-icon {
+    background-color: transparent !important;
+    background-image: var(--icon-url);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+}
+
+/* ==================================================================
+   v24 — colour system: ambient light + semantic action buttons
+   Base stays gold + luxe green; accents add life without hijacking it.
+   ================================================================== */
+
+/* ---------- semantic action buttons ----------
+   gold    = primary commerce CTA (shimmer-btn, unchanged)
+   emerald = confirm / pay / save
+   sky     = send / export / neutral action
+   rose    = destructive
+   ghost   = cancel / back
+   Each sets its own text colour, so drop text-[#241a05] at call sites. */
+
+.btn-emerald,
+.btn-sky,
+.btn-rose {
+  background-size: 220% 100%;
+  background-position: 0 0;
+  border: none;
+  transition:
+    background-position 0.55s ease,
+    box-shadow 0.3s ease,
+    transform 0.15s ease;
+}
+.btn-emerald:hover:not(:disabled),
+.btn-sky:hover:not(:disabled),
+.btn-rose:hover:not(:disabled) {
+  background-position: 100% 0;
+}
+.btn-emerald:active:not(:disabled),
+.btn-sky:active:not(:disabled),
+.btn-rose:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-emerald {
+  background-image: linear-gradient(
+    110deg,
+    #0c6b48 0%,
+    #12946b 26%,
+    #5fe0a5 50%,
+    #12946b 74%,
+    #0c6b48 100%
+  );
+  color: #03150d;
+  box-shadow:
+    0 8px 26px rgba(18, 148, 107, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.btn-emerald:hover:not(:disabled) {
+  box-shadow:
+    0 10px 32px rgba(18, 148, 107, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.btn-sky {
+  background-image: linear-gradient(
+    110deg,
+    #0b5c8a 0%,
+    #0e86bf 26%,
+    #6fd6f5 50%,
+    #0e86bf 74%,
+    #0b5c8a 100%
+  );
+  color: #04141d;
+  box-shadow:
+    0 8px 26px rgba(14, 134, 191, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.btn-sky:hover:not(:disabled) {
+  box-shadow:
+    0 10px 32px rgba(14, 134, 191, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.btn-rose {
+  background-image: linear-gradient(
+    110deg,
+    #8e1330 0%,
+    #c0264a 26%,
+    #f76d8c 50%,
+    #c0264a 74%,
+    #8e1330 100%
+  );
+  color: #fff1f4;
+  box-shadow:
+    0 8px 26px rgba(192, 38, 74, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn-rose:hover:not(:disabled) {
+  box-shadow:
+    0 10px 32px rgba(192, 38, 74, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.btn-ghost {
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  background: rgba(11, 36, 23, 0.4);
+  color: var(--color-gold-soft);
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.15s ease;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+.btn-ghost:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ==================================================================
+   v25 — GLASS OVERHAUL
+
+   The previous glass was mostly a dark green tint with a little blur:
+   on a near-black page that reads as "flat card", not as glass. Real
+   glass needs four things, and the old rules only had one and a half:
+
+     1. something colourful behind it  → the ambient layer below
+     2. strong blur + saturation      → refraction
+     3. a bright top edge and a dark  → thickness
+        bottom edge
+     4. a specular highlight sweeping → a polished surface
+        across the top corner
+
+   These rules come last in the file on purpose: they override the
+   earlier definitions without leaving dead code behind.
+   ================================================================== */
+
+/* ---------- the panels themselves ---------- */
+.glass-panel {
+  position: relative;
+  background-color: rgba(8, 22, 15, 0.3);
+  background-image:
+    radial-gradient(
+      120% 90% at 88% -20%,
+      rgba(255, 255, 255, 0.16),
+      transparent 58%
+    ),
+    linear-gradient(
+      158deg,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.015) 42%,
+      rgba(212, 175, 55, 0.05) 100%
+    );
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  -webkit-backdrop-filter: blur(22px) saturate(165%) brightness(1.06);
+  backdrop-filter: blur(22px) saturate(165%) brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.38),
+    inset 0 0 30px rgba(255, 255, 255, 0.025),
+    0 26px 60px -34px rgba(0, 0, 0, 0.95);
+}
+
+/* Nested surfaces: thinner glass, so a tile inside a panel still reads as
+   a separate sheet instead of doubling the tint into grey mud. */
+.glass-soft {
+  background-color: rgba(255, 255, 255, 0.035);
+  background-image: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.075) 0%,
+    rgba(255, 255, 255, 0.012) 55%,
+    rgba(212, 175, 55, 0.035) 100%
+  );
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  backdrop-filter: blur(10px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* Sticky bars sit over scrolling content, so they need real occlusion:
+   heavier blur, a darker base, and a lit bottom edge. */
+.glass-bar {
+  background-color: rgba(5, 15, 10, 0.62);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.09) 0%,
+    rgba(255, 255, 255, 0.015) 100%
+  );
+  -webkit-backdrop-filter: blur(26px) saturate(175%) brightness(1.04);
+  backdrop-filter: blur(26px) saturate(175%) brightness(1.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 1px 0 rgba(212, 175, 55, 0.1),
+    0 18px 40px -26px rgba(0, 0, 0, 0.95);
+}
+
+/* Inputs read as glass pressed *into* the surface: the highlight moves to
+   the bottom edge and the shadow to the top, the inverse of a panel. */
+.glass-input {
+  background-color: rgba(4, 12, 8, 0.42);
+  background-image: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.18) 0%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.glass-input:focus,
+.glass-input:focus-within {
+  border-color: rgba(212, 175, 55, 0.7);
+  background-color: rgba(4, 12, 8, 0.3);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.32),
+    0 0 0 3px rgba(212, 175, 55, 0.14);
+}
+
+/* The old gold-ring fired a gold glow on every card at once, which flattened
+   the hierarchy. It is now a hairline that lets the glass edge do the work. */
+.gold-ring {
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.16),
+    0 0 22px -6px rgba(212, 175, 55, 0.1);
+}
+
+/* Optional: a moving specular streak for hero surfaces. Add "glass-sheen"
+   next to glass-panel on the few cards that deserve the extra attention. */
+.glass-sheen {
+  overflow: hidden;
+}
+.glass-sheen::after {
+  content: "";
+  position: absolute;
+  inset: -60% -20%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 58%
+  );
+  transform: translateX(-30%);
+  animation: glass-sheen-sweep 9s ease-in-out infinite;
+}
+@keyframes glass-sheen-sweep {
+  0%,
+  70% {
+    transform: translateX(-40%);
+  }
+  100% {
+    transform: translateX(40%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass-sheen::after {
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
+/* Older Safari/Android have no backdrop-filter: transparent panels there
+   would be unreadable, so fall back to solid tints. This block must stay
+   after the rules above or it would be overridden by them. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-panel {
+    background-color: rgba(11, 36, 23, 0.92);
+  }
+  .glass-soft {
+    background-color: rgba(18, 53, 36, 0.85);
+  }
+  .glass-bar {
+    background-color: rgba(6, 18, 11, 0.96);
+  }
+  .glass-input {
+    background-color: rgba(4, 12, 8, 0.95);
+  }
+}
+
+/* ==================================================================
+   v27 — FORM SYSTEM
+
+   The old fields were flat dark-green boxes with a faint gold border:
+   on a dark green page they read as "holes", not as controls, and the
+   green tint clashed with everything around it. The whole set is
+   rebuilt here around one idea: a field is a warm, slightly lit sheet
+   that reacts when you touch it.
+
+     rest   → neutral dark sheet, hairline warm border
+     hover  → border warms up, surface lifts slightly
+     focus  → gold ring + gold glow + brighter surface
+     filled → stays readable cream text, never grey-on-grey
+
+   No green is used anywhere in a form control, which is what made the
+   marked areas look off-brand.
+   ================================================================== */
+
+.glass-input {
+  background-color: rgba(10, 16, 13, 0.55);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.012) 45%,
+    rgba(0, 0, 0, 0.12) 100%
+  );
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  color: var(--color-cream);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    transform 0.18s ease;
+}
+
+.glass-input:hover:not(:disabled):not(:focus):not(:focus-within) {
+  border-color: rgba(212, 175, 55, 0.4);
+  background-color: rgba(14, 21, 17, 0.62);
+}
+
+/* The focus state is the "alive" part: a gold ring, a soft outer glow and a
+   1px lift. It is the same language as the gold CTA buttons, so a focused
+   field clearly belongs to this site. */
+.glass-input:focus,
+.glass-input:focus-within,
+.glass-input:focus-visible {
+  outline: none;
+  border-color: rgba(212, 175, 55, 0.75);
+  background-color: rgba(18, 26, 21, 0.7);
+  box-shadow:
+    0 0 0 3px rgba(212, 175, 55, 0.14),
+    0 8px 24px -12px rgba(212, 175, 55, 0.45),
+    inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.glass-input:disabled,
+.glass-input[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Invalid fields get the same treatment in red, so validation reads as part
+   of the design instead of a browser default. */
+.glass-input[aria-invalid="true"] {
+  border-color: rgba(248, 113, 113, 0.6);
+  box-shadow:
+    0 0 0 3px rgba(248, 113, 113, 0.12),
+    inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.glass-input::placeholder {
+  color: rgba(147, 172, 156, 0.5);
+}
+
+/* Native dropdown lists render with the OS palette unless both sides are set;
+   without this the option list was white-on-white in some browsers. */
+.glass-input option,
+select.glass-input option {
+  background-color: #0b1a12;
+  color: var(--color-cream);
+}
+
+/* Date/colour/file pickers draw their own tiny icons in dark grey, which
+   disappear on this background. */
+.glass-input::-webkit-calendar-picker-indicator,
+.glass-input::-webkit-inner-spin-button {
+  filter: invert(78%) sepia(38%) saturate(560%) hue-rotate(2deg);
+}
+
+/* Labels above fields. Small, warm, and consistent everywhere. */
+.form-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--color-gold-soft);
+}
+
+/* Helper / error line under a field. */
+.form-hint {
+  margin-top: 0.375rem;
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: rgba(147, 172, 156, 0.85);
+}
+
+.form-hint-error {
+  color: #fca5a5;
+}
+
+/* Checkboxes and radios: the browser default is a bright blue square that
+   belongs to no part of this palette. */
+.glass-check {
+  accent-color: #d4af37;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+/* Colour swatch inputs, used for the bottle colours in settings. */
+.glass-swatch {
+  height: 2.5rem;
+  width: 100%;
+  cursor: pointer;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  background: rgba(10, 16, 13, 0.55);
+  padding: 0.25rem;
+}
+.glass-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.glass-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 0.4rem;
+}
+
+/* Browsers paint autofilled fields with a solid pale yellow box, which broke
+   every login form on the site. Keep our own surface and text colour. */
+.glass-input:-webkit-autofill,
+.glass-input:-webkit-autofill:hover,
+.glass-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-cream);
+  caret-color: var(--color-cream);
+  -webkit-box-shadow: 0 0 0 1000px rgba(14, 21, 17, 0.98) inset;
+  transition: background-color 100000s ease-in-out 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-input,
+  .glass-input:focus,
+  .glass-input:focus-within {
+    transition: none;
+    transform: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-input {
+    background-color: rgba(10, 16, 13, 0.96);
+  }
+}
+
+/* ==================================================================
+   v28 — طراحی تازهٔ فرم‌ها (لیبل شناور + نوار طلایی متحرک)
+
+   دفعهٔ قبل فقط رنگ فیلدها عوض شد که عملاً دیده نمی‌شد. این‌بار
+   ساختار خود فیلد عوض شده است:
+
+     • لیبل داخل فیلد می‌نشیند و با فوکوس/پرشدن به بالا می‌لغزد و طلایی می‌شود
+     • یک نوار طلایی از وسط باز می‌شود و کف فیلد را می‌گیرد
+     • کل جعبه یک پیکسل بالا می‌آید و هالهٔ طلایی می‌گیرد
+     • آیکن کنار فیلد با فوکوس رنگ می‌گیرد
+
+   همه‌چیز با ویژگی‌های منطقی CSS (inline-start/end) نوشته شده تا در RTL و
+   LTR یکسان کار کند.
+   ================================================================== */
+
+.field {
+  position: relative;
+  display: block;
+}
+
+.field-input {
+  width: 100%;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  background-color: rgba(10, 16, 13, 0.5);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055) 0%,
+    rgba(255, 255, 255, 0.012) 50%,
+    rgba(0, 0, 0, 0.14) 100%
+  );
+  padding: 1.45rem 0.95rem 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.5rem;
+  color: var(--color-cream);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.32);
+  transition:
+    border-color 0.24s ease,
+    box-shadow 0.24s ease,
+    background-color 0.24s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* فیلدی که آیکن دارد جای بیشتری در ابتدای خط می‌خواهد. */
+.field-has-icon .field-input {
+  padding-inline-start: 2.6rem;
+}
+
+.field-input:hover:not(:disabled):not(:focus) {
+  border-color: rgba(212, 175, 55, 0.38);
+  background-color: rgba(14, 21, 17, 0.58);
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: rgba(212, 175, 55, 0.6);
+  background-color: rgba(18, 26, 21, 0.66);
+  box-shadow:
+    0 10px 26px -14px rgba(212, 175, 55, 0.55),
+    inset 0 1px 2px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
+}
+
+.field-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* جای‌نگه‌دار خالی است تا :placeholder-shown کار کند؛ متن راهنما فقط
+   وقتی فیلد فوکوس دارد دیده می‌شود، وگرنه با لیبل تداخل دارد. */
+.field-input::placeholder {
+  color: transparent;
+  transition: color 0.2s ease;
+}
+.field-input:focus::placeholder {
+  color: rgba(147, 172, 156, 0.42);
+}
+
+.field-label {
+  position: absolute;
+  inset-inline-start: 0.95rem;
+  top: 0.9rem;
+  transform-origin: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(147, 172, 156, 0.85);
+  pointer-events: none;
+  transition:
+    top 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    font-size 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s ease;
+}
+
+.field-has-icon .field-label {
+  inset-inline-start: 2.6rem;
+}
+
+/* لیبل وقتی بالا می‌رود که یا فوکوس داریم یا فیلد خالی نیست. */
+.field-input:focus ~ .field-label,
+.field-input:not(:placeholder-shown) ~ .field-label,
+.field-always-float .field-label {
+  top: 0.3rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+  color: var(--color-gold-soft);
+}
+
+.field-input:focus ~ .field-label {
+  color: var(--color-gold);
+}
+
+/* نوار طلایی: از وسط باز می‌شود. این حرکت همان چیزی است که فرم را
+   «زنده» نشان می‌دهد. */
+.field-bar {
+  position: absolute;
+  bottom: 0.35rem;
+  inset-inline-start: 50%;
+  inset-inline-end: 50%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--color-gold-deep),
+    var(--color-gold),
+    var(--color-gold-soft)
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    inset-inline 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    left 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    right 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.24s ease;
+}
+
+.field-input:focus ~ .field-bar {
+  inset-inline-start: 0.65rem;
+  inset-inline-end: 0.65rem;
+  opacity: 1;
+}
+
+.field-icon {
+  position: absolute;
+  inset-inline-start: 0.95rem;
+  top: 1.05rem;
+  color: rgba(147, 172, 156, 0.75);
+  pointer-events: none;
+  transition:
+    color 0.22s ease,
+    transform 0.22s ease;
+}
+
+.field-input:focus ~ .field-icon {
+  color: var(--color-gold);
+  transform: scale(1.08);
+}
+
+/* وضعیت خطا — همان طراحی، با قرمز. */
+.field-invalid .field-input,
+.field-input[aria-invalid="true"] {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+.field-invalid .field-input:focus {
+  box-shadow:
+    0 10px 26px -14px rgba(248, 113, 113, 0.5),
+    inset 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+.field-invalid .field-label,
+.field-invalid .field-input:focus ~ .field-label {
+  color: #fca5a5;
+}
+.field-invalid .field-bar {
+  background: linear-gradient(90deg, #b91c1c, #f87171, #fca5a5);
+}
+
+/* textarea همین طراحی را دارد، فقط بلندتر است. */
+textarea.field-input {
+  resize: none;
+  padding-top: 1.6rem;
+  line-height: 1.9;
+}
+
+/* select پلیس‌هولدر ندارد، پس لیبلش همیشه بالاست و فلش خودمان را
+   می‌گذاریم تا فلش خاکستری مرورگر دیده نشود. */
+select.field-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 2.2rem;
+  cursor: pointer;
+}
+
+.field-caret {
+  position: absolute;
+  inset-inline-end: 0.9rem;
+  top: 1.15rem;
+  color: rgba(212, 175, 55, 0.7);
+  pointer-events: none;
+  transition: transform 0.24s ease;
+}
+
+.field-input:focus ~ .field-caret {
+  transform: translateY(2px);
+  color: var(--color-gold);
+}
+
+select.field-input option {
+  background-color: #0b1a12;
+  color: var(--color-cream);
+}
+
+.field-hint {
+  margin-top: 0.3rem;
+  padding-inline-start: 0.35rem;
+  font-size: 0.62rem;
+  line-height: 1.7;
+  color: rgba(147, 172, 156, 0.8);
+}
+
+.field-hint-error {
+  color: #fca5a5;
+}
+
+/* autofill مرورگر کل جعبه را زرد می‌کرد و طراحی را نابود می‌کرد. */
+.field-input:-webkit-autofill,
+.field-input:-webkit-autofill:hover,
+.field-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-cream);
+  caret-color: var(--color-cream);
+  -webkit-box-shadow: 0 0 0 1000px rgba(14, 21, 17, 0.98) inset;
+  transition: background-color 100000s ease-in-out 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-input,
+  .field-label,
+  .field-bar,
+  .field-icon {
+    transition: none;
+  }
+  .field-input:focus {
+    transform: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .field-input {
+    background-color: rgba(10, 16, 13, 0.96);
+  }
+}
+
+/* ==================================================================
+   v29 — حذف گرادیان سفید → سبز از فیلدها
+
+   در v28 برای شیشه‌ای شدن فیلدها یک گرادیان روشن از بالا گذاشته بودم.
+   روی پس‌زمینهٔ سبز، آن روشنی بالا با سبز پایین قاطی می‌شد و نتیجه دقیقاً
+   همان «سفید به سبز لجنی» بود. حالا همهٔ فیلدها یک رنگ یکدست تیره‌اند
+   و فقط قاب طلایی و حالت فوکوس آن‌ها را از پس‌زمینه جدا می‌کند.
+   ================================================================== */
+
+.field-input,
+.field-input:hover:not(:disabled):not(:focus),
+.glass-input,
+.glass-input:hover:not(:disabled):not(:focus):not(:focus-within) {
+  /* رنگ یکدست — بدون هیچ لایهٔ گرادیانی. */
+  background-image: none;
+}
+
+.field-input,
+.glass-input {
+  background-color: rgba(9, 15, 12, 0.72);
+}
+
+.field-input:hover:not(:disabled):not(:focus),
+.glass-input:hover:not(:disabled):not(:focus):not(:focus-within) {
+  background-color: rgba(13, 20, 16, 0.78);
+}
+
+.field-input:focus,
+.glass-input:focus,
+.glass-input:focus-within {
+  background-color: rgba(16, 24, 19, 0.85);
+  background-image: none;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .field-input,
+  .glass-input {
+    background-color: rgba(9, 15, 12, 0.97);
+  }
+}
+
+/* =========================================================================
+   v31 — پخش‌کنندهٔ ویدئوی اختصاصی
+   =========================================================================
+   اسلایدر بلندی صدا. مرورگرها ظاهر پیش‌فرض خودشان را می‌سازند
+   (کروم خاکستری، فایرفاکس آبی) پس هر دو موتور جداگانه بازنویسی شده‌اند. */
+.player-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(242, 233, 212, 0.25);
+  outline: none;
+  cursor: pointer;
+}
+.player-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #d4af37;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.7);
+  border: none;
+}
+.player-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #d4af37;
+  border: none;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.7);
+}
+.player-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(242, 233, 212, 0.25);
+}
+
+/* در حالت تمام‌صفحه، ویدئو باید کل فضا را بگیرد و گوشهٔ گرد بی‌معنا می‌شود. */
+.bella-player:fullscreen {
+  border-radius: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  background: #000;
+}
+.bella-player:fullscreen video {
+  height: 100%;
+  width: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
