@@ -14,15 +14,8 @@ export function clientIp(req) {
 }
 
 export function actorOf(req) {
-  if (req.adminUser) {
-    return {
-      actorType: "admin",
-      actorId: String(req.adminUser._id),
-      actorLabel: `${req.adminUser.name} <${req.adminUser.email}>`,
-    };
-  }
   if (req.admin) {
-    return { actorType: "admin", actorId: "env", actorLabel: "\u0645\u062f\u06cc\u0631 (\u0631\u0645\u0632 \u0645\u062d\u06cc\u0637\u06cc)" };
+    return { actorType: "admin", actorId: "super-admin", actorLabel: "مدیر اصلی" };
   }
   if (req.user) {
     return {

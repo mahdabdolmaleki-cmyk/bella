@@ -147,6 +147,9 @@ export default function NotificationsAdmin() {
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setError(data?.error || "ارسال پیام ناموفق بود.");
+        // The server records failed campaigns too; refresh so the diagnostic is
+        // immediately visible in history instead of only after a page reload.
+        if (data?.campaign) loadHistory();
         return;
       }
       setDone(
@@ -358,6 +361,11 @@ export default function NotificationsAdmin() {
                     <span className="text-red-300">ناموفق: {toFa(c.failed)}</span>
                   )}
                 </p>
+                {c.failed > 0 && c.lastError && (
+                  <p className="mt-1.5 rounded-lg bg-red-400/10 px-2.5 py-1.5 text-[10px] leading-5 text-red-200">
+                    {c.lastError}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

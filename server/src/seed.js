@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 
@@ -7,7 +6,6 @@ import Counter from "./models/Counter.js";
 import Product from "./models/Product.js";
 import Settings, { DEFAULT_SETTINGS } from "./models/Settings.js";
 import User from "./models/User.js";
-import AdminUser from "./models/AdminUser.js";
 
 dotenv.config();
 
@@ -115,37 +113,6 @@ async function seed() {
         footerAbout: DEFAULT_SETTINGS.footerAbout,
     });
 
-    // SECURITY: the demo account used to ship with the hard-coded password
-    // "admin123". It is now taken from SEED_ADMIN_PASSWORD, or a strong random
-    // one is generated and printed once.
-    const adminEmail = (process.env.SEED_ADMIN_EMAIL || "admin@bella.ir").toLowerCase();
-    const adminPassword =
-        process.env.SEED_ADMIN_PASSWORD || crypto.randomBytes(12).toString("base64url");
-
-    if (adminPassword.length < 8) {
-        throw new Error("SEED_ADMIN_PASSWORD must be at least 8 characters long.");
-    }
-
-    const adminUser = new User({
-        name: "مدیر Bella",
-        email: adminEmail,
-        phone: "09120000000",
-        address: "تهران",
-    });
-    await adminUser.setPassword(adminPassword);
-    await adminUser.save();
-
-    // Owner account for the admin panel (used by the user-management screen).
-    await AdminUser.deleteMany({});
-    const ownerAccount = new AdminUser({
-        name: "مدیر ارشد",
-        email: adminEmail,
-        role: "owner",
-        active: true,
-    });
-    await ownerAccount.setPassword(adminPassword);
-    await ownerAccount.save();
-
     await Counter.deleteMany({});
 
     const createdProducts = [];
@@ -157,11 +124,6 @@ async function seed() {
 
     console.log("✓ Seed completed");
     console.log("- Settings:", siteSettings.key);
-    console.log("- Admin user:", adminUser.email);
-    console.log("- Admin panel owner account:", ownerAccount.email);
-    if (!process.env.SEED_ADMIN_PASSWORD) {
-        console.log("- Generated admin password (save it now):", adminPassword);
-    }
     console.log("- Products created:", createdProducts.length);
 }
 

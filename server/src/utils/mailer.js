@@ -1,119 +1,123 @@
 /**
- * Provider-agnostic e-mail sender (used for OTP delivery by e-mail).
+ * Direct Gmail SMTP sender used by OTP and admin announcements.
+ *
+ * This is the project's original delivery method: Nodemailer connects
+ * directly to smtp.gmail.com with the Gmail account and its App Password.
+ * No e-mail API or intermediary provider is used.
  *
  * Configure with:
- *   MAIL_PROVIDER=console | resend | mailgun | smtp
- *   MAIL_FROM="Bella Perfume <no-reply@bella.ir>"
- *   RESEND_API_KEY=...                       (provider: resend)
- *   MAILGUN_API_KEY=...  MAILGUN_DOMAIN=...  (provider: mailgun)
- *   SMTP_HOST=... SMTP_PORT=587 SMTP_USER=... SMTP_PASS=... SMTP_SECURE=false
- *
- * With the default "console" provider nothing leaves the machine: outside
- * production the message is printed so the whole flow stays testable without
- * any mail vendor. In production an unconfigured provider fails closed.
+ *   MAIL_PROVIDER=smtp
+ *   MAIL_FROM="Bella Perfume <your-address@gmail.com>"
+ *   SMTP_HOST=smtp.gmail.com
+ *   SMTP_PORT=587
+ *   SMTP_SECURE=false
+ *   SMTP_USER=your-address@gmail.com
+ *   SMTP_PASS=your-16-character-google-app-password
  */
 const PROVIDER = (process.env.MAIL_PROVIDER || "console").toLowerCase();
 const FROM = process.env.MAIL_FROM || "Bella Perfume <no-reply@bella.local>";
-const TIMEOUT_MS = 8000;
 
-function withTimeout() {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  return { signal: controller.signal, done: () => clearTimeout(timer) };
-}
-
-async function sendResend(to, subject, text, html) {
-  const key = process.env.RESEND_API_KEY || "";
-  if (!key) return false;
-  const t = withTimeout();
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from: FROM, to: [to], subject, text, html }),
-      signal: t.signal,
-    });
-    return res.ok;
-  } catch {
-    return false;
-  } finally {
-    t.done();
-  }
-}
-
-async function sendMailgun(to, subject, text, html) {
-  const key = process.env.MAILGUN_API_KEY || "";
-  const domain = process.env.MAILGUN_DOMAIN || "";
-  if (!key || !domain) return false;
-  const base = process.env.MAILGUN_BASE_URL || "https://api.mailgun.net";
-  const t = withTimeout();
-  try {
-    const res = await fetch(`${base}/v3/${domain}/messages`, {
-      method: "POST",
-      headers: {
-        Authorization: "Basic " + Buffer.from(`api:${key}`).toString("base64"),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ from: FROM, to, subject, text, html }).toString(),
-      signal: t.signal,
-    });
-    return res.ok;
-  } catch {
-    return false;
-  } finally {
-    t.done();
-  }
+function failure(error, provider) {
+  return {
+    ok: false,
+    error: String(error || "ارسال ایمیل ناموفق بود.").slice(0, 300),
+    provider,
+  };
 }
 
 let transporter = null;
+
+async function smtpTransport() {
+  if (transporter) return transporter;
+
+  const nodemailerModule = await import("nodemailer");
+  const nodemailer = nodemailerModule.default ?? nodemailerModule;
+
+  // Keep the same SMTP transport used by the original project. Gmail port
+  // 587 uses STARTTLS (`secure: false`); port 465 uses implicit TLS
+  // (`secure: true`). There is deliberately no API/provider fallback.
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "",
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || "false") === "true",
+    auth: process.env.SMTP_USER
+      ? {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS || "",
+        }
+      : undefined,
+  });
+
+  return transporter;
+}
+
+function smtpErrorMessage(err) {
+  const code = String(err?.code || "");
+  if (code === "EAUTH") {
+    return "احراز هویت Gmail رد شد؛ SMTP_PASS باید App Password معتبر گوگل باشد.";
+  }
+  if (code === "ETIMEDOUT") {
+    return `اتصال مستقیم به ${process.env.SMTP_HOST || "smtp.gmail.com"}:${
+      process.env.SMTP_PORT || 587
+    } منقضی شد.`;
+  }
+  return String(err?.message || "ارسال SMTP ناموفق بود.").slice(0, 300);
+}
+
 async function sendSmtp(to, subject, text, html) {
-  const host = process.env.SMTP_HOST || "";
-  if (!host) return false;
+  const host = String(process.env.SMTP_HOST || "").trim().toLowerCase();
+  if (!host) return failure("SMTP_HOST تنظیم نشده است.", "smtp");
+  if (host !== "smtp.gmail.com") {
+    return failure("برای ارسال مستقیم Gmail، SMTP_HOST باید smtp.gmail.com باشد.", "smtp");
+  }
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return failure("SMTP_USER یا SMTP_PASS تنظیم نشده است.", "smtp");
+  }
+
   try {
-    if (!transporter) {
-      // Optional dependency: only required when MAIL_PROVIDER=smtp.
-      const nodemailer = await import("nodemailer");
-      transporter = (nodemailer.default ?? nodemailer).createTransport({
-        host,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: String(process.env.SMTP_SECURE || "false") === "true",
-        auth: process.env.SMTP_USER
-          ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || "" }
-          : undefined,
-      });
-    }
-    await transporter.sendMail({ from: FROM, to, subject, text, html });
-    return true;
+    const transport = await smtpTransport();
+    const info = await transport.sendMail({ from: FROM, to, subject, text, html });
+    return {
+      ok: true,
+      error: "",
+      provider: "smtp",
+      messageId: String(info?.messageId || ""),
+    };
   } catch (err) {
     console.warn("SMTP send failed:", err?.message || err);
-    return false;
+    return failure(smtpErrorMessage(err), "smtp");
   }
 }
 
 /**
- * @returns {Promise<boolean>} true when the message was handed to the provider.
+ * Sends one message and preserves a safe SMTP error for admin reporting.
+ * @returns {Promise<{ok: boolean, error: string, provider: string, messageId?: string}>}
  */
-export async function sendMail(to, subject, text, html) {
+export async function sendMailDetailed(to, subject, text, html) {
   const address = String(to || "").trim();
-  if (!address) return false;
+  if (!address) return failure("آدرس ایمیل خالی است.", PROVIDER);
 
+  // Preserve the original local-development behaviour.
   if (PROVIDER === "console") {
     if (process.env.NODE_ENV !== "production") {
-      console.log(`\u2709\ufe0f  [MAIL \u2192 ${address}] ${subject}\n${text}`);
-      return true;
+      console.log(`✉️  [MAIL → ${address}] ${subject}\n${text}`);
+      return { ok: true, error: "", provider: "console" };
     }
-    console.warn("Mail provider is not configured \u2014 message not delivered.");
-    return false;
+    return failure("Mail provider در محیط production تنظیم نشده است.", "console");
   }
-  if (PROVIDER === "resend") return sendResend(address, subject, text, html);
-  if (PROVIDER === "mailgun") return sendMailgun(address, subject, text, html);
-  if (PROVIDER === "smtp") return sendSmtp(address, subject, text, html);
 
-  console.warn(`Unknown MAIL_PROVIDER "${PROVIDER}" \u2014 message not sent.`);
-  return false;
+  if (PROVIDER === "smtp") {
+    return sendSmtp(address, subject, text, html);
+  }
+
+  return failure('MAIL_PROVIDER باید روی "smtp" تنظیم شود.', PROVIDER);
+}
+
+/** Backward-compatible boolean API used by OTP delivery. */
+export async function sendMail(to, subject, text, html) {
+  const result = await sendMailDetailed(to, subject, text, html);
+  if (!result.ok) console.warn("Mail send failed:", result.error);
+  return result.ok;
 }
 
 export function otpMail(code) {

@@ -121,10 +121,7 @@ router.patch(
       if (body) {
         review.reply = {
           body,
-          author:
-            str(req.body?.replyAuthor, { max: 80 }) ||
-            req.adminUser?.name ||
-            "مدیر سایت",
+          author: str(req.body?.replyAuthor, { max: 80 }) || "مدیر اصلی",
           at: new Date(),
         };
       } else {

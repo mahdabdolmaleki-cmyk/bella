@@ -51,7 +51,8 @@ const SECRET_FIELDS = new Set([
   "passwordHash",
   "tokenVersion",
   "codeHash",
-  "ticketHash",
+  "ticketHash", // legacy field; old short-lived rows may still exist during deploy
+  "ticketDigest",
   "ip",
   "lastLoginIp",
 ]);

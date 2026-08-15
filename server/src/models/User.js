@@ -8,8 +8,9 @@ const userSchema = new mongoose.Schema(
     // ایمیل دیگر اجباری نیست: کاربر با شماره + کد وارد می‌شود و بعداً می‌تواند
     // ایمیل را در پروفایل ثبت/ویرایش کند. sparse تا چند حساب بدون ایمیل مجاز باشد.
     email: { type: String, unique: true, sparse: true, lowercase: true, trim: true, maxlength: 160, default: undefined },
-    // Phone is the primary identity for OTP sign-up/recovery.
-    phone: { type: String, default: "", maxlength: 20, index: true },
+    // Phone is the primary identity for OTP sign-up/recovery. A partial unique
+    // index below excludes legacy/admin-created rows whose phone is empty.
+    phone: { type: String, default: "", maxlength: 20 },
     phoneVerified: { type: Boolean, default: false },
     address: { type: String, default: "", maxlength: 500 },
     // Default delivery destination, reused to pre-fill checkout and to quote
@@ -30,6 +31,15 @@ const userSchema = new mongoose.Schema(
     favorites: { type: [Number], default: [] },
   },
   { timestamps: true },
+);
+
+userSchema.index(
+  { phone: 1 },
+  {
+    unique: true,
+    name: "user_phone_unique",
+    partialFilterExpression: { phone: { $type: "string", $gt: "" } },
+  }
 );
 
 userSchema.methods.setPassword = async function (plain) {

@@ -1,12 +1,10 @@
 import { Router } from "express";
-import bcrypt from "bcryptjs";
 import path from "path";
 import Product from "../models/Product.js";
 import Order, { ORDER_STATUSES } from "../models/Order.js";
 import Message from "../models/Message.js";
 import Settings, { NUMERIC_SETTINGS } from "../models/Settings.js";
 import User from "../models/User.js";
-import AdminUser, { ADMIN_ROLES } from "../models/AdminUser.js";
 import {
   readLogs,
   purgeLogs,
@@ -15,12 +13,11 @@ import {
 } from "../utils/fileLog.js";
 import { upload, isRealImage, removeFile, UPLOAD_DIR } from "../middleware/upload.js";
 import { requireAdmin, requireAdminWrite, requireOwner } from "../middleware/authMiddleware.js";
-import { rateLimit, penalise, resetLimit } from "../middleware/rateLimit.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
 import { logActivity, clientIp } from "../utils/activityLog.js";
-import { consumeTicket } from "../utils/otp.js";
 import { releaseOrderStock } from "../jobs/staleOrders.js";
-import { maskPhone, SUPER_ADMIN_PHONE, normalizePhone } from "../config/superAdmin.js";
+import { SUPER_ADMIN_PHONE, normalizePhone } from "../config/superAdmin.js";
 import {
   str,
   num,
@@ -31,15 +28,7 @@ import {
   safeImage,
   passwordIssue,
 } from "../utils/validate.js";
-import {
-  ADMIN_COOKIE,
-  signToken,
-  cookieOptions,
-  adminCookieOptions,
-  adminSessionHours,
-  clearCookieOptions,
-  safeEqual,
-} from "../utils/auth.js";
+import { ADMIN_COOKIE, clearCookieOptions } from "../utils/auth.js";
 
 const router = Router();
 
@@ -53,9 +42,6 @@ function removeUploadedImage(url) {
   if (!match) return;
   removeFile(path.join(UPLOAD_DIR, match[1]));
 }
-
-// Dummy hash so a wrong e-mail costs exactly as much time as a wrong password.
-const DUMMY_HASH = "$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvaliduO";
 
 /** Shared ?page= / ?limit= parsing for the admin list endpoints. */
 function paging(req, defaultLimit = 100, maxLimit = 500) {
@@ -82,12 +68,8 @@ router.post("/logout", (req, res) => {
 router.use(requireAdmin);
 router.use(rateLimit({ name: "admin-api", windowMs: 60 * 1000, max: 200 }));
 
-router.get("/me", (req, res) => {
-  res.json({
-    admin: true,
-    role: req.adminUser?.role || req.adminRole || "owner",
-    account: req.adminUser ? req.adminUser.toDTO() : null,
-  });
+router.get("/me", (_req, res) => {
+  res.json({ admin: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -380,112 +362,6 @@ router.delete(
     await user.save();
 
     logActivity(req, { action: "customer.delete", target: String(user._id), status: 200 });
-    res.json({ ok: true });
-  })
-);
-
-// ---------------------------------------------------------------------------
-// Admin accounts (owner only)
-// ---------------------------------------------------------------------------
-router.get(
-  "/admins",
-  requireOwner,
-  ah(async (_req, res) => {
-    const admins = await AdminUser.find().sort({ createdAt: 1 }).limit(200);
-    res.json({ admins: admins.map((a) => a.toDTO()), roles: ADMIN_ROLES });
-  })
-);
-
-router.post(
-  "/admins",
-  requireOwner,
-  ah(async (req, res) => {
-    const name = str(req.body?.name, { max: 80 });
-    const email = isEmail(req.body?.email);
-    const role = ADMIN_ROLES.includes(req.body?.role) ? req.body.role : "admin";
-    const password = typeof req.body?.password === "string" ? req.body.password : "";
-
-    if (!name) return res.status(400).json({ error: "\u0646\u0627\u0645 \u0627\u0644\u0632\u0627\u0645\u06cc \u0627\u0633\u062a." });
-    if (!email) return res.status(400).json({ error: "\u0627\u06cc\u0645\u06cc\u0644 \u0645\u0639\u062a\u0628\u0631 \u0648\u0627\u0631\u062f \u06a9\u0646\u06cc\u062f." });
-    const pwIssue = passwordIssue(password);
-    if (pwIssue) return res.status(400).json({ error: pwIssue });
-    if (await AdminUser.exists({ email })) {
-      return res.status(409).json({ error: "\u0627\u06cc\u0646 \u0627\u06cc\u0645\u06cc\u0644 \u0642\u0628\u0644\u0627\u064b \u062b\u0628\u062a \u0634\u062f\u0647 \u0627\u0633\u062a." });
-    }
-
-    const account = new AdminUser({ name, email, role, active: bool(req.body?.active ?? true) });
-    await account.setPassword(password);
-    await account.save();
-
-    logActivity(req, { action: "admin.create", target: email, status: 201, meta: `role=${role}` });
-    res.status(201).json({ admin: account.toDTO() });
-  })
-);
-
-router.patch(
-  "/admins/:id",
-  requireOwner,
-  ah(async (req, res) => {
-    const account = await AdminUser.findById(req.params.id);
-    if (!account) return res.status(404).json({ error: "\u062d\u0633\u0627\u0628 \u06cc\u0627\u0641\u062a \u0646\u0634\u062f." });
-
-    const activeOwners = await AdminUser.countDocuments({ role: "owner", active: true });
-    const losingOwner =
-      account.role === "owner" &&
-      account.active &&
-      ((req.body?.role !== undefined && req.body.role !== "owner") ||
-        (req.body?.active !== undefined && !bool(req.body.active)));
-    if (losingOwner && activeOwners <= 1) {
-      return res.status(400).json({ error: "\u062d\u062f\u0627\u0642\u0644 \u06cc\u06a9 \u0645\u0627\u0644\u06a9 \u0641\u0639\u0627\u0644 \u0628\u0627\u06cc\u062f \u0628\u0627\u0642\u06cc \u0628\u0645\u0627\u0646\u062f." });
-    }
-
-    if (req.body?.name !== undefined) {
-      const name = str(req.body.name, { max: 80 });
-      if (!name) return res.status(400).json({ error: "\u0646\u0627\u0645 \u0646\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u062f \u062e\u0627\u0644\u06cc \u0628\u0627\u0634\u062f." });
-      account.name = name;
-    }
-    if (req.body?.email !== undefined) {
-      const email = isEmail(req.body.email);
-      if (!email) return res.status(400).json({ error: "\u0627\u06cc\u0645\u06cc\u0644 \u0645\u0639\u062a\u0628\u0631 \u0648\u0627\u0631\u062f \u06a9\u0646\u06cc\u062f." });
-      if (email !== account.email && (await AdminUser.exists({ email }))) {
-        return res.status(409).json({ error: "\u0627\u06cc\u0646 \u0627\u06cc\u0645\u06cc\u0644 \u0642\u0628\u0644\u0627\u064b \u062b\u0628\u062a \u0634\u062f\u0647 \u0627\u0633\u062a." });
-      }
-      account.email = email;
-    }
-    if (req.body?.role !== undefined && ADMIN_ROLES.includes(req.body.role)) {
-      account.role = req.body.role;
-    }
-    if (req.body?.active !== undefined) account.active = bool(req.body.active);
-    if (req.body?.password) {
-      const pwIssue = passwordIssue(req.body.password);
-      if (pwIssue) return res.status(400).json({ error: pwIssue });
-      await account.setPassword(req.body.password);
-    }
-
-    await account.save();
-    logActivity(req, { action: "admin.update", target: account.email, status: 200, meta: `role=${account.role}` });
-    res.json({ admin: account.toDTO() });
-  })
-);
-
-router.delete(
-  "/admins/:id",
-  requireOwner,
-  ah(async (req, res) => {
-    const account = await AdminUser.findById(req.params.id);
-    if (!account) return res.status(404).json({ error: "\u062d\u0633\u0627\u0628 \u06cc\u0627\u0641\u062a \u0646\u0634\u062f." });
-    if (req.adminUser && String(req.adminUser._id) === String(account._id)) {
-      return res.status(400).json({ error: "\u062d\u0633\u0627\u0628 \u062e\u0648\u062f\u062a\u0627\u0646 \u0631\u0627 \u0646\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u06cc\u062f \u062d\u0630\u0641 \u06a9\u0646\u06cc\u062f." });
-    }
-    if (account.role === "owner") {
-      const owners = await AdminUser.countDocuments({ role: "owner", active: true });
-      if (owners <= 1) {
-        return res.status(400).json({ error: "\u062d\u062f\u0627\u0642\u0644 \u06cc\u06a9 \u0645\u0627\u0644\u06a9 \u0641\u0639\u0627\u0644 \u0628\u0627\u06cc\u062f \u0628\u0627\u0642\u06cc \u0628\u0645\u0627\u0646\u062f." });
-      }
-    }
-
-    await AdminUser.deleteOne({ _id: account._id });
-    logActivity(req, { action: "admin.delete", target: account.email, status: 200 });
     res.json({ ok: true });
   })
 );

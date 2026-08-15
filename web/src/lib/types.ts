@@ -120,19 +120,6 @@ export type Customer = User & {
   totalSpent: number;
 };
 
-export type AdminRole = "owner" | "admin" | "viewer";
-
-export type AdminAccount = {
-  id: string;
-  name: string;
-  email: string;
-  role: AdminRole;
-  active: boolean;
-  lastLoginAt: string | Date | null;
-  lastLoginIp: string;
-  createdAt: string | Date;
-};
-
 /* ------------------------------------------------------------------ */
 /*  نقد و بررسی‌ها                                                    */
 /* ------------------------------------------------------------------ */

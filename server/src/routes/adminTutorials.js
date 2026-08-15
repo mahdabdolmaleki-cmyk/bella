@@ -247,7 +247,7 @@ router.patch(
     if (typeof req.body?.reply === "string") {
       const replyBody = str(req.body.reply, { max: 1500 });
       comment.reply = replyBody
-        ? { body: replyBody, author: req.adminUser?.name || "مدیر بلّا", at: new Date() }
+        ? { body: replyBody, author: "مدیر اصلی", at: new Date() }
         : { body: "", author: "", at: null };
     }
 

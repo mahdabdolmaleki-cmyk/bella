@@ -1,6 +1,7 @@
 "use client";
+
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Pencil, Trash2, Users, ShieldCheck, X, Search } from "lucide-react";
+import { Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { formatToman } from "@/lib/data";
 
 export type Customer = {
@@ -15,26 +16,27 @@ export type Customer = {
   totalSpent: number;
 };
 
-export type AdminAccount = {
-  id: string;
+type CustomerForm = {
   name: string;
   email: string;
-  role: "owner" | "admin" | "viewer";
-  active: boolean;
-  lastLoginAt: string | Date | null;
-  lastLoginIp: string;
-  createdAt: string | Date;
+  phone: string;
+  address: string;
+  password: string;
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  owner: "مالک",
-  admin: "مدیر",
-  viewer: "فقط مشاهده",
+const EMPTY_CUSTOMER: CustomerForm = {
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  password: "",
 };
 
-function fmtDate(d: string | Date | null) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("fa-IR", {
+const inputCls =
+  "w-full rounded-xl glass-input px-4 py-2.5 text-sm text-cream placeholder:text-sage/50 focus:border-gold focus:outline-none";
+
+function fmtDate(date: string | Date) {
+  return new Date(date).toLocaleDateString("fa-IR", {
     day: "2-digit",
     month: "long",
     hour: "2-digit",
@@ -42,32 +44,17 @@ function fmtDate(d: string | Date | null) {
   });
 }
 
-const inputCls =
-  "w-full rounded-xl glass-input px-4 py-2.5 text-sm text-cream placeholder:text-sage/50 focus:border-gold focus:outline-none";
-
-type CustomerForm = { name: string; email: string; phone: string; address: string; password: string };
-type AdminForm = { name: string; email: string; role: AdminAccount["role"]; password: string; active: boolean };
-
-const EMPTY_CUSTOMER: CustomerForm = { name: "", email: "", phone: "", address: "", password: "" };
-const EMPTY_ADMIN: AdminForm = { name: "", email: "", role: "admin", password: "", active: true };
-
-export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boolean }) {
-  const [tab, setTab] = useState<"customers" | "admins">("customers");
-
+export default function UsersAdmin() {
   const [customers, setCustomers] = useState<Customer[] | null>(null);
-  const [admins, setAdmins] = useState<AdminAccount[] | null>(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
   const [customerForm, setCustomerForm] = useState<CustomerForm | null>(null);
   const [customerEditId, setCustomerEditId] = useState<string | null>(null);
-  const [adminForm, setAdminForm] = useState<AdminForm | null>(null);
-  const [adminEditId, setAdminEditId] = useState<string | null>(null);
 
-  const loadCustomers = useCallback(async (q = "") => {
+  const loadCustomers = useCallback(async (query = "") => {
     try {
-      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setCustomers(data.users ?? []);
@@ -77,22 +64,9 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
     }
   }, []);
 
-  const loadAdmins = useCallback(async () => {
-    if (!canManageAdmins) return;
-    try {
-      const res = await fetch("/api/admin/admins");
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setAdmins(data.admins ?? []);
-    } catch {
-      setAdmins([]);
-    }
-  }, [canManageAdmins]);
-
   useEffect(() => {
     loadCustomers();
-    loadAdmins();
-  }, [loadCustomers, loadAdmins]);
+  }, [loadCustomers]);
 
   const send = async (url: string, method: string, body?: unknown) => {
     setBusy(true);
@@ -117,9 +91,9 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
     }
   };
 
-  /* ---------------- customers ---------------- */
   const saveCustomer = async () => {
     if (!customerForm) return;
+
     const payload: Record<string, unknown> = {
       name: customerForm.name,
       email: customerForm.email,
@@ -139,233 +113,113 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
     }
   };
 
-  const deleteCustomer = async (c: Customer) => {
-    if (!confirm(`حساب «${c.name}» حذف شود؟ سفارش‌های ثبت‌شده باقی می‌مانند.`)) return;
-    if (await send(`/api/admin/users/${c.id}`, "DELETE")) loadCustomers(search);
-  };
-
-  /* ---------------- admins ---------------- */
-  const saveAdmin = async () => {
-    if (!adminForm) return;
-    const payload: Record<string, unknown> = {
-      name: adminForm.name,
-      email: adminForm.email,
-      role: adminForm.role,
-      active: adminForm.active,
-    };
-    if (adminForm.password) payload.password = adminForm.password;
-
-    const ok = adminEditId
-      ? await send(`/api/admin/admins/${adminEditId}`, "PATCH", payload)
-      : await send("/api/admin/admins", "POST", payload);
-
-    if (ok) {
-      setAdminForm(null);
-      setAdminEditId(null);
-      loadAdmins();
+  const deleteCustomer = async (customer: Customer) => {
+    if (!confirm(`حساب «${customer.name}» حذف شود؟ سفارش‌های ثبت‌شده باقی می‌مانند.`)) {
+      return;
     }
-  };
-
-  const deleteAdmin = async (a: AdminAccount) => {
-    if (!confirm(`حساب مدیریتی «${a.name}» حذف شود؟`)) return;
-    if (await send(`/api/admin/admins/${a.id}`, "DELETE")) loadAdmins();
+    if (await send(`/api/admin/users/${customer.id}`, "DELETE")) {
+      loadCustomers(search);
+    }
   };
 
   return (
     <div>
-      <h1 className="text-xl font-black text-cream">مدیریت کاربران</h1>
-      <p className="mt-1 text-xs text-sage">حساب‌های مشتریان و حساب‌های مدیریتی را اینجا بسازید، ویرایش یا حذف کنید.</p>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          onClick={() => setTab("customers")}
-          className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold ${
-            tab === "customers" ? "bg-gold text-[#241a05]" : "border border-gold/25 text-sage"
-          }`}
-        >
-          <Users size={14} /> مشتریان ({(customers?.length ?? 0).toLocaleString("fa-IR")})
-        </button>
-        {canManageAdmins && (
-          <button
-            onClick={() => setTab("admins")}
-            className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold ${
-              tab === "admins" ? "bg-gold text-[#241a05]" : "border border-gold/25 text-sage"
-            }`}
-          >
-            <ShieldCheck size={14} /> حساب‌های مدیریت ({(admins?.length ?? 0).toLocaleString("fa-IR")})
-          </button>
-        )}
-      </div>
+      <h1 className="text-xl font-black text-cream">مدیریت مشتریان</h1>
+      <p className="mt-1 text-xs text-sage">
+        حساب‌های مشتریان را اینجا بسازید، ویرایش یا حذف کنید.
+      </p>
 
       {error && <p className="mt-4 text-xs text-red-400">{error}</p>}
 
-      {/* ---------------- customers ---------------- */}
-      {tab === "customers" && (
-        <div className="mt-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-sage/60" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && loadCustomers(search)}
-                placeholder="جست‌وجو بر اساس نام، ایمیل یا شماره"
-                className={`${inputCls} pr-9`}
-              />
-            </div>
-            <button
-              onClick={() => loadCustomers(search)}
-              className="rounded-full border border-gold/30 px-4 py-2 text-xs font-bold text-gold-soft hover:bg-gold/10"
-            >
-              جست‌وجو
-            </button>
-            <button
-              onClick={() => {
-                setCustomerEditId(null);
-                setCustomerForm({ ...EMPTY_CUSTOMER });
-              }}
-              className="flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-xs font-bold text-[#241a05]"
-            >
-              <Plus size={14} /> مشتری جدید
-            </button>
+      <div className="mt-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px] flex-1">
+            <Search
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sage/60"
+            />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && loadCustomers(search)}
+              placeholder="جست‌وجو بر اساس نام، ایمیل یا شماره"
+              className={`${inputCls} pr-9`}
+            />
           </div>
-
-          {!customers ? (
-            <div className="mt-6 flex items-center gap-2 text-sage">
-              <Loader2 size={16} className="animate-spin" /> در حال بارگذاری…
-            </div>
-          ) : customers.length === 0 ? (
-            <p className="mt-6 text-sm text-sage">هیچ مشتری‌ای یافت نشد.</p>
-          ) : (
-            <div className="mt-5 flex flex-col gap-3">
-              {customers.map((c) => (
-                <div key={c.id} className="gold-ring rounded-2xl glass-panel p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-cream">{c.name}</p>
-                      <p className="mt-0.5 truncate text-xs text-gold-soft">{c.email}</p>
-                      <p className="mt-0.5 text-[11px] text-sage">
-                        {c.phone || "بدون شماره"} · عضویت: {fmtDate(c.createdAt)}
-                      </p>
-                      {c.address && <p className="mt-1 text-[11px] leading-5 text-sage">{c.address}</p>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-gold/20 px-2.5 py-1 text-[10px] text-sage">
-                        {c.orderCount.toLocaleString("fa-IR")} سفارش · {formatToman(c.totalSpent)}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setCustomerEditId(c.id);
-                          setCustomerForm({
-                            name: c.name,
-                            email: c.email,
-                            phone: c.phone,
-                            address: c.address,
-                            password: "",
-                          });
-                        }}
-                        className="rounded-lg border border-gold/25 p-2 text-gold-soft hover:bg-gold/10"
-                        aria-label="ویرایش"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => deleteCustomer(c)}
-                        className="rounded-lg border border-red-400/25 p-2 text-red-400 hover:bg-red-400/10"
-                        aria-label="حذف"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ---------------- admins ---------------- */}
-      {tab === "admins" && canManageAdmins && (
-        <div className="mt-5">
+          <button
+            onClick={() => loadCustomers(search)}
+            className="rounded-full border border-gold/30 px-4 py-2 text-xs font-bold text-gold-soft hover:bg-gold/10"
+          >
+            جست‌وجو
+          </button>
           <button
             onClick={() => {
-              setAdminEditId(null);
-              setAdminForm({ ...EMPTY_ADMIN });
+              setCustomerEditId(null);
+              setCustomerForm({ ...EMPTY_CUSTOMER });
             }}
             className="flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-xs font-bold text-[#241a05]"
           >
-            <Plus size={14} /> حساب مدیریتی جدید
+            <Plus size={14} /> مشتری جدید
           </button>
+        </div>
 
-          {!admins ? (
-            <div className="mt-6 flex items-center gap-2 text-sage">
-              <Loader2 size={16} className="animate-spin" /> در حال بارگذاری…
-            </div>
-          ) : admins.length === 0 ? (
-            <p className="mt-6 text-sm text-sage">
-              هنوز حساب مدیریتی ساخته نشده است. تا وقتی حسابی نسازید، ورود با رمز محیطی (ADMIN_PASSWORD) انجام می‌شود.
-            </p>
-          ) : (
-            <div className="mt-5 flex flex-col gap-3">
-              {admins.map((a) => (
-                <div key={a.id} className="gold-ring rounded-2xl glass-panel p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-bold text-cream">{a.name}</p>
-                        <span className="rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-gold-soft">
-                          {ROLE_LABEL[a.role]}
-                        </span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                            a.active
-                              ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-300"
-                              : "border-red-400/30 bg-red-400/10 text-red-400"
-                          }`}
-                        >
-                          {a.active ? "فعال" : "غیرفعال"}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 truncate text-xs text-gold-soft">{a.email}</p>
-                      <p className="mt-0.5 text-[11px] text-sage">
-                        آخرین ورود: {fmtDate(a.lastLoginAt)} · آی‌پی: {a.lastLoginIp || "—"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setAdminEditId(a.id);
-                          setAdminForm({
-                            name: a.name,
-                            email: a.email,
-                            role: a.role,
-                            active: a.active,
-                            password: "",
-                          });
-                        }}
-                        className="rounded-lg border border-gold/25 p-2 text-gold-soft hover:bg-gold/10"
-                        aria-label="ویرایش"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => deleteAdmin(a)}
-                        className="rounded-lg border border-red-400/25 p-2 text-red-400 hover:bg-red-400/10"
-                        aria-label="حذف"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+        {!customers ? (
+          <div className="mt-6 flex items-center gap-2 text-sage">
+            <Loader2 size={16} className="animate-spin" /> در حال بارگذاری…
+          </div>
+        ) : customers.length === 0 ? (
+          <p className="mt-6 text-sm text-sage">هیچ مشتری‌ای یافت نشد.</p>
+        ) : (
+          <div className="mt-5 flex flex-col gap-3">
+            {customers.map((customer) => (
+              <div key={customer.id} className="gold-ring rounded-2xl glass-panel p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-cream">{customer.name}</p>
+                    <p className="mt-0.5 truncate text-xs text-gold-soft">{customer.email}</p>
+                    <p className="mt-0.5 text-[11px] text-sage">
+                      {customer.phone || "بدون شماره"} · عضویت: {fmtDate(customer.createdAt)}
+                    </p>
+                    {customer.address && (
+                      <p className="mt-1 text-[11px] leading-5 text-sage">{customer.address}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-gold/20 px-2.5 py-1 text-[10px] text-sage">
+                      {customer.orderCount.toLocaleString("fa-IR")} سفارش ·{" "}
+                      {formatToman(customer.totalSpent)}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setCustomerEditId(customer.id);
+                        setCustomerForm({
+                          name: customer.name,
+                          email: customer.email,
+                          phone: customer.phone,
+                          address: customer.address,
+                          password: "",
+                        });
+                      }}
+                      className="rounded-lg border border-gold/25 p-2 text-gold-soft hover:bg-gold/10"
+                      aria-label="ویرایش"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteCustomer(customer)}
+                      className="rounded-lg border border-red-400/25 p-2 text-red-400 hover:bg-red-400/10"
+                      aria-label="حذف"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* ---------------- customer modal ---------------- */}
       {customerForm && (
         <Modal
           title={customerEditId ? "ویرایش مشتری" : "مشتری جدید"}
@@ -379,7 +233,9 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
               <input
                 className={inputCls}
                 value={customerForm.name}
-                onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
+                onChange={(event) =>
+                  setCustomerForm({ ...customerForm, name: event.target.value })
+                }
               />
             </Field>
             <Field label="ایمیل">
@@ -387,7 +243,9 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
                 dir="ltr"
                 className={inputCls}
                 value={customerForm.email}
-                onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+                onChange={(event) =>
+                  setCustomerForm({ ...customerForm, email: event.target.value })
+                }
               />
             </Field>
             <Field label="شماره تماس">
@@ -395,7 +253,9 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
                 dir="ltr"
                 className={inputCls}
                 value={customerForm.phone}
-                onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
+                onChange={(event) =>
+                  setCustomerForm({ ...customerForm, phone: event.target.value })
+                }
               />
             </Field>
             <Field label="نشانی">
@@ -403,7 +263,9 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
                 rows={2}
                 className={inputCls}
                 value={customerForm.address}
-                onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
+                onChange={(event) =>
+                  setCustomerForm({ ...customerForm, address: event.target.value })
+                }
               />
             </Field>
             <Field label={customerEditId ? "رمز عبور جدید (اختیاری)" : "رمز عبور"}>
@@ -413,79 +275,14 @@ export default function UsersAdmin({ canManageAdmins }: { canManageAdmins: boole
                 autoComplete="new-password"
                 className={inputCls}
                 value={customerForm.password}
-                onChange={(e) => setCustomerForm({ ...customerForm, password: e.target.value })}
+                onChange={(event) =>
+                  setCustomerForm({ ...customerForm, password: event.target.value })
+                }
               />
             </Field>
           </div>
           <button
             onClick={saveCustomer}
-            disabled={busy}
-            className="mt-5 w-full rounded-full bg-gold py-3 text-sm font-bold text-[#241a05] disabled:opacity-60"
-          >
-            {busy ? "در حال ذخیره…" : "ذخیره"}
-          </button>
-        </Modal>
-      )}
-
-      {/* ---------------- admin modal ---------------- */}
-      {adminForm && (
-        <Modal
-          title={adminEditId ? "ویرایش حساب مدیریتی" : "حساب مدیریتی جدید"}
-          onClose={() => {
-            setAdminForm(null);
-            setAdminEditId(null);
-          }}
-        >
-          <div className="space-y-3">
-            <Field label="نام">
-              <input
-                className={inputCls}
-                value={adminForm.name}
-                onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })}
-              />
-            </Field>
-            <Field label="ایمیل">
-              <input
-                dir="ltr"
-                className={inputCls}
-                value={adminForm.email}
-                onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
-              />
-            </Field>
-            <Field label="نقش">
-              <select
-                className={inputCls}
-                value={adminForm.role}
-                onChange={(e) =>
-                  setAdminForm({ ...adminForm, role: e.target.value as AdminAccount["role"] })
-                }
-              >
-                <option value="owner">مالک (دسترسی کامل)</option>
-                <option value="admin">مدیر (بدون مدیریت حساب‌های مدیریتی)</option>
-                <option value="viewer">فقط مشاهده</option>
-              </select>
-            </Field>
-            <Field label={adminEditId ? "رمز عبور جدید (اختیاری)" : "رمز عبور"}>
-              <input
-                dir="ltr"
-                type="password"
-                autoComplete="new-password"
-                className={inputCls}
-                value={adminForm.password}
-                onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-              />
-            </Field>
-            <label className="flex items-center gap-2 text-xs text-sage">
-              <input
-                type="checkbox"
-                checked={adminForm.active}
-                onChange={(e) => setAdminForm({ ...adminForm, active: e.target.checked })}
-              />
-              حساب فعال باشد
-            </label>
-          </div>
-          <button
-            onClick={saveAdmin}
             disabled={busy}
             className="mt-5 w-full rounded-full bg-gold py-3 text-sm font-bold text-[#241a05] disabled:opacity-60"
           >
@@ -520,7 +317,11 @@ function Modal({
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-gold/25 bg-forest p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-black text-cream">{title}</h3>
-          <button onClick={onClose} className="rounded-full border border-gold/25 p-1.5 text-gold" aria-label="بستن">
+          <button
+            onClick={onClose}
+            className="rounded-full border border-gold/25 p-1.5 text-gold"
+            aria-label="بستن"
+          >
             <X size={14} />
           </button>
         </div>

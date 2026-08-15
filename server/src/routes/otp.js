@@ -106,8 +106,21 @@ router.post(
       if (!email) return res.status(400).json({ error: "ایمیل معتبر وارد کنید." });
       const owner = await User.findOne({ email, deletedAt: null }).select("phone").lean();
       if (!owner?.phone) {
-        return res.status(404).json({
-          error: "حسابی با این ایمیل پیدا نشد. لطفاً با شماره موبایل وارد شوید.",
+        // Keep the public response indistinguishable from an existing account;
+        // otherwise this endpoint becomes an e-mail enumeration oracle.
+        logActivity(req, {
+          action: "otp.login.request",
+          target: maskEmail(email),
+          success: true,
+          status: 200,
+          meta: "generic response for unknown identity",
+        });
+        return res.json({
+          ok: true,
+          channel: "email",
+          sentTo: maskEmail(email),
+          expiresIn: 5 * 60,
+          retryAfter: OTP_RESEND_SECONDS,
         });
       }
       phone = owner.phone;

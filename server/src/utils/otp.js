@@ -1,29 +1,67 @@
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
 import Otp, { OTP_MAX_ATTEMPTS, OTP_TTL_SECONDS } from "../models/Otp.js";
 import { sendSms, otpMessage } from "./sms.js";
 import { sendMail, otpMail } from "./mailer.js";
 import { clientIp } from "./activityLog.js";
 import { normalizePhone } from "../config/superAdmin.js";
 
-// A new code can only be requested once every 60 seconds per phone+purpose.
+// A new code can only be requested once every 60 seconds per identity+purpose.
 export const OTP_RESEND_SECONDS = 60;
-// Max codes per phone+purpose per hour (anti SMS-bombing / cost abuse).
+// Max codes per identity+purpose per hour (anti SMS-bombing / cost abuse).
 const OTP_HOURLY_MAX = 5;
+// A verified OTP only authorises its final action for this long.
+const OTP_TICKET_TTL_MS = 10 * 60 * 1000;
 
 function sixDigits() {
   // crypto.randomInt is unbiased and unpredictable (Math.random is neither).
   return String(crypto.randomInt(100000, 1000000));
 }
 
+function subjectOf(value) {
+  if (value === undefined || value === null || typeof value === "object") return "";
+  return String(value).trim().slice(0, 64);
+}
+
+function emailOf(value) {
+  if (value === undefined || value === null || typeof value === "object") return "";
+  return String(value).trim().toLowerCase().slice(0, 160);
+}
+
+function targetOf(value) {
+  if (value === undefined || value === null || typeof value === "object") return "";
+  return String(value).trim().toLowerCase().slice(0, 220);
+}
+
+function scopedFilter(phone, purpose, options = {}) {
+  const filter = { phone, purpose };
+  const subject = subjectOf(options.subject);
+  if (subject) filter.subject = subject;
+  const target = targetOf(options.target);
+  if (target) filter.target = target;
+  if (
+    purpose === "change-email" &&
+    Object.prototype.hasOwnProperty.call(options, "email")
+  ) {
+    filter.email = emailOf(options.email);
+  }
+  return filter;
+}
+
+function ticketDigest(ticket) {
+  // Tickets contain 256 random bits, so a deterministic SHA-256 digest is safe
+  // to query and does not permit a practical offline search if MongoDB leaks.
+  return crypto.createHash("sha256").update(ticket, "utf8").digest("hex");
+}
+
 /**
  * Creates and sends a one-time code, by SMS or by e-mail.
  *
- * The code is always bound to the account's phone number, whatever the
- * delivery channel is, so every downstream step (register / reset) keeps using
- * one single identity. `options.channel` only decides HOW the code travels.
+ * `phone` is the canonical identity used to locate the OTP. For an e-mail
+ * identity change it remains the account's current phone, while `email` stores
+ * the delivery address. `subject` binds sensitive OTPs to one user and `target`
+ * binds them to the exact proposed action.
  *
- * @param {object} options { channel?: "sms" | "email", email?: string }
+ * @param {object} options { channel?: "sms" | "email", email?: string, subject?: string, target?: string }
  * @returns {Promise<{ok: true, expiresIn: number, channel: string, devCode?: string} | {ok: false, status: number, error: string, retryAfter?: number}>}
  */
 export async function issueOtp(req, phoneInput, purpose, options = {}) {
@@ -33,14 +71,16 @@ export async function issueOtp(req, phoneInput, purpose, options = {}) {
   }
 
   const channel = options.channel === "email" ? "email" : "sms";
-  const email =
-    channel === "email" ? String(options.email || "").trim().toLowerCase() : "";
+  const email = emailOf(options.email);
   if (channel === "email" && !/^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/.test(email)) {
     return { ok: false, status: 400, error: "ایمیل معتبر وارد کنید." };
   }
 
+  // Issuing a fresh code invalidates every older code for this identity/purpose,
+  // even if the user changed the proposed e-mail between requests.
+  const scope = scopedFilter(phone, purpose, { subject: options.subject });
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const recent = await Otp.find({ phone, purpose, createdAt: { $gte: hourAgo } })
+  const recent = await Otp.find({ ...scope, createdAt: { $gte: hourAgo } })
     .sort({ createdAt: -1 })
     .limit(OTP_HOURLY_MAX)
     .lean();
@@ -65,11 +105,19 @@ export async function issueOtp(req, phoneInput, purpose, options = {}) {
     }
   }
 
-  // Any previous unused code for this phone+purpose is invalidated.
-  await Otp.deleteMany({ phone, purpose, consumedAt: null });
+  // Any previous unused code in the same scope is invalidated.
+  await Otp.deleteMany({ ...scope, consumedAt: null });
 
   const code = sixDigits();
-  const doc = new Otp({ phone, purpose, ip: clientIp(req), channel, email });
+  const doc = new Otp({
+    phone,
+    purpose,
+    subject: subjectOf(options.subject),
+    target: targetOf(options.target),
+    ip: clientIp(req),
+    channel,
+    email,
+  });
   await doc.setCode(code);
   await doc.save();
 
@@ -108,15 +156,20 @@ export async function issueOtp(req, phoneInput, purpose, options = {}) {
 
 /**
  * Verifies a code and returns a one-time ticket used by the final step.
+ * Both failed-attempt increments and the successful claim are conditional
+ * MongoDB updates, so concurrent requests cannot bypass the attempt limit or
+ * turn one code into multiple tickets.
  */
-export async function verifyOtp(phoneInput, purpose, codeInput) {
+export async function verifyOtp(phoneInput, purpose, codeInput, options = {}) {
   const phone = normalizePhone(phoneInput);
   const code = String(codeInput ?? "").replace(/[^0-9]/g, "");
   if (!phone || code.length !== 6) {
     return { ok: false, status: 400, error: "کد تأیید ۶ رقمی را وارد کنید." };
   }
 
-  const doc = await Otp.findOne({ phone, purpose, consumedAt: null }).sort({ createdAt: -1 });
+  const scope = scopedFilter(phone, purpose, options);
+  const createdAfter = new Date(Date.now() - OTP_TTL_SECONDS * 1000);
+  const doc = await Otp.findOne({ ...scope, consumedAt: null }).sort({ createdAt: -1 });
   if (!doc || doc.isExpired()) {
     return { ok: false, status: 400, error: "کد تأیید منقضی شده است. کد تازه بگیرید." };
   }
@@ -126,9 +179,20 @@ export async function verifyOtp(phoneInput, purpose, codeInput) {
 
   const match = await doc.checkCode(code);
   if (!match) {
-    doc.attempts += 1;
-    await doc.save().catch(() => {});
-    const left = Math.max(0, OTP_MAX_ATTEMPTS - doc.attempts);
+    const updated = await Otp.findOneAndUpdate(
+      {
+        _id: doc._id,
+        consumedAt: null,
+        attempts: { $lt: OTP_MAX_ATTEMPTS },
+        createdAt: { $gte: createdAfter },
+      },
+      { $inc: { attempts: 1 } },
+      { new: true }
+    );
+    if (!updated) {
+      return { ok: false, status: 400, error: "کد تأیید دیگر معتبر نیست. کد تازه بگیرید." };
+    }
+    const left = Math.max(0, OTP_MAX_ATTEMPTS - updated.attempts);
     return {
       ok: false,
       status: 400,
@@ -137,30 +201,50 @@ export async function verifyOtp(phoneInput, purpose, codeInput) {
   }
 
   const ticket = crypto.randomBytes(32).toString("hex");
-  doc.ticketHash = await bcrypt.hash(ticket, 10);
-  doc.consumedAt = new Date();
-  await doc.save();
+  const consumedAt = new Date();
+  const claimed = await Otp.findOneAndUpdate(
+    {
+      _id: doc._id,
+      consumedAt: null,
+      attempts: { $lt: OTP_MAX_ATTEMPTS },
+      createdAt: { $gte: createdAfter },
+    },
+    {
+      $set: {
+        ticketDigest: ticketDigest(ticket),
+        consumedAt,
+        ticketExpiresAt: new Date(consumedAt.getTime() + OTP_TICKET_TTL_MS),
+      },
+    },
+    { new: true }
+  );
+  if (!claimed) {
+    return { ok: false, status: 400, error: "کد تأیید قبلاً استفاده شده یا منقضی شده است." };
+  }
+
   return { ok: true, phone, ticket };
 }
 
 /**
- * Consumes the ticket produced by verifyOtp. Single-use: the record is deleted.
+ * Atomically consumes the ticket produced by verifyOtp.
+ *
+ * The digest is queryable, so validation and deletion happen in one
+ * findOneAndDelete operation. At most one concurrent caller can receive the
+ * successful result. Optional scope fields bind profile tickets to their user
+ * and exact destination.
  */
-export async function consumeTicket(phoneInput, purpose, ticketInput) {
+export async function consumeTicket(phoneInput, purpose, ticketInput, options = {}) {
   const phone = normalizePhone(phoneInput);
   const ticket = String(ticketInput ?? "");
-  if (!phone || ticket.length !== 64) return null;
+  if (!phone || !/^[0-9a-f]{64}$/.test(ticket)) return null;
 
-  const doc = await Otp.findOne({ phone, purpose, ticketHash: { $ne: null } }).sort({
-    consumedAt: -1,
+  const now = new Date();
+  const doc = await Otp.findOneAndDelete({
+    ...scopedFilter(phone, purpose, options),
+    ticketDigest: ticketDigest(ticket),
+    consumedAt: { $ne: null },
+    ticketExpiresAt: { $gt: now },
   });
-  if (!doc || !doc.consumedAt) return null;
-  // The ticket is only valid for 10 minutes after the code was verified.
-  if (Date.now() - new Date(doc.consumedAt).getTime() > 10 * 60 * 1000) return null;
 
-  const match = await bcrypt.compare(ticket, doc.ticketHash);
-  if (!match) return null;
-
-  await Otp.deleteOne({ _id: doc._id }).catch(() => {});
-  return phone;
+  return doc ? phone : null;
 }

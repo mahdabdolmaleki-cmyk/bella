@@ -33,7 +33,11 @@ import {
   Hash,
 } from "lucide-react";
 import { Field, SelectField, TextField } from "@/components/Field";
-import { useAuth, type OtpChannel } from "@/components/AuthContext";
+import {
+  useAuth,
+  type IdentityField,
+  type OtpChannel,
+} from "@/components/AuthContext";
 import PageHero from "@/components/PageHero";
 import { ProductVisual } from "@/components/art";
 import { formatToman, toFa, type ProductDTO } from "@/lib/data";
@@ -1082,7 +1086,12 @@ function addressIssue(raw: string) {
 }
 
 function AccountSettings() {
-  const { user, updateProfile } = useAuth();
+  const {
+    user,
+    updateProfile,
+    requestIdentityOtp,
+    verifyIdentityOtp,
+  } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -1096,6 +1105,17 @@ function AccountSettings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [pendingIdentity, setPendingIdentity] = useState<{
+    field: IdentityField;
+    value: string;
+    sentTo: string;
+    channel: OtpChannel;
+    stage: "current" | "destination";
+  } | null>(null);
+  const [identityCode, setIdentityCode] = useState("");
+  const [identityNotice, setIdentityNotice] = useState("");
+  const [identityDevCode, setIdentityDevCode] = useState("");
+  const [identityCooldown, setIdentityCooldown] = useState(0);
 
   // Reload the form whenever the signed-in identity changes, so a different
   // account never inherits the previous one's values.
@@ -1112,8 +1132,19 @@ function AccountSettings() {
     });
     setSaved(false);
     setError("");
+    setPendingIdentity(null);
+    setIdentityCode("");
+    setIdentityNotice("");
+    setIdentityDevCode("");
+    setIdentityCooldown(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity]);
+
+  useEffect(() => {
+    if (identityCooldown <= 0) return;
+    const timer = setTimeout(() => setIdentityCooldown((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [identityCooldown]);
 
   // Same province list the checkout uses, so the two can never disagree.
   useEffect(() => {
@@ -1129,48 +1160,176 @@ function AccountSettings() {
     };
   }, []);
 
-  const set = (k: keyof typeof form, v: string) => {
-    setForm((f) => ({ ...f, [k]: v }));
+  const set = (key: keyof typeof form, value: string) => {
+    setForm((current) => ({ ...current, [key]: value }));
     setSaved(false);
   };
 
   const pcIssue = postalCodeIssue(form.postalCode);
   const addrIssue = addressIssue(form.address);
 
-  const save = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!form.name.trim()) {
-      setError("نام نمی‌تواند خالی باشد.");
-      return;
-    }
+  const profilePayload = () => ({
+    ...form,
+    email: form.email.trim().toLowerCase(),
+    phone: normalizePhone(form.phone),
+    // Send the normalised value so the stored code always matches what the
+    // shipping engine expects.
+    postalCode: toLatinDigits(form.postalCode).replace(/[\s-]/g, ""),
+  });
+
+  const validate = () => {
+    if (!form.name.trim()) return "نام نمی‌تواند خالی باشد.";
     if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) {
-      setError("ایمیل معتبر وارد کنید.");
-      return;
+      return "ایمیل معتبر وارد کنید.";
     }
-    if (pcIssue) {
-      setError(pcIssue);
-      return;
+    if (!PHONE_RE.test(normalizePhone(form.phone))) {
+      return "شماره موبایل را به صورت 09xxxxxxxxx وارد کنید.";
     }
-    if (addrIssue) {
-      setError(addrIssue);
-      return;
-    }
+    return pcIssue || addrIssue;
+  };
+
+  const requestChangeCode = async (
+    field: IdentityField,
+    value: string,
+    stage: "current" | "destination" = "current",
+    currentTicket?: string
+  ) => {
     setSaving(true);
     setSaved(false);
     setError("");
     try {
-      await updateProfile({
-        ...form,
-        // Send the normalised value so the stored code always matches what the
-        // shipping engine expects.
-        postalCode: toLatinDigits(form.postalCode).replace(/[\s-]/g, ""),
+      const result = await requestIdentityOtp({ field, value, stage, currentTicket });
+      setPendingIdentity({
+        field,
+        value,
+        sentTo: result.sentTo,
+        channel: result.channel,
+        stage,
       });
+      setIdentityCode("");
+      setIdentityDevCode(result.devCode ?? "");
+      setIdentityCooldown(result.retryAfter);
+      setIdentityNotice(
+        result.channel === "email"
+          ? `کد تأیید به ${result.sentTo} ایمیل شد.`
+          : `کد تأیید به ${result.sentTo} پیامک شد.`
+      );
+    } catch (err) {
+      // A destination request consumes the current-phone proof before sending.
+      // If delivery fails, restart the two-step verification from the beginning.
+      if (stage === "destination") setPendingIdentity(null);
+      setError(err instanceof Error ? err.message : "ارسال کد تأیید ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (pendingIdentity) {
+      setError("ابتدا کد تغییر شناسه را تأیید یا عملیات را لغو کنید.");
+      return;
+    }
+
+    const issue = validate();
+    if (issue) {
+      setError(issue);
+      return;
+    }
+
+    const nextPhone = normalizePhone(form.phone);
+    const nextEmail = form.email.trim().toLowerCase();
+    const phoneChanged = nextPhone !== normalizePhone(user?.phone ?? "");
+    const emailChanged = nextEmail !== (user?.email ?? "").trim().toLowerCase();
+
+    if (phoneChanged && emailChanged) {
+      setError("شماره و ایمیل را جداگانه ذخیره کنید تا هر مقصد مستقل تأیید شود.");
+      return;
+    }
+    if (phoneChanged) {
+      await requestChangeCode("phone", nextPhone);
+      return;
+    }
+    if (emailChanged) {
+      await requestChangeCode("email", nextEmail);
+      return;
+    }
+
+    setSaving(true);
+    setSaved(false);
+    setError("");
+    try {
+      await updateProfile(profilePayload());
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا در ذخیره.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const confirmIdentityChange = async () => {
+    if (!pendingIdentity || !/^\d{6}$/.test(toLatinDigits(identityCode).trim())) {
+      setError("کد تأیید ۶ رقمی را وارد کنید.");
+      return;
+    }
+
+    setSaving(true);
+    setSaved(false);
+    setError("");
+    try {
+      const ticket = await verifyIdentityOtp({
+        field: pendingIdentity.field,
+        value: pendingIdentity.value,
+        stage: pendingIdentity.stage,
+        code: toLatinDigits(identityCode).trim(),
+      });
+
+      if (pendingIdentity.stage === "current") {
+        // Removing e-mail has no new destination, so control of the current
+        // verified phone is the final proof. Other changes continue to step 2.
+        if (pendingIdentity.field === "email" && !pendingIdentity.value) {
+          await updateProfile({
+            ...profilePayload(),
+            currentIdentityTicket: ticket,
+          });
+        } else {
+          await requestChangeCode(
+            pendingIdentity.field,
+            pendingIdentity.value,
+            "destination",
+            ticket
+          );
+          return;
+        }
+      } else {
+        const ticketPayload =
+          pendingIdentity.field === "phone"
+            ? { phoneTicket: ticket }
+            : { emailTicket: ticket };
+        await updateProfile({ ...profilePayload(), ...ticketPayload });
+      }
+
+      setPendingIdentity(null);
+      setIdentityCode("");
+      setIdentityNotice("");
+      setIdentityDevCode("");
+      setIdentityCooldown(0);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تأیید تغییر شناسه ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelIdentityChange = () => {
+    setPendingIdentity(null);
+    setIdentityCode("");
+    setIdentityNotice("");
+    setIdentityDevCode("");
+    setIdentityCooldown(0);
+    setError("");
   };
 
   return (
@@ -1200,6 +1359,8 @@ function AccountSettings() {
           onChange={(e) => set("phone", e.target.value)}
           autoComplete="tel"
           icon={<Smartphone size={15} />}
+          disabled={Boolean(pendingIdentity)}
+          hint="تغییر شماره پس از تأیید شماره فعلی و سپس شماره جدید انجام می‌شود."
         />
         <Field
           label="ایمیل"
@@ -1209,9 +1370,81 @@ function AccountSettings() {
           onChange={(e) => set("email", e.target.value)}
           autoComplete="email"
           icon={<Mail size={15} />}
-          hint="اختیاری؛ می‌توانید برای ورود با ایمیل هم استفاده کنید."
+          disabled={Boolean(pendingIdentity)}
+          hint="تغییر ایمیل پس از تأیید شماره فعلی و سپس ایمیل جدید انجام می‌شود."
         />
       </div>
+
+      {pendingIdentity && (
+        <div className="rounded-2xl border border-gold/25 bg-gold/[0.06] p-4">
+          <div className="flex items-start gap-2">
+            <ShieldCheck size={17} className="mt-0.5 shrink-0 text-gold" />
+            <div>
+              <p className="text-xs font-bold text-gold-soft">
+                {pendingIdentity.stage === "current"
+                  ? pendingIdentity.field === "email" && !pendingIdentity.value
+                    ? "تأیید حذف ایمیل با شماره فعلی"
+                    : "مرحله ۱ از ۲: تأیید شماره فعلی"
+                  : `مرحله ۲ از ۲: تأیید ${
+                      pendingIdentity.field === "phone" ? "شماره جدید" : "ایمیل جدید"
+                    }`}
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-sage">{identityNotice}</p>
+            </div>
+          </div>
+          <div className="mt-3">
+            <Field
+              label="کد ۶ رقمی"
+              dir="ltr"
+              inputMode="numeric"
+              maxLength={6}
+              value={identityCode}
+              onChange={(e) => setIdentityCode(e.target.value)}
+              className="text-center tracking-[0.45em]"
+              autoComplete="one-time-code"
+            />
+            {identityDevCode && (
+              <p className="mt-1 text-[10px] text-gold-soft">
+                کد تست (فقط حالت توسعه): {identityDevCode}
+              </p>
+            )}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={confirmIdentityChange}
+              disabled={saving || toLatinDigits(identityCode).trim().length !== 6}
+              className="btn-emerald flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold disabled:opacity-60"
+            >
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              تأیید و ذخیره
+            </button>
+            <button
+              type="button"
+              onClick={() => requestChangeCode(pendingIdentity.field, pendingIdentity.value)}
+              disabled={
+                saving ||
+                (pendingIdentity.stage === "current" && identityCooldown > 0)
+              }
+              className="rounded-full border border-gold/25 px-4 py-2 text-xs text-gold-soft disabled:opacity-50"
+            >
+              {pendingIdentity.stage === "destination"
+                ? "شروع دوباره از تأیید شماره فعلی"
+                : identityCooldown > 0
+                  ? `ارسال دوباره (${identityCooldown})`
+                  : "ارسال دوباره کد"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelIdentityChange}
+              disabled={saving}
+              className="rounded-full border border-red-400/25 px-4 py-2 text-xs text-red-300 disabled:opacity-50"
+            >
+              لغو
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <SelectField
@@ -1262,11 +1495,17 @@ function AccountSettings() {
       />
       {error && <p className="text-xs text-red-400">{error}</p>}
       <button
-        disabled={saving}
+        disabled={saving || Boolean(pendingIdentity)}
         className="btn-emerald flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold disabled:opacity-60"
       >
         {saved && !saving ? <Check size={14} /> : null}
-        {saving ? "در حال ذخیره…" : saved ? "ذخیره شد" : "ذخیره پروفایل"}
+        {saving
+          ? "در حال ذخیره…"
+          : pendingIdentity
+            ? "ابتدا کد را تأیید کنید"
+            : saved
+              ? "ذخیره شد"
+              : "ذخیره پروفایل"}
       </button>
     </form>
   );

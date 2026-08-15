@@ -6,7 +6,7 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
 import { logActivity } from "../utils/activityLog.js";
 import { str, int } from "../utils/validate.js";
-import { sendMail, announcementMail } from "../utils/mailer.js";
+import { sendMailDetailed, announcementMail } from "../utils/mailer.js";
 
 /**
  * اطلاع‌رسانی به مشتریان — announcement e-mails.
@@ -133,8 +133,18 @@ router.post(
         const person = people[cursor++];
         const mail = announcementMail(subject, body, person.name);
         try {
-          await sendMail(person.email, mail.subject, mail.text, mail.html);
-          sent += 1;
+          const result = await sendMailDetailed(
+            person.email,
+            mail.subject,
+            mail.text,
+            mail.html
+          );
+          if (result.ok) {
+            sent += 1;
+          } else {
+            failed += 1;
+            if (!lastError) lastError = result.error;
+          }
         } catch (err) {
           failed += 1;
           if (!lastError) lastError = String(err?.message || err).slice(0, 300);
@@ -154,9 +164,7 @@ router.post(
       failed,
       sampleRecipients: people.slice(0, 5).map((p) => p.email),
       lastError,
-      sentByLabel: req.adminUser
-        ? `${req.adminUser.name} <${req.adminUser.email}>`
-        : "مدیر",
+      sentByLabel: "مدیر اصلی",
     });
 
     logActivity(req, {
@@ -167,8 +175,12 @@ router.post(
       meta: `${subject} | sent=${sent} failed=${failed}`,
     });
 
-    res.json({
-      ok: true,
+    const allFailed = sent === 0;
+    res.status(allFailed ? 502 : 200).json({
+      ok: failed === 0,
+      error: allFailed
+        ? `هیچ ایمیلی تحویل سرویس‌دهنده نشد. ${lastError || "تنظیمات سرویس ایمیل را بررسی کنید."}`
+        : undefined,
       total: people.length,
       sent,
       failed,

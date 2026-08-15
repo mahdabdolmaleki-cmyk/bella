@@ -27,9 +27,6 @@ type NavItem = {
   /** Tailwind text colour for this entry's icon. */
   tint: string;
   exact?: boolean;
-  // Hidden from staff admins and viewers. The server enforces this too — hiding
-  // a link on its own would never be a real restriction.
-  ownerOnly?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -50,7 +47,7 @@ const NAV: NavItem[] = [
     icon: MessageSquare,
     tint: "text-fuchsia-300",
   },
-  { href: "/admin/users", label: "مدیریت کاربران", icon: Users, tint: "text-violet-300" },
+  { href: "/admin/users", label: "مدیریت مشتریان", icon: Users, tint: "text-violet-300" },
   {
     href: "/admin/tutorials",
     label: "آموزش‌ها",
@@ -64,7 +61,6 @@ const NAV: NavItem[] = [
     href: "/admin/backup",
     label: "پشتیبان‌گیری",
     icon: DatabaseBackup,
-    ownerOnly: true,
     tint: "text-rose-300",
   },
 ];
@@ -75,28 +71,12 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   // RESPONSIVE FIX: seven nav items never fitted in a fixed bottom bar, so
   // small screens now get a proper slide-in drawer instead.
   const [menuOpen, setMenuOpen] = useState(false);
-  const [role, setRole] = useState<string | null>(null);
 
   // Close the drawer whenever the route changes, and lock body scrolling while
   // it is open so the page behind it does not move under the finger.
   useEffect(() => setMenuOpen(false), [pathname]);
 
-  // Owner-only links stay hidden until the role is known, so a staff admin
-  // never sees them flash on screen during the first render.
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/admin/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (alive) setRole(d?.role ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const nav = NAV.filter((item) => !item.ownerOnly || role === "owner");
+  const nav = NAV;
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => {

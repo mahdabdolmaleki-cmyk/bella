@@ -11,11 +11,15 @@ import type { User } from "@/lib/types";
 
 // کد یک‌بارمصرف می‌تواند با پیامک یا ایمیل فرستاده شود؛ کاربر انتخاب می‌کند.
 export type OtpChannel = "sms" | "email";
+export type IdentityField = "phone" | "email";
 
-// در پروفایل، کاربر می‌تواند همهٔ این فیلدها — حتی ایمیل و شماره — را ویرایش کند.
 type ProfileInput = Partial<
   Pick<User, "name" | "email" | "phone" | "address" | "province" | "city" | "postalCode">
->;
+> & {
+  currentIdentityTicket?: string;
+  phoneTicket?: string;
+  emailTicket?: string;
+};
 
 type LoginInput = {
   phone?: string;
@@ -40,6 +44,18 @@ type AuthCtx = {
     channel?: OtpChannel;
   }) => Promise<{ retryAfter: number; devCode?: string; sentTo?: string; channel: OtpChannel }>;
   verifyOtp: (opts: { phone?: string; email?: string; code: string }) => Promise<string>;
+  requestIdentityOtp: (opts: {
+    field: IdentityField;
+    value: string;
+    stage: "current" | "destination";
+    currentTicket?: string;
+  }) => Promise<{ retryAfter: number; devCode?: string; sentTo: string; channel: OtpChannel }>;
+  verifyIdentityOtp: (opts: {
+    field: IdentityField;
+    value: string;
+    stage: "current" | "destination";
+    code: string;
+  }) => Promise<string>;
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -136,6 +152,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const requestIdentityOtp = useCallback(
+    async (opts: {
+      field: IdentityField;
+      value: string;
+      stage: "current" | "destination";
+      currentTicket?: string;
+    }) => {
+      const data = await jsonFetch("/api/auth/me/identity/request-otp", {
+        method: "POST",
+        body: JSON.stringify(opts),
+      });
+      return {
+        retryAfter: Number(data?.retryAfter) || 60,
+        devCode: data?.devCode,
+        sentTo: String(data?.sentTo || ""),
+        channel: (data?.channel === "email" ? "email" : "sms") as OtpChannel,
+      };
+    },
+    []
+  );
+
+  const verifyIdentityOtp = useCallback(
+    async (opts: {
+      field: IdentityField;
+      value: string;
+      stage: "current" | "destination";
+      code: string;
+    }) => {
+      const data = await jsonFetch("/api/auth/me/identity/verify-otp", {
+        method: "POST",
+        body: JSON.stringify(opts),
+      });
+      return String(data?.ticket || "");
+    },
+    []
+  );
+
   const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -164,6 +217,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refresh,
         requestOtp,
         verifyOtp,
+        requestIdentityOtp,
+        verifyIdentityOtp,
       }}
     >
       {children}
