@@ -45,7 +45,7 @@ export function BrandsSection({
         </div>
         <SectionHeading
           eyebrow="MAISONS DU MONDE"
-          title="برندهای مطرح دنیا در بلّا"
+          title="برندهای مطرح دنیا در بلا"
           sub="الهام‌بخش‌های ما و خانه‌هایی که تاریخ عطرسازی را نوشتند."
         />
 
@@ -104,7 +104,7 @@ export function BestsellersSection({ icon }: { icon?: string }) {
         </div>
         <SectionHeading
           eyebrow="BEST SELLERS"
-          title="پرفروش‌ترین عطرهای بلّا"
+          title="پرفروش‌ترین عطرهای بلا"
           sub="انتخاب مشتریان ما در سه ماه گذشته."
         />
 
@@ -212,7 +212,7 @@ export function FeaturesSection({ features = "", icon }: { features?: string; ic
           <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-gold/35 bg-gold/10">
             <SiteIcon name={icon} fallback="shield-check" size={18} />
           </span>
-          <h2 className="text-sm font-black text-cream sm:text-base">چرا بلّا؟</h2>
+          <h2 className="text-sm font-black text-cream sm:text-base">چرا بلا؟</h2>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

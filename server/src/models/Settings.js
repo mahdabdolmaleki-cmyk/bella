@@ -1,11 +1,14 @@
 import mongoose from "mongoose";
 
 export const DEFAULT_SETTINGS = {
+  // Login methods controlled by the owner. At least one must stay enabled.
+  loginPhoneEnabled: "1",
+  loginEmailEnabled: "1",
   festivalActive: "true",
-  festivalTitle: "جشنواره خرید اول بلّا",
+  festivalTitle: "جشنواره خرید اول بلا",
   festivalSubtitle: "۲۵٪ تخفیف + اتومایزر هدیه",
   footerAbout:
-    "مزون بلّا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
+    "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
   // Loyalty club: how many Toman of settled purchases earn one point, and the
   // spend thresholds for the golden / diamond memberships.
   tomanPerPoint: 10000,
@@ -34,16 +37,16 @@ export const DEFAULT_SETTINGS = {
   shopCategories: "",
   // ---- صفحهٔ تماس با ما (v31) ----
   // متنی که بالای ردیف شبکه‌های اجتماعی می‌نشیند.
-  contactSocialIntro: "بلّا را در شبکه‌های اجتماعی دنبال کنید",
+  contactSocialIntro: "بلا را در شبکه‌های اجتماعی دنبال کنید",
   // JSON array of { name, href, icon, color } social channels.
   // خالی = همان سه کانال پیش‌فرض سایت.
   contactSocials: "",
   contactPhone: "۰۲۱ – ۲۲ ۴۴ ۶۶ ۸۸",
   contactAddress: "تهران، خیابان فرشته، پاساژ رویال، واحد ۱۲",
   contactHours: "هر روز ۱۰ صبح تا ۱۰ شب",
-  // ---- فوتر: ستون «ضمانت‌های بلّا» (v33) ----
+  // ---- فوتر: ستون «ضمانت‌های بلا» (v33) ----
   // هر خط از footerGuarantees یک ردیف لیست است. هر دو خالی = ستون حذف.
-  footerGuaranteeTitle: "ضمانت‌های بلّا",
+  footerGuaranteeTitle: "ضمانت‌های بلا",
   footerGuarantees:
     "اصالت اسانس با هولوگرام اختصاصی\n۷ روز ضمانت بازگشت بدون قید و شرط\nارسال بیمه‌شده در پاکت مخملی\nپشتیبانی رایحه‌شناس به‌صورت ۲۴/۷",
   // ---- حالت تعمیر پرداخت (v33) ----
@@ -62,6 +65,16 @@ export const NUMERIC_SETTINGS = {
 
 const settingsSchema = new mongoose.Schema({
   key: { type: String, default: "site", unique: true },
+  loginPhoneEnabled: {
+    type: String,
+    default: DEFAULT_SETTINGS.loginPhoneEnabled,
+    maxlength: 1,
+  },
+  loginEmailEnabled: {
+    type: String,
+    default: DEFAULT_SETTINGS.loginEmailEnabled,
+    maxlength: 1,
+  },
   festivalActive: { type: String, default: DEFAULT_SETTINGS.festivalActive },
   festivalTitle: { type: String, default: DEFAULT_SETTINGS.festivalTitle, maxlength: 120 },
   festivalSubtitle: { type: String, default: DEFAULT_SETTINGS.festivalSubtitle, maxlength: 200 },
@@ -123,6 +136,10 @@ settingsSchema.statics.getSingleton = async function () {
 
 settingsSchema.methods.toDTO = function () {
   return {
+    // Missing fields belong to legacy documents and mean "enabled". Only an
+    // explicit empty string, written by the admin toggle, disables a method.
+    loginPhoneEnabled: this.loginPhoneEnabled === "" ? "" : "1",
+    loginEmailEnabled: this.loginEmailEnabled === "" ? "" : "1",
     festivalActive: this.festivalActive,
     festivalTitle: this.festivalTitle,
     festivalSubtitle: this.festivalSubtitle,

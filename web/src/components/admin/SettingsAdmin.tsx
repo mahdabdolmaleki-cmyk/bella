@@ -23,6 +23,9 @@ import {
   LayoutGrid,
   Share2,
   Link2,
+  LogIn,
+  Mail,
+  Smartphone,
 } from "lucide-react";
 import {
   parseSocials,
@@ -68,6 +71,9 @@ import { DEFAULT_BRANDS } from "@/components/HomeSections";
  * save button, so switching tabs never loses an unsaved edit.         *
  * ------------------------------------------------------------------ */
 const TABS = [
+  // Login controls come first and open by default; they must not be hidden at
+  // the far end of the horizontally scrollable settings tabs.
+  { id: "login", label: "روش‌های ورود", icon: LogIn, tint: "text-cyan-300" },
   { id: "home", label: "صفحهٔ اصلی", icon: Home, tint: "text-sky-300" },
   { id: "brands", label: "برندها", icon: Tag, tint: "text-amber-300" },
   { id: "icons", label: "آیکن‌ها و مزیت‌ها", icon: Shapes, tint: "text-fuchsia-300" },
@@ -81,7 +87,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default function SettingsAdmin({ initialSettings }: { initialSettings: SiteSettingsMap }) {
-  const [tab, setTab] = useState<TabId>("home");
+  const [tab, setTab] = useState<TabId>("login");
   const [form, setForm] = useState(initialSettings);
   const [saved, setSavedSnapshot] = useState(initialSettings);
   const [saving, setSaving] = useState(false);
@@ -90,6 +96,20 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
 
   const set = (key: keyof SiteSettingsMap, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const toggleLoginMethod = (
+    key: "loginPhoneEnabled" | "loginEmailEnabled",
+  ) => {
+    const other =
+      key === "loginPhoneEnabled" ? "loginEmailEnabled" : "loginPhoneEnabled";
+    const disabling = form[key] === "1";
+    if (disabling && form[other] !== "1") {
+      setError("حداقل یکی از روش‌های ورود باید فعال بماند.");
+      return;
+    }
+    setError("");
+    set(key, disabling ? "" : "1");
+  };
 
   // Compared against the last saved snapshot so each save bar can warn before
   // the admin leaves with unsaved work.
@@ -410,7 +430,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                   value={form.festivalTitle}
                   onChange={(e) => set("festivalTitle", e.target.value)}
                   className={inputCls}
-                  placeholder="جشنواره خرید اول بلّا"
+                  placeholder="جشنواره خرید اول بلا"
                 />
               </div>
               <div>
@@ -586,7 +606,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
             </div>
           </div>
           <p className="mt-1 text-[11px] leading-6 text-sage">
-            همین کارت‌ها در بخش «برندهای مطرح دنیا در بلّا» نمایش داده می‌شوند.
+            همین کارت‌ها در بخش «برندهای مطرح دنیا در بلا» نمایش داده می‌شوند.
           </p>
 
           <div className="mt-4 space-y-3">
@@ -1136,7 +1156,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
               rows={2}
               value={form.contactSocialIntro}
               onChange={(e) => set("contactSocialIntro", e.target.value)}
-              placeholder="مثلاً: بلّا را در شبکه‌های اجتماعی دنبال کنید"
+              placeholder="مثلاً: بلا را در شبکه‌های اجتماعی دنبال کنید"
               className={inputCls}
             />
             <span className="form-hint">خالی بگذارید تا هیچ متنی نمایش داده نشود.</span>
@@ -1286,6 +1306,92 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
           <p className="mt-1.5 text-[11px] text-sage">
             هر کدام را خالی بگذارید، همان کارت حذف می‌شود.
           </p>
+
+          {saveBar}
+        </section>
+      )}
+
+      {/* ================= روش‌های ورود ================= */}
+      {tab === "login" && (
+        <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
+          <div className="flex items-center gap-2 text-gold">
+            <LogIn size={16} />
+            <h2 className="text-sm font-black">روش‌های ورود با کد یک‌بارمصرف</h2>
+          </div>
+          <p className="mt-1 text-[11px] leading-6 text-sage">
+            مشخص کنید کاربران و مدیر اصلی کد ورود را با پیامک، ایمیل یا هر دو دریافت
+            کنند. این محدودیت روی سرور هم اعمال می‌شود و فقط مخفی‌کردن گزینه در صفحه
+            نیست. برای جلوگیری از قفل‌شدن پنل، حداقل یک روش باید فعال بماند.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                {
+                  key: "loginPhoneEnabled",
+                  title: "ورود با شماره موبایل",
+                  desc: "کد یک‌بارمصرف با پیامک ارسال می‌شود؛ ثبت‌نام خودکار کاربران تازه نیز از این روش انجام می‌شود.",
+                  icon: Smartphone,
+                },
+                {
+                  key: "loginEmailEnabled",
+                  title: "ورود با ایمیل",
+                  desc: "کد به ایمیل ارسال می‌شود و برای ایمیل تازه نیز حساب بدون نیاز به شماره ساخته می‌شود.",
+                  icon: Mail,
+                },
+              ] as const
+            ).map(({ key, title, desc, icon: Icon }) => {
+              const active = form[key] === "1";
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleLoginMethod(key)}
+                  aria-pressed={active}
+                  className={`flex items-start gap-3 rounded-2xl border p-4 text-right transition ${
+                    active
+                      ? "border-emerald-300/40 bg-emerald-300/10"
+                      : "border-gold/15 glass-soft opacity-70"
+                  }`}
+                >
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                      active
+                        ? "border-emerald-300/50 bg-emerald-300/15 text-emerald-200"
+                        : "border-gold/25 text-sage"
+                    }`}
+                  >
+                    <Icon size={18} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-black text-cream">{title}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                          active
+                            ? "bg-emerald-300/15 text-emerald-200"
+                            : "bg-white/5 text-sage"
+                        }`}
+                      >
+                        {active ? "فعال" : "غیرفعال"}
+                      </span>
+                    </span>
+                    <span className="mt-1.5 block text-[10.5px] leading-5 text-sage">
+                      {desc}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300/25 bg-amber-300/[0.06] p-3 text-[10.5px] leading-6 text-amber-100/80">
+            <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-300" />
+            <span>
+              این انتخاب روی ورود مدیر هم اثر دارد. پیش از غیرفعال‌کردن یک روش، مطمئن
+              شوید روش باقی‌مانده و سرویس ارسال کد آن واقعاً کار می‌کند.
+            </span>
+          </div>
 
           {saveBar}
         </section>

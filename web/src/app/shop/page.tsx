@@ -3,7 +3,7 @@ import { ProductsSection } from "@/components/Store";
 import PageHero from "@/components/PageHero";
 import { getSiteSettings, parseShopCategories } from "@/lib/settings";
 
-export const metadata: Metadata = { title: "فروشگاه | بلّا پرفیوم" };
+export const metadata: Metadata = { title: "فروشگاه | بلا پرفیوم" };
 
 export default async function ShopPage() {
   // دسته‌بندی‌ها از تنظیمات سایت می‌آیند تا ادمین بتواند بدون دست زدن
@@ -15,8 +15,8 @@ export default async function ShopPage() {
     <>
       <PageHero
         eyebrow="THE COLLECTION"
-        title="فروشگاه بلّا"
-        sub="کلکسیون کامل عطرهای اورینتال و فرانسوی مزون بلّا"
+        title="فروشگاه بلا"
+        sub="کلکسیون کامل عطرهای اورینتال و فرانسوی مزون بلا"
       />
       <ProductsSection heading={false} categories={categories} />
     </>

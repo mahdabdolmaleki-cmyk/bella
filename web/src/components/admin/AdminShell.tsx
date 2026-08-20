@@ -104,7 +104,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2 px-1">
           <CrestImg className="w-9" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-black text-gold">پنل مدیریت بلّا</p>
+            <p className="truncate text-sm font-black text-gold">پنل مدیریت بلا</p>
             <p className="text-[10px] text-sage">Bella Perfume Admin</p>
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               {nav.find((item) => (item.exact ? pathname === item.href : pathname?.startsWith(item.href)))
                 ?.label || "پنل مدیریت"}
             </p>
-            <p className="truncate text-[9.5px] text-sage">پنل مدیریت بلّا</p>
+            <p className="truncate text-[9.5px] text-sage">پنل مدیریت بلا</p>
           </div>
         </div>
 
@@ -193,7 +193,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               <div className="flex min-w-0 items-center gap-2">
                 <CrestImg className="w-8" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-black text-gold">پنل مدیریت بلّا</p>
+                  <p className="truncate text-sm font-black text-gold">پنل مدیریت بلا</p>
                   <p className="text-[10px] text-sage">Bella Perfume Admin</p>
                 </div>
               </div>

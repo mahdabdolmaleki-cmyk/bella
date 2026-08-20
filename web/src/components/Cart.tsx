@@ -534,7 +534,7 @@ export function CartDrawer() {
                   کد پیگیری: <span className="font-bold text-gold-soft">{code}</span>
                 </p>
                 <p className="mt-2 text-xs leading-6 text-sage">
-                  همکاران ما برای هماهنگی ارسال با شما تماس خواهند گرفت. پاکت مخملی بلّا در راه است!
+                  همکاران ما برای هماهنگی ارسال با شما تماس خواهند گرفت. پاکت مخملی بلا در راه است!
                 </p>
                 <button
                   onClick={() => {

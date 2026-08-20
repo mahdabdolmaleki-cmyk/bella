@@ -1,21 +1,14 @@
-/**
- * SUPER ADMIN (root owner) configuration.
- *
- * The phone number below is HARD-CODED ON PURPOSE.
- * It is the only number that can receive an OTP for the root admin account,
- * it can never be changed from the admin panel, from the API, from the
- * database, or from an environment variable. Changing it requires editing
- * this file and re-deploying the server.
- *
- * If an attacker gets full write access to MongoDB they still cannot take
- * over the root account, because the recovery channel lives in the source code.
- */
+import crypto from "node:crypto";
 
-// ⚠️  CHANGE THIS ONE LINE TO YOUR OWN MOBILE NUMBER BEFORE DEPLOYING.
-// NOTE: the previous placeholder (09120000000) was the SAME number as one of
-// the demo customers created by `npm run seed`, which meant the seeded customer
-// was treated as the root owner. It is now a number the seed script never uses.
-const RAW_SUPER_ADMIN_PHONE = "09000000000";
+/**
+ * The application has exactly one administrator identity. Its two login
+ * identifiers come exclusively from deployment environment variables and are
+ * never stored in MongoDB or editable through an API/admin screen.
+ *
+ * Required in production:
+ *   SUPER_ADMIN_PHONE=09121234567
+ *   SUPER_ADMIN_EMAIL=owner@example.com
+ */
 
 /**
  * Normalises any Iranian mobile format to the canonical 09xxxxxxxxx form:
@@ -35,15 +28,39 @@ export function normalizePhone(value) {
   return /^09\d{9}$/.test(s) ? s : null;
 }
 
-export const SUPER_ADMIN_PHONE = Object.freeze(
-  normalizePhone(RAW_SUPER_ADMIN_PHONE) || ""
-);
-
-if (!SUPER_ADMIN_PHONE) {
-  console.warn(
-    "⚠️  SUPER_ADMIN_PHONE in src/config/superAdmin.js is not a valid 09xxxxxxxxx number — root admin OTP recovery is disabled."
-  );
+/** Normalises an e-mail to a trimmed lower-case form, or null when invalid. */
+export function normalizeEmail(value) {
+  if (value === undefined || value === null || typeof value === "object") return null;
+  const s = String(value).trim().toLowerCase();
+  return /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/.test(s) ? s : null;
 }
+
+// No fallback literals on purpose: the owner must explicitly configure both.
+// The ENV phone is deliberately stricter than a login input: deployments must
+// use the single canonical 09xxxxxxxxx representation.
+const rawSuperAdminPhone = String(process.env.SUPER_ADMIN_PHONE || "").trim();
+export const SUPER_ADMIN_PHONE = /^09\d{9}$/.test(rawSuperAdminPhone)
+  ? rawSuperAdminPhone
+  : "";
+export const SUPER_ADMIN_EMAIL = normalizeEmail(process.env.SUPER_ADMIN_EMAIL) || "";
+
+const configErrors = [];
+if (!SUPER_ADMIN_PHONE) configErrors.push("SUPER_ADMIN_PHONE");
+if (!SUPER_ADMIN_EMAIL) configErrors.push("SUPER_ADMIN_EMAIL");
+if (configErrors.length) {
+  const message = `${configErrors.join(" و ")} تنظیم نشده یا نامعتبر است؛ ورود مدیر اصلی غیرفعال است.`;
+  if (process.env.NODE_ENV === "production") throw new Error(message);
+  console.warn(`⚠️  ${message}`);
+}
+
+/**
+ * Admin cookies are bound to this non-secret digest. Changing either ENV value
+ * invalidates every older admin session without a database lookup.
+ */
+export const SUPER_ADMIN_SESSION_ID = crypto
+  .createHash("sha256")
+  .update(`${SUPER_ADMIN_PHONE}\0${SUPER_ADMIN_EMAIL}`, "utf8")
+  .digest("hex");
 
 /** Masked form for the UI: 0912***4567 */
 export function maskPhone(phone) {
@@ -53,33 +70,11 @@ export function maskPhone(phone) {
 }
 
 export function isSuperAdminPhone(value) {
-  const p = normalizePhone(value);
-  return Boolean(p && SUPER_ADMIN_PHONE && p === SUPER_ADMIN_PHONE);
+  const phone = normalizePhone(value);
+  return Boolean(phone && SUPER_ADMIN_PHONE && phone === SUPER_ADMIN_PHONE);
 }
-
-/**
- * SUPER ADMIN e-mail — the root owner may ALSO sign in with this hard-coded
- * e-mail address (the OTP is delivered to the inbox instead of by SMS). Like
- * the phone above, keeping it in the source code means a database takeover can
- * never grant admin access. You may override it with the SUPER_ADMIN_EMAIL
- * environment variable; otherwise the value on the next line is used.
- */
-// ⚠️  CHANGE THIS TO YOUR OWN ADMIN E-MAIL BEFORE DEPLOYING (or set SUPER_ADMIN_EMAIL).
-const RAW_SUPER_ADMIN_EMAIL =
-  process.env.SUPER_ADMIN_EMAIL || "mm.abdolmaleki79@gmail.com";
-
-/** Normalises an e-mail to a trimmed lower-case form, or null when invalid. */
-export function normalizeEmail(value) {
-  if (value === undefined || value === null || typeof value === "object") return null;
-  const s = String(value).trim().toLowerCase();
-  return /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/.test(s) ? s : null;
-}
-
-export const SUPER_ADMIN_EMAIL = Object.freeze(
-  normalizeEmail(RAW_SUPER_ADMIN_EMAIL) || ""
-);
 
 export function isSuperAdminEmail(value) {
-  const e = normalizeEmail(value);
-  return Boolean(e && SUPER_ADMIN_EMAIL && e === SUPER_ADMIN_EMAIL);
+  const email = normalizeEmail(value);
+  return Boolean(email && SUPER_ADMIN_EMAIL && email === SUPER_ADMIN_EMAIL);
 }

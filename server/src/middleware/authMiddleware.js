@@ -1,4 +1,5 @@
 import { ADMIN_COOKIE, USER_COOKIE, verifyToken } from "../utils/auth.js";
+import { SUPER_ADMIN_SESSION_ID } from "../config/superAdmin.js";
 import User from "../models/User.js";
 
 // Only the OTP-authenticated super-admin session is accepted. Database-backed
@@ -7,7 +8,11 @@ export function requireAdmin(req, res, next) {
   const token = req.cookies?.[ADMIN_COOKIE];
   const payload = token && verifyToken(token);
 
-  if (!payload || payload.superAdmin !== true) {
+  if (
+    !payload ||
+    payload.superAdmin !== true ||
+    payload.adminSessionId !== SUPER_ADMIN_SESSION_ID
+  ) {
     return res.status(401).json({ error: "دسترسی غیرمجاز." });
   }
 

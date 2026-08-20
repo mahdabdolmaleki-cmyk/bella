@@ -100,7 +100,7 @@ export function BellaCrest({
 /* ---------------- raster logo files ---------------- */
 export function LogoImg({ className = "" }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/logo.webp" alt="بلّا پرفیوم" className={className} draggable={false} />;
+  return <img src="/logo.webp" alt="بلا پرفیوم" className={className} draggable={false} />;
 }
 export function CrestImg({ className = "" }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element

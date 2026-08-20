@@ -18,9 +18,14 @@ import {
   isSuperAdminPhone,
   isSuperAdminEmail,
   maskPhone,
-  SUPER_ADMIN_PHONE,
+  SUPER_ADMIN_SESSION_ID,
 } from "../config/superAdmin.js";
 import { maskEmail } from "../utils/mailer.js";
+import {
+  getLoginMethods,
+  loginChannelDisabledMessage,
+  loginChannelEnabled,
+} from "../utils/loginMethods.js";
 import {
   USER_COOKIE,
   ADMIN_COOKIE,
@@ -61,7 +66,7 @@ const IDENTITY_PURPOSE = Object.freeze({
   email: "change-email",
 });
 
-function identityChangeFor(user, fieldInput, valueInput) {
+export function identityChangeFor(user, fieldInput, valueInput) {
   const field = fieldInput === "phone" || fieldInput === "email" ? fieldInput : "";
   if (!field) {
     return { ok: false, status: 400, error: "نوع شناسه باید phone یا email باشد." };
@@ -107,27 +112,35 @@ function identityChangeFor(user, fieldInput, valueInput) {
     return { ok: false, status: 400, error: "این ایمیل قابل استفاده نیست." };
   }
 
-  const currentPhone = normalizePhone(user.phone);
-  if (!currentPhone) {
-    return { ok: false, status: 400, error: "شماره فعلی حساب برای تأیید معتبر نیست." };
+  const currentPhone = normalizePhone(user.phone) || "";
+  if (!value && !currentPhone) {
+    return {
+      ok: false,
+      status: 400,
+      error: "پیش از حذف تنها ایمیل حساب، ابتدا یک شماره موبایل تأییدشده اضافه کنید.",
+    };
   }
 
-  // A new e-mail proves itself. Removing an existing e-mail has no destination,
-  // so that operation is confirmed by an OTP sent to the verified current phone.
-  const channel = value ? "email" : "sms";
+  // A new e-mail proves itself directly. Removal has no destination and is
+  // therefore finalised by the current-identity step (phone when available).
   return {
     ok: true,
     field,
     value,
     purpose: IDENTITY_PURPOSE.email,
-    otpPhone: currentPhone,
+    otpPhone: "",
     target: `email:${value}`,
-    otpOptions: { channel, email: value, subject, target: `email:${value}` },
+    otpOptions: {
+      channel: "email",
+      email: value,
+      subject,
+      target: `email:${value}`,
+    },
     sentTo: value ? maskEmail(value) : maskPhone(currentPhone),
   };
 }
 
-function identityOtpStepFor(user, change, stageInput) {
+export function identityOtpStepFor(user, change, stageInput) {
   const stage = stageInput === "destination" ? "destination" : "current";
   if (stage === "destination") {
     if (change.field === "email" && !change.value) {
@@ -136,10 +149,12 @@ function identityOtpStepFor(user, change, stageInput) {
     return { ok: true, stage, ...change };
   }
 
-  const currentPhone = normalizePhone(user.phone);
-  if (!currentPhone) {
-    return { ok: false, status: 400, error: "شماره فعلی حساب برای تأیید معتبر نیست." };
+  const currentPhone = normalizePhone(user.phone) || "";
+  const currentEmail = isEmail(user.email) || "";
+  if (!currentPhone && !currentEmail) {
+    return { ok: false, status: 400, error: "شناسه فعلی حساب برای تأیید معتبر نیست." };
   }
+  const channel = currentPhone ? "sms" : "email";
   return {
     ok: true,
     stage,
@@ -148,11 +163,12 @@ function identityOtpStepFor(user, change, stageInput) {
     purpose: IDENTITY_PURPOSE.current,
     otpPhone: currentPhone,
     otpOptions: {
-      channel: "sms",
+      channel,
+      email: currentEmail,
       subject: String(user._id),
       target: change.target,
     },
-    sentTo: maskPhone(currentPhone),
+    sentTo: channel === "sms" ? maskPhone(currentPhone) : maskEmail(currentEmail),
   };
 }
 
@@ -165,6 +181,81 @@ async function identityIsTaken(change, userId) {
       _id: { $ne: userId },
     })
   );
+}
+
+export function initialNameFromEmail(email) {
+  const local = String(email || "").split("@", 1)[0] || "";
+  const readable = local.replace(/[._+\-]+/g, " ").replace(/\s+/g, " ").trim();
+  return readable.slice(0, 80) || "مشتری بلا";
+}
+
+function loginUserQuery(UserModel, filter) {
+  return UserModel.findOne(filter).select("+tokenVersion");
+}
+
+/**
+ * Returns the single customer account for a verified login identity, creating
+ * it only when no active or legacy soft-deleted row owns that identity.
+ *
+ * Older deployments could leave a deleted row's phone/e-mail in place while a
+ * unique MongoDB index still reserved it. Looking only for `deletedAt: null`
+ * then attempted an impossible insert and surfaced the generic duplicate-key
+ * error after a correct OTP. A verified owner may safely reactivate that row;
+ * tokenVersion is advanced so sessions issued before deletion stay revoked.
+ */
+export async function findOrCreateVerifiedUser(
+  { email = "", phone = "" },
+  UserModel = User
+) {
+  const identity = email ? { email } : { phone };
+  const verifiedField = email ? "emailVerified" : "phoneVerified";
+
+  async function activate(user) {
+    let changed = false;
+    if (user.deletedAt) {
+      user.deletedAt = null;
+      user.tokenVersion = Number(user.tokenVersion ?? 0) + 1;
+      changed = true;
+    }
+    if (!user[verifiedField]) {
+      user[verifiedField] = true;
+      changed = true;
+    }
+    if (changed) await user.save();
+    return user;
+  }
+
+  // Prefer the active account, but also recognise legacy deleted rows that
+  // still reserve the unique identity in MongoDB.
+  let user = await loginUserQuery(UserModel, { ...identity, deletedAt: null });
+  if (user) return activate(user);
+  user = await loginUserQuery(UserModel, identity);
+  if (user) return activate(user);
+
+  const registration = email
+    ? {
+        name: initialNameFromEmail(email),
+        email,
+        emailVerified: true,
+      }
+    : {
+        name: "مشتری بلا",
+        phone,
+        phoneVerified: true,
+      };
+
+  try {
+    return await UserModel.create(registration);
+  } catch (err) {
+    if (err?.code !== 11000) throw err;
+
+    // Close a concurrent first-login/reactivation race. Query by the verified
+    // identity itself instead of repeating the active-only lookup.
+    user = await loginUserQuery(UserModel, { ...identity, deletedAt: null });
+    if (!user) user = await loginUserQuery(UserModel, identity);
+    if (!user) throw err;
+    return activate(user);
+  }
 }
 
 function publicUser(user) {
@@ -182,34 +273,39 @@ function publicUser(user) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/auth/login  { phone? , email? , ticket , name? }
-// تنها راه ورود: کد یک‌بارمصرف. رمز عبور به‌کلی حذف شده است.
-//  • اگر شماره همان شمارهٔ مدیر اصلیِ هاردکدشده باشد ← نشست مدیر ساخته می‌شود
-//    و { admin: true } برمی‌گردد تا فرانت به /admin برود.
-//  • در غیر این صورت، حساب مشتری پیدا یا ساخته می‌شود و نشست کاربر ست می‌شود.
+// POST /api/auth/login  { phone? , email? , ticket }
+// A verified new phone or e-mail creates the customer account automatically.
+// No name is requested during sign-up: e-mail accounts use the readable local
+// part of the address, while phone accounts start as «مشتری بلا».
 // ---------------------------------------------------------------------------
 router.post(
   "/login",
   loginLimiter,
   ah(async (req, res) => {
     const ticket = str(req.body?.ticket, { max: 100 });
-    const email = isEmail(req.body?.email);
-    const name = str(req.body?.name, { max: 80 });
-    let phone = normalizePhone(req.body?.phone);
+    const rawEmail = str(req.body?.email, { max: 160 });
+    const email = rawEmail ? isEmail(rawEmail) : "";
+    const phone = normalizePhone(req.body?.phone);
+    if (rawEmail && !email) {
+      return res.status(400).json({ error: "ایمیل معتبر وارد کنید." });
+    }
+    if ((email && phone) || (!email && !phone)) {
+      return res.status(400).json({ error: "فقط یک ایمیل یا شماره موبایل معتبر وارد کنید." });
+    }
 
-    // مدیر اصلی با ایمیل هاردکدشده وارد می‌شود؛ در غیر این صورت شماره را از روی حساب پیدا می‌کنیم.
-    if (!phone && email && isSuperAdminEmail(email)) {
-      phone = SUPER_ADMIN_PHONE;
-    } else if (!phone && email) {
-      const owner = await User.findOne({ email, deletedAt: null }).select("phone").lean();
-      phone = owner?.phone || "";
+    // Re-check the owner switch when the one-time ticket is consumed. An OTP
+    // requested before a method was disabled must not remain a bypass.
+    const loginChannel = email ? "email" : "sms";
+    const loginMethods = await getLoginMethods();
+    if (!loginChannelEnabled(loginMethods, loginChannel)) {
+      return res.status(403).json({ error: loginChannelDisabledMessage(loginChannel) });
     }
 
     const fail = (msg) => {
       penalise(req, "user-login", LOGIN_WINDOW);
       logActivity(req, {
         action: "user.login.failed",
-        target: email || phone || "",
+        target: email || phone,
         success: false,
         status: 401,
       });
@@ -218,56 +314,36 @@ router.post(
         .json({ error: msg || "کد تأیید معتبر نیست یا منقضی شده است." });
     };
 
-    if (!phone) {
-      return res.status(400).json({ error: "شماره موبایل یا ایمیل معتبر وارد کنید." });
-    }
-
-    // بلیت اثبات می‌کند که کد پیامک‌شده به این شماره درست وارد شده است.
-    const verifiedPhone = await consumeTicket(phone, "login", ticket);
-    if (!verifiedPhone) return fail();
+    // Ticket, channel and canonical identity are consumed atomically. A ticket
+    // issued for an e-mail can never be replayed as a phone login or vice versa.
+    const verifiedIdentity = await consumeTicket(
+      loginChannel === "sms" ? phone : "",
+      "login",
+      ticket,
+      { channel: loginChannel, email }
+    );
+    if (!verifiedIdentity) return fail();
 
     resetLimit(req, "user-login");
 
-    // ---- ورود مدیر اصلی (فقط شمارهٔ هاردکدشده) ----
-    if (isSuperAdminPhone(phone)) {
+    if ((phone && isSuperAdminPhone(phone)) || (email && isSuperAdminEmail(email))) {
       res.cookie(
         ADMIN_COOKIE,
-        signToken({ role: "admin", superAdmin: true }, { expiresIn: `${adminSessionHours()}h` }),
+        signToken(
+          {
+            role: "admin",
+            superAdmin: true,
+            adminSessionId: SUPER_ADMIN_SESSION_ID,
+          },
+          { expiresIn: `${adminSessionHours()}h` }
+        ),
         adminCookieOptions()
       );
       logActivity(req, { action: "admin.login", target: "super-admin", status: 200 });
       return res.json({ ok: true, admin: true });
     }
 
-    // ---- ورود/ثبت‌نام مشتری (پیدا یا ساخت) ----
-    let user = await User.findOne({ phone, deletedAt: null }).select("+tokenVersion");
-    if (!user) {
-      try {
-        user = await User.create({
-          name: name || "مشتری بلّا",
-          phone,
-          phoneVerified: true,
-        });
-      } catch (err) {
-        // The partial unique phone index closes the concurrent first-login race.
-        // If another request created the row first, continue with that account.
-        if (err?.code !== 11000) throw err;
-        user = await User.findOne({ phone, deletedAt: null }).select("+tokenVersion");
-        if (!user) throw err;
-      }
-    } else {
-      let dirty = false;
-      if (!user.phoneVerified) {
-        user.phoneVerified = true;
-        dirty = true;
-      }
-      // اگر کاربر هنگام ورودِ اول نامی وارد کرده و هنوز نام واقعی ندارد، ذخیره کن.
-      if (name && (!user.name || user.name === "مشتری بلّا")) {
-        user.name = name;
-        dirty = true;
-      }
-      if (dirty) await user.save();
-    }
+    const user = await findOrCreateVerifiedUser({ email, phone });
 
     res.cookie(
       USER_COOKIE,
@@ -276,7 +352,7 @@ router.post(
     );
     logActivity(req, {
       action: "user.login",
-      target: user.phone,
+      target: email || phone,
       status: 200,
       actor: { actorType: "user", actorId: String(user._id), actorLabel: user.name },
     });
@@ -318,8 +394,8 @@ router.post(
     if (!step.ok) return res.status(step.status).json({ error: step.error });
 
     // Before sending a code to the proposed destination, prove control of the
-    // account's existing verified phone. Consuming this ticket here means the
-    // destination ticket issued later represents both checks.
+    // account's current identifier (phone, or e-mail for e-mail-only accounts).
+    // Consuming that ticket here means the destination ticket represents both.
     if (step.stage === "destination") {
       const currentStep = identityOtpStepFor(req.user, change, "current");
       const currentTicket = str(req.body?.currentTicket, { max: 100 });
@@ -331,7 +407,7 @@ router.post(
       );
       if (!currentVerified) {
         return res.status(403).json({
-          error: "ابتدا کد ارسال‌شده به شماره فعلی حساب را تأیید کنید.",
+          error: "ابتدا کد ارسال‌شده به شناسه فعلی حساب را تأیید کنید.",
         });
       }
     }
@@ -424,11 +500,18 @@ router.patch(
     }
 
     if (req.body?.phone !== undefined) {
-      const phone = normalizePhone(str(req.body.phone, { max: 20 }));
-      if (!phone) {
+      const raw = str(req.body.phone, { max: 20 });
+      const currentPhone = normalizePhone(user.phone);
+      const phone = raw ? normalizePhone(raw) : "";
+      if (raw && !phone) {
         return res.status(400).json({ error: "شماره موبایل معتبر وارد کنید (مثل 09121234567)." });
       }
-      if (phone !== user.phone) {
+      // Empty is valid for an account that registered by e-mail and has never
+      // added a phone. Removing an existing verified phone is a separate flow.
+      if (!phone && currentPhone) {
+        return res.status(400).json({ error: "شماره تأییدشده را نمی‌توان خالی کرد." });
+      }
+      if (phone !== currentPhone) {
         const change = identityChangeFor(user, "phone", phone);
         if (!change.ok) return res.status(change.status).json({ error: change.error });
         identityChanges.push(change);
@@ -515,6 +598,7 @@ router.patch(
         user.phoneVerified = true;
       } else {
         user.email = identityChange.value || undefined;
+        user.emailVerified = Boolean(identityChange.value);
       }
       // Revoke every older session, then replace this browser's cookie below.
       user.tokenVersion = Number(user.tokenVersion ?? 0) + 1;

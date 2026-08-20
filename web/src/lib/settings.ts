@@ -2,6 +2,8 @@
 // Used by the root layout and home page (server components).
 
 export const SETTING_KEYS = [
+  "loginPhoneEnabled",
+  "loginEmailEnabled",
   "festivalActive",
   "festivalTitle",
   "festivalSubtitle",
@@ -31,6 +33,10 @@ export const SETTING_KEYS = [
 
 // Every setting travels as a string so one generic admin form can edit them.
 export type SiteSettingsMap = {
+  /** "1" = ورود با کد پیامکی فعال است. */
+  loginPhoneEnabled: string;
+  /** "1" = ورود با کد ایمیلی فعال است. */
+  loginEmailEnabled: string;
   festivalActive: string;
   festivalTitle: string;
   festivalSubtitle: string;
@@ -62,7 +68,7 @@ export type SiteSettingsMap = {
   contactPhone: string;
   contactAddress: string;
   contactHours: string;
-  /** تیتر ستون «ضمانت‌های بلّا» در فوتر. خالی = ستون حذف می‌شود. */
+  /** تیتر ستون «ضمانت‌های بلا» در فوتر. خالی = ستون حذف می‌شود. */
   footerGuaranteeTitle: string;
   /** هر خط یک ردیف ضمانت. */
   footerGuarantees: string;
@@ -228,11 +234,13 @@ export function parseJourneyStages(
 }
 
 export const DEFAULT_SETTINGS: SiteSettingsMap = {
+  loginPhoneEnabled: "1",
+  loginEmailEnabled: "1",
   festivalActive: "true",
-  festivalTitle: "جشنواره خرید اول بلّا",
+  festivalTitle: "جشنواره خرید اول بلا",
   festivalSubtitle: "۲۵٪ تخفیف + اتومایزر هدیه",
   footerAbout:
-    "مزون بلّا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
+    "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
   tomanPerPoint: "10000",
   tierGoldSpend: "20000000",
   tierDiamondSpend: "60000000",
@@ -246,12 +254,12 @@ export const DEFAULT_SETTINGS: SiteSettingsMap = {
   homeFeatures: "",
   footerBadges: "",
   shopCategories: "",
-  contactSocialIntro: "بلّا را در شبکه‌های اجتماعی دنبال کنید",
+  contactSocialIntro: "بلا را در شبکه‌های اجتماعی دنبال کنید",
   contactSocials: "",
   contactPhone: "۰۲۱ – ۲۲ ۴۴ ۶۶ ۸۸",
   contactAddress: "تهران، خیابان فرشته، پاساژ رویال، واحد ۱۲",
   contactHours: "هر روز ۱۰ صبح تا ۱۰ شب",
-  footerGuaranteeTitle: "ضمانت‌های بلّا",
+  footerGuaranteeTitle: "ضمانت‌های بلا",
   footerGuarantees:
     "اصالت اسانس با هولوگرام اختصاصی\n۷ روز ضمانت بازگشت بدون قید و شرط\nارسال بیمه‌شده در پاکت مخملی\nپشتیبانی رایحه‌شناس به‌صورت ۲۴/۷",
   paymentsDisabled: "",

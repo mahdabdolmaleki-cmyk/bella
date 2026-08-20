@@ -17,7 +17,7 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
 import { logActivity, clientIp } from "../utils/activityLog.js";
 import { releaseOrderStock } from "../jobs/staleOrders.js";
-import { SUPER_ADMIN_PHONE, normalizePhone } from "../config/superAdmin.js";
+import { normalizePhone } from "../config/superAdmin.js";
 import {
   str,
   num,
@@ -29,6 +29,7 @@ import {
   passwordIssue,
 } from "../utils/validate.js";
 import { ADMIN_COOKIE, clearCookieOptions } from "../utils/auth.js";
+import { requestedLoginMethods } from "../utils/loginMethods.js";
 
 const router = Router();
 
@@ -426,6 +427,17 @@ router.put(
   requireAdminWrite,
   ah(async (req, res) => {
     const doc = await Settings.getSingleton();
+
+    // Login switches are normalised separately from free-text settings. The
+    // server (not only the UI) refuses a configuration that would lock every
+    // customer and the owner out of the site.
+    const loginMethods = requestedLoginMethods(doc, req.body || {});
+    if (!loginMethods.ok) {
+      return res.status(400).json({ error: loginMethods.error });
+    }
+    doc.loginPhoneEnabled = loginMethods.phone;
+    doc.loginEmailEnabled = loginMethods.email;
+
     const limits = {
       festivalActive: 6,
       festivalTitle: 120,

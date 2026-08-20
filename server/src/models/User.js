@@ -4,12 +4,20 @@ import bcrypt from "bcryptjs";
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 80 },
-    // `unique: true` builds the index already; `index: true` duplicated it.
-    // ایمیل دیگر اجباری نیست: کاربر با شماره + کد وارد می‌شود و بعداً می‌تواند
-    // ایمیل را در پروفایل ثبت/ویرایش کند. sparse تا چند حساب بدون ایمیل مجاز باشد.
-    email: { type: String, unique: true, sparse: true, lowercase: true, trim: true, maxlength: 160, default: undefined },
-    // Phone is the primary identity for OTP sign-up/recovery. A partial unique
-    // index below excludes legacy/admin-created rows whose phone is empty.
+    // E-mail and phone are independent verified login identities. `sparse`
+    // allows phone-only accounts to omit e-mail while keeping e-mails unique.
+    email: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+      maxlength: 160,
+      default: undefined,
+    },
+    emailVerified: { type: Boolean, default: false },
+    // E-mail-only accounts may add a phone later. The partial unique index below
+    // excludes rows whose phone is still empty.
     phone: { type: String, default: "", maxlength: 20 },
     phoneVerified: { type: Boolean, default: false },
     address: { type: String, default: "", maxlength: 500 },
@@ -56,6 +64,7 @@ userSchema.methods.toDTO = function () {
     id: this._id.toString(),
     name: this.name,
     email: this.email,
+    emailVerified: Boolean(this.emailVerified),
     phone: this.phone,
     phoneVerified: Boolean(this.phoneVerified),
     address: this.address,

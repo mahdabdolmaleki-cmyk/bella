@@ -2,10 +2,10 @@ import mongoose from "mongoose";
 
 export const DEFAULT_SETTINGS = {
   festivalActive: "true",
-  festivalTitle: "جشنواره خرید اول بلّا",
+  festivalTitle: "جشنواره خرید اول بلا",
   festivalSubtitle: "۲۵٪ تخفیف + اتومایزر هدیه",
   footerAbout:
-    "مزون بلّا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
+    "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
   // Loyalty club: how many Toman of settled purchases earn one point, and the
   // spend thresholds for the golden / diamond memberships.
   tomanPerPoint: 10000,

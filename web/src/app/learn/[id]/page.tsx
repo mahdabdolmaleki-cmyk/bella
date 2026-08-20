@@ -160,7 +160,7 @@ export default function TutorialPage() {
           href="/learn"
           className="inline-flex items-center gap-2 text-xs font-bold text-gold-soft transition-colors hover:text-gold"
         >
-          <ArrowRight size={14} /> آکادمی بلّا
+          <ArrowRight size={14} /> آکادمی بلا
         </Link>
       </div>
 

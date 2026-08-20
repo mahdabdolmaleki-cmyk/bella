@@ -303,7 +303,7 @@ export default function NotificationsAdmin() {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               maxLength={160}
-              placeholder="مثلاً: جشنواره‌ی پایان تابستان بلّا"
+              placeholder="مثلاً: جشنواره‌ی پایان تابستان بلا"
               className={inputCls}
             />
           </div>

@@ -80,7 +80,7 @@ router.post(
 
     const out = await requestPayment({
       amount: order.total,
-      description: `\u067e\u0631\u062f\u0627\u062e\u062a \u0633\u0641\u0627\u0631\u0634 ${order.code} \u2014 \u0628\u0644\u0651\u0627 \u067e\u0631\u0641\u06cc\u0648\u0645`,
+      description: `\u067e\u0631\u062f\u0627\u062e\u062a \u0633\u0641\u0627\u0631\u0634 ${order.code} \u2014 \u0628\u0644\u0627 \u067e\u0631\u0641\u06cc\u0648\u0645`,
       callbackUrl: `${API_BASE_URL}/api/payment/callback`,
       mobile: order.phone,
     });

@@ -32,8 +32,22 @@ function targetOf(value) {
   return String(value).trim().toLowerCase().slice(0, 220);
 }
 
+const EMAIL_RE = /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/;
+
+function otpIdentity(phone, options = {}) {
+  const channel = options.channel === "email" ? "email" : "sms";
+  if (channel === "email") {
+    const email = emailOf(options.email);
+    return EMAIL_RE.test(email) ? `email:${email}` : "";
+  }
+  return phone ? `phone:${phone}` : "";
+}
+
 function scopedFilter(phone, purpose, options = {}) {
-  const filter = { phone, purpose };
+  const filter = { identity: otpIdentity(phone, options), purpose };
+  if (options.channel === "email" || options.channel === "sms") {
+    filter.channel = options.channel;
+  }
   const subject = subjectOf(options.subject);
   if (subject) filter.subject = subject;
   const target = targetOf(options.target);
@@ -56,29 +70,37 @@ function ticketDigest(ticket) {
 /**
  * Creates and sends a one-time code, by SMS or by e-mail.
  *
- * `phone` is the canonical identity used to locate the OTP. For an e-mail
- * identity change it remains the account's current phone, while `email` stores
- * the delivery address. `subject` binds sensitive OTPs to one user and `target`
- * binds them to the exact proposed action.
+ * OTPs are keyed by a canonical `phone:...` or `email:...` identity. This lets
+ * a verified e-mail create an account before the customer has added a phone.
+ * `subject` binds sensitive profile OTPs to one user and `target` binds them to
+ * the exact proposed action.
  *
  * @param {object} options { channel?: "sms" | "email", email?: string, subject?: string, target?: string }
  * @returns {Promise<{ok: true, expiresIn: number, channel: string, devCode?: string} | {ok: false, status: number, error: string, retryAfter?: number}>}
  */
 export async function issueOtp(req, phoneInput, purpose, options = {}) {
-  const phone = normalizePhone(phoneInput);
-  if (!phone) {
+  const phone = normalizePhone(phoneInput) || "";
+  const channel = options.channel === "email" ? "email" : "sms";
+  const email = emailOf(options.email);
+  if (channel === "email" && !EMAIL_RE.test(email)) {
+    return { ok: false, status: 400, error: "ایمیل معتبر وارد کنید." };
+  }
+  if (channel === "sms" && !phone) {
     return { ok: false, status: 400, error: "شماره موبایل معتبر وارد کنید (مثل 09121234567)." };
   }
 
-  const channel = options.channel === "email" ? "email" : "sms";
-  const email = emailOf(options.email);
-  if (channel === "email" && !/^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/.test(email)) {
-    return { ok: false, status: 400, error: "ایمیل معتبر وارد کنید." };
+  const identity = otpIdentity(phone, { channel, email });
+  if (!identity) {
+    return { ok: false, status: 400, error: "شناسه دریافت کد معتبر نیست." };
   }
 
   // Issuing a fresh code invalidates every older code for this identity/purpose,
   // even if the user changed the proposed e-mail between requests.
-  const scope = scopedFilter(phone, purpose, { subject: options.subject });
+  const scope = scopedFilter(phone, purpose, {
+    channel,
+    email,
+    subject: options.subject,
+  });
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const recent = await Otp.find({ ...scope, createdAt: { $gte: hourAgo } })
     .sort({ createdAt: -1 })
@@ -111,6 +133,7 @@ export async function issueOtp(req, phoneInput, purpose, options = {}) {
   const code = sixDigits();
   const doc = new Otp({
     phone,
+    identity,
     purpose,
     subject: subjectOf(options.subject),
     target: targetOf(options.target),
@@ -161,9 +184,10 @@ export async function issueOtp(req, phoneInput, purpose, options = {}) {
  * turn one code into multiple tickets.
  */
 export async function verifyOtp(phoneInput, purpose, codeInput, options = {}) {
-  const phone = normalizePhone(phoneInput);
+  const phone = normalizePhone(phoneInput) || "";
   const code = String(codeInput ?? "").replace(/[^0-9]/g, "");
-  if (!phone || code.length !== 6) {
+  const identity = otpIdentity(phone, options);
+  if (!identity || code.length !== 6) {
     return { ok: false, status: 400, error: "کد تأیید ۶ رقمی را وارد کنید." };
   }
 
@@ -222,7 +246,7 @@ export async function verifyOtp(phoneInput, purpose, codeInput, options = {}) {
     return { ok: false, status: 400, error: "کد تأیید قبلاً استفاده شده یا منقضی شده است." };
   }
 
-  return { ok: true, phone, ticket };
+  return { ok: true, identity, phone, ticket };
 }
 
 /**
@@ -234,9 +258,10 @@ export async function verifyOtp(phoneInput, purpose, codeInput, options = {}) {
  * and exact destination.
  */
 export async function consumeTicket(phoneInput, purpose, ticketInput, options = {}) {
-  const phone = normalizePhone(phoneInput);
+  const phone = normalizePhone(phoneInput) || "";
+  const identity = otpIdentity(phone, options);
   const ticket = String(ticketInput ?? "");
-  if (!phone || !/^[0-9a-f]{64}$/.test(ticket)) return null;
+  if (!identity || !/^[0-9a-f]{64}$/.test(ticket)) return null;
 
   const now = new Date();
   const doc = await Otp.findOneAndDelete({
@@ -246,5 +271,5 @@ export async function consumeTicket(phoneInput, purpose, ticketInput, options = 
     ticketExpiresAt: { $gt: now },
   });
 
-  return doc ? phone : null;
+  return doc ? identity : null;
 }

@@ -49,7 +49,7 @@ const STAGES: Stage[] = [
     title: "نخستین برخورد",
     boxes: [
       { t: "ترنج کالابریا", d: "درخششی مرکباتی که در ثانیه‌ی اول منتشر می‌شود." },
-      { t: "زعفران ایرانی", d: "گرمای سرخ و اشرافی، امضای رسمی بلّا." },
+      { t: "زعفران ایرانی", d: "گرمای سرخ و اشرافی، امضای رسمی بلا." },
       { t: "هل سبز", d: "لمسی ادویه‌ای که رایحه را زنده نگه می‌دارد." },
       { t: "۱۵ دقیقه اول", d: "لحظه‌ای که حضور شما اعلام می‌شود." },
     ],
@@ -95,7 +95,7 @@ const STAGES: Stage[] = [
   },
   {
     key: "why",
-    rail: "چرا بلّا",
+    rail: "چرا بلا",
     en: "WHY BELLA / 04",
     title: "چرا عطر زدن؟",
     boxes: [
@@ -118,7 +118,7 @@ const STAGES: Stage[] = [
     boxes: [
       { t: "مخمل زمردی", d: "پارچه‌ی دست‌دوز با بافت شاهانه." },
       { t: "دوخت طلایی", d: "خط‌های ریشه‌دار طلا روی لبه‌ها." },
-      { t: "نشان بلّا", d: "لوگوی طلایی مزون بر سینه‌ی پاکت." },
+      { t: "نشان بلا", d: "لوگوی طلایی مزون بر سینه‌ی پاکت." },
       { t: "آماده‌ی هدیه", d: "بدون نیاز به کادوپیچی اضافه." },
     ],
     dLeft: 50,
@@ -157,7 +157,7 @@ function linesToBoxes(raw: string): Box[] {
 export default function Journey({
   festivalIcon,
   festivalActive = true,
-  festivalTitle = "جشنواره خرید اول بلّا",
+  festivalTitle = "جشنواره خرید اول بلا",
   festivalSubtitle = "۲۵٪ تخفیف + اتومایزر هدیه",
   journeyStages = "",
   bottleGlass = "#0d3b26",
@@ -455,7 +455,7 @@ export default function Journey({
                 onClick={() => go(1)}
                 className="mt-3 rounded-full border border-gold/35 bg-black/20 px-6 py-2.5 text-[12px] text-gold-soft active:scale-95"
               >
-                شروع تجربه لوکس بلّا ←
+                شروع تجربه لوکس بلا ←
               </button>
             </motion.div>
 
@@ -563,7 +563,7 @@ export default function Journey({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={bottleImage}
-            alt="عطر بلّا"
+            alt="عطر بلا"
             className="animate-bob relative w-36 object-contain drop-shadow-[0_22px_45px_rgba(0,0,0,0.7)] sm:w-48"
           />
         ) : (

@@ -117,7 +117,7 @@ export async function sendMail(to, subject, text, html) {
 }
 
 export function otpMail(code) {
-  const subject = "\u06a9\u062f \u062a\u0623\u06cc\u06cc\u062f \u0628\u0644\u0651\u0627 \u067e\u0631\u0641\u06cc\u0648\u0645";
+  const subject = "\u06a9\u062f \u062a\u0623\u06cc\u06cc\u062f \u0628\u0644\u0627 \u067e\u0631\u0641\u06cc\u0648\u0645";
   const text =
     `\u06a9\u062f \u062a\u0623\u06cc\u06cc\u062f \u0634\u0645\u0627: ${code}\n` +
     "\u0627\u06cc\u0646 \u06a9\u062f \u062a\u0627 \u06f5 \u062f\u0642\u06cc\u0642\u0647 \u0645\u0639\u062a\u0628\u0631 \u0627\u0633\u062a. \u0622\u0646 \u0631\u0627 \u062f\u0631 \u0627\u062e\u062a\u06cc\u0627\u0631 \u06a9\u0633\u06cc \u0642\u0631\u0627\u0631 \u0646\u062f\u0647\u06cc\u062f.";
@@ -150,7 +150,7 @@ export function maskEmail(value) {
 export function announcementMail(subject, body, name = "") {
   const clean = String(body || "").replace(/\r\n/g, "\n").trim();
   const greeting = name ? `سلام ${name} عزیز،` : "سلام،";
-  const text = `${greeting}\n\n${clean}\n\nبلّا — خانهٔ عطر`;
+  const text = `${greeting}\n\n${clean}\n\nبلا — خانهٔ عطر`;
 
   const esc = (v) =>
     String(v)
@@ -178,10 +178,10 @@ export function announcementMail(subject, body, name = "") {
     ${paragraphs}
     <hr style="margin:22px 0;border:none;border-top:1px solid rgba(212,175,55,0.18)"/>
     <p style="margin:0;font-size:11px;color:#93ac9c">
-      این پیام از سوی فروشگاه بلّا برای مشتریان فرستاده شده است.
+      این پیام از سوی فروشگاه بلا برای مشتریان فرستاده شده است.
     </p>
   </div>
 </body></html>`;
 
-  return { subject: String(subject || "").trim() || "اطلاعیهٔ بلّا", text, html };
+  return { subject: String(subject || "").trim() || "اطلاعیهٔ بلا", text, html };
 }

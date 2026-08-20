@@ -55,8 +55,8 @@ export default function AccountPage() {
         title={user ? `خوش آمدید، ${firstName || user.name}` : "حساب کاربری"}
         sub={
           user
-            ? "پنل شخصی شما در بلّا — باشگاه مشتریان، سفارش‌ها، علاقه‌مندی‌ها و تنظیمات حساب."
-            : "ورود، ثبت‌نام و پیگیری سفارش‌های بلّا."
+            ? "پنل شخصی شما در بلا — باشگاه مشتریان، سفارش‌ها، علاقه‌مندی‌ها و تنظیمات حساب."
+            : "ورود، ثبت‌نام و پیگیری سفارش‌های بلا."
         }
       />
       <section className={`mx-auto px-4 pb-24 sm:px-5 ${user ? "max-w-5xl" : "max-w-2xl"}`}>
@@ -99,16 +99,52 @@ function AuthForms() {
   const { login, requestOtp, verifyOtp } = useAuth();
   const router = useRouter();
   const [channel, setChannel] = useState<OtpChannel>("sms");
+  const [loginMethods, setLoginMethods] = useState({ phone: false, email: false });
+  const [methodsLoading, setMethodsLoading] = useState(true);
+  const [methodsError, setMethodsError] = useState("");
   const [step, setStep] = useState<"form" | "otp">("form");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState("");
   const [cooldown, setCooldown] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const loadLoginMethods = useCallback(async () => {
+    setMethodsLoading(true);
+    setMethodsError("");
+    try {
+      const res = await fetch("/api/settings/login-methods", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "دریافت روش‌های ورود ناموفق بود.");
+      const methods = {
+        phone: data?.methods?.phone === true,
+        email: data?.methods?.email === true,
+      };
+      if (!methods.phone && !methods.email) {
+        throw new Error("در حال حاضر هیچ روش ورودی فعال نیست.");
+      }
+      setLoginMethods(methods);
+      setChannel((current) => {
+        if (current === "sms" && methods.phone) return current;
+        if (current === "email" && methods.email) return current;
+        return methods.phone ? "sms" : "email";
+      });
+    } catch (err) {
+      setLoginMethods({ phone: false, email: false });
+      setMethodsError(
+        err instanceof Error ? err.message : "دریافت روش‌های ورود ناموفق بود.",
+      );
+    } finally {
+      setMethodsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLoginMethods();
+  }, [loadLoginMethods]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -129,6 +165,16 @@ function AuthForms() {
   const sendCode = async () => {
     const normalizedPhone = normalizePhone(phone);
     const trimmedEmail = email.trim();
+    const methodEnabled = byEmail ? loginMethods.email : loginMethods.phone;
+    if (methodsLoading || !methodEnabled) {
+      setError(
+        methodsError ||
+          (byEmail
+            ? "ورود با ایمیل در حال حاضر غیرفعال است."
+            : "ورود با شماره موبایل در حال حاضر غیرفعال است."),
+      );
+      return;
+    }
     if (byEmail) {
       if (!EMAIL_RE.test(trimmedEmail)) {
         setError("ایمیل را درست وارد کنید.");
@@ -169,11 +215,7 @@ function AuthForms() {
         ? { email: email.trim() }
         : { phone: normalizePhone(phone) };
       const ticket = await verifyOtp({ ...identity, code: code.trim() });
-      const result = await login({
-        ...identity,
-        ticket,
-        ...(name.trim() ? { name: name.trim() } : {}),
-      });
+      const result = await login({ ...identity, ticket });
       if (result.admin) {
         // مدیر اصلی: مستقیم به پنل مدیریت.
         router.replace("/admin");
@@ -197,13 +239,38 @@ function AuthForms() {
         <h2 className="text-sm font-black">ورود / ثبت‌نام با کد یک‌بارمصرف</h2>
       </div>
       <p className="mt-1 text-[11px] leading-5 text-sage">
-        شماره موبایل یا ایمیل خود را وارد کنید؛ یک کد برایتان می‌فرستیم و بدون
-        رمز عبور وارد می‌شوید. اگر حساب نداشته باشید، به‌صورت خودکار ساخته می‌شود.
+        {methodsLoading
+          ? "در حال دریافت روش‌های ورود فعال…"
+          : loginMethods.phone && loginMethods.email
+            ? "شماره موبایل یا ایمیل خود را وارد کنید؛ اگر حسابی نداشته باشید بعد از تأیید کد خودکار ساخته می‌شود."
+            : loginMethods.email
+              ? "ورود و ثبت‌نام فقط با ایمیل فعال است؛ بعد از تأیید کد، حساب جدید خودکار ساخته می‌شود."
+              : loginMethods.phone
+                ? "ورود و ثبت‌نام فقط با شماره موبایل فعال است؛ کد یک‌بارمصرف برایتان پیامک می‌شود."
+                : "دریافت روش‌های ورود با خطا مواجه شد."}
       </p>
 
       <div className="mt-5 space-y-3 text-right">
         {step === "form" && (
           <>
+            {methodsLoading && (
+              <div className="flex items-center gap-2 rounded-xl border border-gold/15 glass-soft p-3 text-[11px] text-sage">
+                <Loader2 size={14} className="animate-spin" /> در حال دریافت روش‌های ورود…
+              </div>
+            )}
+            {!methodsLoading && methodsError && (
+              <div className="rounded-xl border border-red-400/25 bg-red-400/[0.06] p-3 text-[11px] text-red-300">
+                <p>{methodsError}</p>
+                <button
+                  type="button"
+                  onClick={() => void loadLoginMethods()}
+                  className="mt-2 font-bold underline"
+                >
+                  تلاش دوباره
+                </button>
+              </div>
+            )}
+
             <div>
               <label className="mb-1.5 block text-[11px] font-bold text-sage">
                 روش دریافت کد
@@ -214,7 +281,11 @@ function AuthForms() {
                     ["sms", "پیامک", MessageSquare],
                     ["email", "ایمیل", Mail],
                   ] as const
-                ).map(([key, label, Icon]) => (
+                )
+                  .filter(([key]) =>
+                    key === "sms" ? loginMethods.phone : loginMethods.email,
+                  )
+                  .map(([key, label, Icon]) => (
                   <button
                     key={key}
                     type="button"
@@ -258,25 +329,20 @@ function AuthForms() {
               />
             )}
 
-            <Field
-              label="نام (اختیاری)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-              icon={<UserRound size={15} />}
-              hint="اگر حساب جدید ساخته شود، این نام ثبت می‌شود."
-            />
-
             <p className="text-[10px] leading-5 text-sage/70">
               {byEmail
-                ? "کد ۶ رقمی به این ایمیل فرستاده می‌شود. پوشه‌ی هرزنامه را هم ببینید."
-                : "کد ۶ رقمی پیامکی به این شماره فرستاده می‌شود."}
+                ? "کد ۶ رقمی به این ایمیل فرستاده می‌شود. اگر عضو نباشید، نام اولیه از بخش اول ایمیل ساخته می‌شود."
+                : "کد ۶ رقمی پیامکی به این شماره فرستاده می‌شود و در صورت نیاز حساب تازه می‌سازد."}
             </p>
 
             <button
               type="button"
               onClick={sendCode}
-              disabled={busy}
+              disabled={
+                busy ||
+                methodsLoading ||
+                (byEmail ? !loginMethods.email : !loginMethods.phone)
+              }
               className="shimmer-btn flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-bold text-[#241a05] disabled:opacity-60"
             >
               {busy && <Loader2 size={15} className="animate-spin" />}
@@ -509,7 +575,7 @@ function Overview({
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div>
             <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.2em] text-sage">
-              <Gem size={13} /> باشگاه مشتریان بلّا
+              <Gem size={13} /> باشگاه مشتریان بلا
             </p>
             <p className="font-display mt-2 text-3xl leading-none text-cream sm:text-4xl">
               {loyalty ? toFa(loyalty.points) : "—"}
@@ -1179,12 +1245,13 @@ function AccountSettings() {
 
   const validate = () => {
     if (!form.name.trim()) return "نام نمی‌تواند خالی باشد.";
-    if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) {
-      return "ایمیل معتبر وارد کنید.";
-    }
-    if (!PHONE_RE.test(normalizePhone(form.phone))) {
+    const email = form.email.trim();
+    const phone = normalizePhone(form.phone);
+    if (email && !EMAIL_RE.test(email)) return "ایمیل معتبر وارد کنید.";
+    if (form.phone.trim() && !PHONE_RE.test(phone)) {
       return "شماره موبایل را به صورت 09xxxxxxxxx وارد کنید.";
     }
+    if (!email && !phone) return "حداقل ایمیل یا شماره موبایل باید در حساب باقی بماند.";
     return pcIssue || addrIssue;
   };
 
@@ -1287,7 +1354,7 @@ function AccountSettings() {
 
       if (pendingIdentity.stage === "current") {
         // Removing e-mail has no new destination, so control of the current
-        // verified phone is the final proof. Other changes continue to step 2.
+        // identifier is the final proof. Other changes continue to step 2.
         if (pendingIdentity.field === "email" && !pendingIdentity.value) {
           await updateProfile({
             ...profilePayload(),
@@ -1360,7 +1427,11 @@ function AccountSettings() {
           autoComplete="tel"
           icon={<Smartphone size={15} />}
           disabled={Boolean(pendingIdentity)}
-          hint="تغییر شماره پس از تأیید شماره فعلی و سپس شماره جدید انجام می‌شود."
+          hint={
+            user?.phone
+              ? "تغییر شماره پس از تأیید شماره فعلی و سپس شماره جدید انجام می‌شود."
+              : "افزودن شماره پس از تأیید ایمیل فعلی و سپس شماره جدید انجام می‌شود."
+          }
         />
         <Field
           label="ایمیل"
@@ -1371,7 +1442,11 @@ function AccountSettings() {
           autoComplete="email"
           icon={<Mail size={15} />}
           disabled={Boolean(pendingIdentity)}
-          hint="تغییر ایمیل پس از تأیید شماره فعلی و سپس ایمیل جدید انجام می‌شود."
+          hint={
+            user?.phone
+              ? "تغییر ایمیل پس از تأیید شماره فعلی و سپس ایمیل جدید انجام می‌شود."
+              : "تغییر ایمیل پس از تأیید ایمیل فعلی و سپس ایمیل جدید انجام می‌شود."
+          }
         />
       </div>
 
@@ -1384,7 +1459,9 @@ function AccountSettings() {
                 {pendingIdentity.stage === "current"
                   ? pendingIdentity.field === "email" && !pendingIdentity.value
                     ? "تأیید حذف ایمیل با شماره فعلی"
-                    : "مرحله ۱ از ۲: تأیید شماره فعلی"
+                    : `مرحله ۱ از ۲: تأیید ${
+                        pendingIdentity.channel === "email" ? "ایمیل فعلی" : "شماره فعلی"
+                      }`
                   : `مرحله ۲ از ۲: تأیید ${
                       pendingIdentity.field === "phone" ? "شماره جدید" : "ایمیل جدید"
                     }`}
@@ -1429,7 +1506,7 @@ function AccountSettings() {
               className="rounded-full border border-gold/25 px-4 py-2 text-xs text-gold-soft disabled:opacity-50"
             >
               {pendingIdentity.stage === "destination"
-                ? "شروع دوباره از تأیید شماره فعلی"
+                ? `شروع دوباره از تأیید ${user?.phone ? "شماره فعلی" : "ایمیل فعلی"}`
                 : identityCooldown > 0
                   ? `ارسال دوباره (${identityCooldown})`
                   : "ارسال دوباره کد"}

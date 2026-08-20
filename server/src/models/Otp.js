@@ -16,7 +16,10 @@ export const OTP_MAX_ATTEMPTS = 5;
 
 const otpSchema = new mongoose.Schema(
   {
-    phone: { type: String, required: true, maxlength: 20, index: true },
+    // Phone remains for SMS/profile compatibility, but e-mail-only sign-ups do
+    // not have one yet. `identity` is the canonical OTP owner for both methods.
+    phone: { type: String, default: "", maxlength: 20, index: true },
+    identity: { type: String, required: true, maxlength: 220, index: true },
     purpose: { type: String, required: true, enum: OTP_PURPOSES },
     // Sensitive profile OTPs are bound to the authenticated user id. Login OTPs
     // leave this empty because no user may exist yet.
@@ -54,6 +57,11 @@ otpSchema.index(
     partialFilterExpression: { ticketDigest: { $type: "string" } },
   }
 );
+otpSchema.index(
+  { identity: 1, purpose: 1, subject: 1, createdAt: -1 },
+  { name: "otp_identity_scope_created" }
+);
+// Retained while old phone-bound OTP documents age out after deployment.
 otpSchema.index(
   { phone: 1, purpose: 1, subject: 1, createdAt: -1 },
   { name: "otp_scope_created" }

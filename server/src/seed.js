@@ -13,7 +13,7 @@ const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/bella";
 
 const seedProducts = [
     {
-        name: "بلّا امپراتریس",
+        name: "بلا امپراتریس",
         nameEn: "Bella Empress",
         tagline: "امضای ملکه‌ی شب‌های طلایی",
         description:

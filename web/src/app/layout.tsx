@@ -40,9 +40,9 @@ const alexBrush = Alex_Brush({
 });
 
 export const metadata: Metadata = {
-  title: "بلّا پرفیوم | مزون عطرهای لوکس",
+  title: "بلا پرفیوم | مزون عطرهای لوکس",
   description:
-    "بلّا پرفیوم — افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده. کلکسیون عطرهای اورینتال با بسته‌بندی مخملی و دوخت طلایی.",
+    "بلا پرفیوم — افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده. کلکسیون عطرهای اورینتال با بسته‌بندی مخملی و دوخت طلایی.",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {

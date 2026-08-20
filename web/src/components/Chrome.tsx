@@ -163,7 +163,7 @@ export function BottomNav() {
  */
 export function ContactSection({
   heading = true,
-  intro = "بلّا را در شبکه‌های اجتماعی دنبال کنید",
+  intro = "بلا را در شبکه‌های اجتماعی دنبال کنید",
   socials = DEFAULT_SOCIALS,
   phone = "۰۲۱ – ۲۲ ۴۴ ۶۶ ۸۸",
   address = "تهران، خیابان فرشته، پاساژ رویال، واحد ۱۲",
@@ -236,7 +236,7 @@ export function ContactSection({
         {heading && (
           <SectionHeading
             eyebrow="CONTACT"
-            title="با مزون بلّا در تماس باشید"
+            title="با مزون بلا در تماس باشید"
             sub="مشاوران رایحه‌ی ما آماده‌اند تا عطر اختصاصی شما را پیدا کنند."
           />
         )}
@@ -320,7 +320,7 @@ export function ContactSection({
                 <div className="flex h-full flex-col items-center justify-center py-10 text-center">
                   <CheckCircle2 size={44} className="text-gold" />
                   <h3 className="mt-4 text-lg font-black text-cream">پیام شما دریافت شد</h3>
-                  <p className="mt-2 text-sm text-sage">به‌زودی یکی از مشاوران بلّا با شما تماس می‌گیرد.</p>
+                  <p className="mt-2 text-sm text-sage">به‌زودی یکی از مشاوران بلا با شما تماس می‌گیرد.</p>
                   <button
                     type="button"
                     onClick={() => setState("idle")}
@@ -385,7 +385,7 @@ export function ContactSection({
 export function Footer({
   aboutText,
   badges: badgesRaw,
-  guaranteeTitle = "ضمانت‌های بلّا",
+  guaranteeTitle = "ضمانت‌های بلا",
   guarantees: guaranteesRaw,
 }: {
   aboutText?: string;
@@ -414,16 +414,16 @@ export function Footer({
           </motion.p>
           <p className="mt-3 max-w-xs text-xs leading-6 text-sage">
             {aboutText ||
-              "مزون بلّا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند."}
+              "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند."}
           </p>
         </div>
         <div className="text-sm">
           <h4 className="mb-4 text-xs font-black tracking-widest text-gold">دسترسی سریع</h4>
           <ul className="space-y-2.5 text-xs text-sage">
             {[
-              ["تجربه لوکس بلّا", "/"],
+              ["تجربه لوکس بلا", "/"],
               ["کلکسیون عطرها", "/shop"],
-              ["آکادمی بلّا", "/learn"],
+              ["آکادمی بلا", "/learn"],
               ["تماس با ما", "/contact"],
             ].map(([l, href]) => (
               <li key={href}>
@@ -508,7 +508,7 @@ export function Footer({
 
       <div className="hairline mx-auto h-px max-w-6xl" />
       <p className="mt-6 text-center text-[11px] text-sage/70">
-        © {new Date().toLocaleDateString("fa-IR", { year: "numeric" })} بلّا پرفیوم — تمامی حقوق محفوظ است.
+        © {new Date().toLocaleDateString("fa-IR", { year: "numeric" })} بلا پرفیوم — تمامی حقوق محفوظ است.
       </p>
     </footer>
   );

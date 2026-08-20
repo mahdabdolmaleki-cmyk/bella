@@ -203,7 +203,7 @@ export default function AdminDashboard() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-0">
           <h1 className="text-xl font-black text-cream">داشبورد</h1>
-          <p className="mt-1 text-sm text-sage">گزارش کامل وضعیت فروشگاه بلّا پرفیوم</p>
+          <p className="mt-1 text-sm text-sage">گزارش کامل وضعیت فروشگاه بلا پرفیوم</p>
         </div>
         <button
           onClick={load}
