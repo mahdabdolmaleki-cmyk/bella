@@ -83,15 +83,12 @@ export type ShippingOption = {
   codFee: number;
   weightGrams: number;
   billableKg: number;
-  zone: string;
   etaDays: { min: number; max: number };
 };
 
 export type ShippingQuote = {
   province: string;
   subtotal: number;
-  zone: string;
-  zoneLabel: string;
   weightGrams: number;
   billableKg: number;
   freeThreshold: number;

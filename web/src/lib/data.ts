@@ -1,3 +1,9 @@
+export type ProductDescriptionBlock = {
+  type: "text" | "image" | "video";
+  text: string;
+  src: string;
+};
+
 export type ProductDTO = {
   id: number;
   name: string;
@@ -32,7 +38,9 @@ export type ProductDTO = {
   scentType?: string;
   scentStructure?: string;
   season?: string;
-  // Long body of the "توضیحات" tab plus extra photos.
+  // Ordered rich content for the "توضیحات" tab. Legacy fields remain optional
+  // so products saved before the block editor continue to render unchanged.
+  descriptionBlocks?: ProductDescriptionBlock[];
   longDescription?: string;
   gallery?: string[];
 };

@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS = {
   tomanPerPoint: 10000,
   tierGoldSpend: 20000000,
   tierDiamondSpend: 60000000,
+  // Minimum goods subtotal (Toman) that makes eligible couriers free.
+  shippingFreeThreshold: 5000000,
   // Home-page scroll story. Empty string = use the built-in default text, so
   // the site looks exactly the same until an admin decides to change it.
   journeyStages: "",
@@ -61,6 +63,7 @@ export const NUMERIC_SETTINGS = {
   tomanPerPoint: { min: 1, max: 100000000 },
   tierGoldSpend: { min: 0, max: 1e12 },
   tierDiamondSpend: { min: 0, max: 1e12 },
+  shippingFreeThreshold: { min: 0, max: 1e12 },
 };
 
 const settingsSchema = new mongoose.Schema({
@@ -82,6 +85,11 @@ const settingsSchema = new mongoose.Schema({
   tomanPerPoint: { type: Number, default: DEFAULT_SETTINGS.tomanPerPoint, min: 1 },
   tierGoldSpend: { type: Number, default: DEFAULT_SETTINGS.tierGoldSpend, min: 0 },
   tierDiamondSpend: { type: Number, default: DEFAULT_SETTINGS.tierDiamondSpend, min: 0 },
+  shippingFreeThreshold: {
+    type: Number,
+    default: DEFAULT_SETTINGS.shippingFreeThreshold,
+    min: 0,
+  },
   // JSON array of { t, d } objects — stored as text so the admin panel can edit
   // it without a schema migration every time a stage is added.
   journeyStages: { type: String, default: DEFAULT_SETTINGS.journeyStages, maxlength: 4000 },
@@ -147,6 +155,9 @@ settingsSchema.methods.toDTO = function () {
     tomanPerPoint: String(this.tomanPerPoint ?? DEFAULT_SETTINGS.tomanPerPoint),
     tierGoldSpend: String(this.tierGoldSpend ?? DEFAULT_SETTINGS.tierGoldSpend),
     tierDiamondSpend: String(this.tierDiamondSpend ?? DEFAULT_SETTINGS.tierDiamondSpend),
+    shippingFreeThreshold: String(
+      this.shippingFreeThreshold ?? DEFAULT_SETTINGS.shippingFreeThreshold
+    ),
     journeyStages: this.journeyStages || "",
     journeyBottleGlass: this.journeyBottleGlass || DEFAULT_SETTINGS.journeyBottleGlass,
     journeyBottleLiquid: this.journeyBottleLiquid || DEFAULT_SETTINGS.journeyBottleLiquid,

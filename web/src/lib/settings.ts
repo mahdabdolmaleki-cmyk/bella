@@ -11,6 +11,7 @@ export const SETTING_KEYS = [
   "tomanPerPoint",
   "tierGoldSpend",
   "tierDiamondSpend",
+  "shippingFreeThreshold",
   "journeyStages",
   "journeyBottleGlass",
   "journeyBottleLiquid",
@@ -45,6 +46,8 @@ export type SiteSettingsMap = {
   tomanPerPoint: string;
   tierGoldSpend: string;
   tierDiamondSpend: string;
+  /** حداقل مبلغ کالاها برای ارسال رایگان، به تومان. */
+  shippingFreeThreshold: string;
   // متن مراحل اسکرول صفحه اصلی (JSON) + رنگ بطری
   journeyStages: string;
   journeyBottleGlass: string;
@@ -244,6 +247,7 @@ export const DEFAULT_SETTINGS: SiteSettingsMap = {
   tomanPerPoint: "10000",
   tierGoldSpend: "20000000",
   tierDiamondSpend: "60000000",
+  shippingFreeThreshold: "5000000",
   // Empty = keep the built-in default story text and bottle colours.
   journeyStages: "",
   journeyBottleGlass: "#0d3b26",

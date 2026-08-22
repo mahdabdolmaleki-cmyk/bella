@@ -9,7 +9,12 @@ import { ah } from "../utils/asyncHandler.js";
 import { logActivity } from "../utils/activityLog.js";
 import { str, int, isPhone, isEmail, isPostalCode, addressIssue } from "../utils/validate.js";
 import { isZarinpalConfigured } from "../utils/zarinpal.js";
-import { resolveShipping, isProvince, DEFAULT_SHIPPING_METHOD } from "../utils/shipping.js";
+import {
+  resolveShipping,
+  isProvince,
+  DEFAULT_SHIPPING_METHOD,
+  DEFAULT_FREE_SHIPPING_THRESHOLD,
+} from "../utils/shipping.js";
 
 const router = Router();
 const MAX_LINES = 50;
@@ -121,6 +126,8 @@ router.post(
       methodKey: shippingMethodKey,
       items,
       subtotal,
+      freeShippingThreshold:
+        siteSettings.shippingFreeThreshold ?? DEFAULT_FREE_SHIPPING_THRESHOLD,
     });
     if (!shipping) {
       return res.status(400).json({ error: "روش ارسالی برای این مقصد در دسترس نیست." });

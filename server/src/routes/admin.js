@@ -1,6 +1,6 @@
 import { Router } from "express";
 import path from "path";
-import Product from "../models/Product.js";
+import Product, { PRODUCT_DESCRIPTION_BLOCK_TYPES } from "../models/Product.js";
 import Order, { ORDER_STATUSES } from "../models/Order.js";
 import Message from "../models/Message.js";
 import Settings, { NUMERIC_SETTINGS } from "../models/Settings.js";
@@ -11,37 +11,51 @@ import {
   LOG_RETENTION_DAYS,
   LOG_LEVELS,
 } from "../utils/fileLog.js";
-import { upload, isRealImage, removeFile, UPLOAD_DIR } from "../middleware/upload.js";
+import {
+  upload,
+  uploadVideo,
+  isRealImage,
+  isRealVideo,
+  removeFile,
+  UPLOAD_DIR,
+  VIDEO_DIR,
+} from "../middleware/upload.js";
 import { requireAdmin, requireAdminWrite, requireOwner } from "../middleware/authMiddleware.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
 import { logActivity, clientIp } from "../utils/activityLog.js";
 import { releaseOrderStock } from "../jobs/staleOrders.js";
-import { normalizePhone } from "../config/superAdmin.js";
 import {
   str,
   num,
   int,
   bool,
-  isEmail,
   isHexColor,
   safeImage,
-  passwordIssue,
 } from "../utils/validate.js";
 import { ADMIN_COOKIE, clearCookieOptions } from "../utils/auth.js";
 import { requestedLoginMethods } from "../utils/loginMethods.js";
 
 const router = Router();
 
-/**
- * Removes an uploaded product image from disk. Only paths inside
- * /uploads/products are touched, so a crafted value cannot delete other files.
- */
-function removeUploadedImage(url) {
+/** Removes only product-owned uploads; crafted paths can never escape. */
+function removeUploadedProductMedia(url) {
   if (typeof url !== "string") return;
-  const match = /^\/uploads\/products\/([A-Za-z0-9._-]+)$/.exec(url.trim());
+  const match = /^\/uploads\/(products|videos)\/([A-Za-z0-9._-]+)$/.exec(url.trim());
   if (!match) return;
-  removeFile(path.join(UPLOAD_DIR, match[1]));
+  removeFile(path.join(match[1] === "videos" ? VIDEO_DIR : UPLOAD_DIR, match[2]));
+}
+
+function productMediaUrls(product) {
+  return new Set(
+    [
+      product?.image,
+      ...(Array.isArray(product?.gallery) ? product.gallery : []),
+      ...(Array.isArray(product?.descriptionBlocks)
+        ? product.descriptionBlocks.map((block) => block?.src)
+        : []),
+    ].filter((url) => typeof url === "string" && url.length > 0),
+  );
 }
 
 /** Shared ?page= / ?limit= parsing for the admin list endpoints. */
@@ -111,11 +125,13 @@ router.patch(
     if (id === null) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0646\u0627\u0645\u0639\u062a\u0628\u0631." });
     const product = await Product.findOne({ id });
     if (!product) return res.status(404).json({ error: "\u0645\u062d\u0635\u0648\u0644 \u06cc\u0627\u0641\u062a \u0646\u0634\u062f." });
-    const previousImage = product.image;
+    const previousMedia = productMediaUrls(product);
     Object.assign(product, sanitizeProduct(req.body || {}, true));
     await product.save();
-    // BUG FIX: replacing an image left the old file on disk forever.
-    if (previousImage && previousImage !== product.image) removeUploadedImage(previousImage);
+    const currentMedia = productMediaUrls(product);
+    for (const url of previousMedia) {
+      if (!currentMedia.has(url)) removeUploadedProductMedia(url);
+    }
     logActivity(req, { action: "product.update", target: product.name, status: 200, meta: `stock=${product.stock}` });
     res.json({ product: product.toAdminDTO() });
   })
@@ -160,8 +176,7 @@ router.delete(
     const product = await Product.findOne({ id });
     if (!product) return res.status(404).json({ error: "\u0645\u062d\u0635\u0648\u0644 \u06cc\u0627\u0641\u062a \u0646\u0634\u062f." });
     await Product.deleteOne({ id });
-    // BUG FIX: the uploaded image used to stay on disk after the product was gone.
-    removeUploadedImage(product.image);
+    for (const url of productMediaUrls(product)) removeUploadedProductMedia(url);
     logActivity(req, { action: "product.delete", target: product.name, status: 200 });
     res.json({ ok: true });
   })
@@ -283,69 +298,9 @@ router.get(
   })
 );
 
-router.post(
-  "/users",
-  requireAdminWrite,
-  ah(async (req, res) => {
-    const name = str(req.body?.name, { max: 80 });
-    const email = isEmail(req.body?.email);
-    const phone = normalizePhone(req.body?.phone) || "";
-    const address = str(req.body?.address, { max: 500 });
-    const password = typeof req.body?.password === "string" ? req.body.password : "";
-
-    if (!name) return res.status(400).json({ error: "\u0646\u0627\u0645 \u0627\u0644\u0632\u0627\u0645\u06cc \u0627\u0633\u062a." });
-    if (!email) return res.status(400).json({ error: "\u0627\u06cc\u0645\u06cc\u0644 \u0645\u0639\u062a\u0628\u0631 \u0648\u0627\u0631\u062f \u06a9\u0646\u06cc\u062f." });
-    const pwIssue = passwordIssue(password);
-    if (pwIssue) return res.status(400).json({ error: pwIssue });
-
-    if (await User.exists({ email, deletedAt: null })) {
-      return res.status(409).json({ error: "\u0627\u06cc\u0646 \u0627\u06cc\u0645\u06cc\u0644 \u0642\u0628\u0644\u0627\u064b \u062b\u0628\u062a \u0634\u062f\u0647 \u0627\u0633\u062a." });
-    }
-
-    const user = new User({ name, email, phone, address });
-    await user.setPassword(password);
-    await user.save();
-
-    logActivity(req, { action: "customer.create", target: email, status: 201 });
-    res.status(201).json({ user: customerDTO(user) });
-  })
-);
-
-router.patch(
-  "/users/:id",
-  requireAdminWrite,
-  ah(async (req, res) => {
-    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
-    if (!user) return res.status(404).json({ error: "\u06a9\u0627\u0631\u0628\u0631 \u06cc\u0627\u0641\u062a \u0646\u0634\u062f." });
-
-    if (req.body?.name !== undefined) {
-      const name = str(req.body.name, { max: 80 });
-      if (!name) return res.status(400).json({ error: "\u0646\u0627\u0645 \u0646\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u062f \u062e\u0627\u0644\u06cc \u0628\u0627\u0634\u062f." });
-      user.name = name;
-    }
-    if (req.body?.email !== undefined) {
-      const email = isEmail(req.body.email);
-      if (!email) return res.status(400).json({ error: "\u0627\u06cc\u0645\u06cc\u0644 \u0645\u0639\u062a\u0628\u0631 \u0648\u0627\u0631\u062f \u06a9\u0646\u06cc\u062f." });
-      if (email !== user.email && (await User.exists({ email, deletedAt: null }))) {
-        return res.status(409).json({ error: "\u0627\u06cc\u0646 \u0627\u06cc\u0645\u06cc\u0644 \u0642\u0628\u0644\u0627\u064b \u062b\u0628\u062a \u0634\u062f\u0647 \u0627\u0633\u062a." });
-      }
-      user.email = email;
-    }
-    if (req.body?.phone !== undefined) {
-      user.phone = normalizePhone(req.body.phone) || str(req.body.phone, { max: 20 });
-    }
-    if (req.body?.address !== undefined) user.address = str(req.body.address, { max: 500 });
-    if (req.body?.password) {
-      const pwIssue = passwordIssue(req.body.password);
-      if (pwIssue) return res.status(400).json({ error: pwIssue });
-      await user.setPassword(req.body.password);
-    }
-
-    await user.save();
-    logActivity(req, { action: "customer.update", target: user.email, status: 200 });
-    res.json({ user: customerDTO(user) });
-  })
-);
+// Customer identities are self-service and OTP-verified. Administrators can
+// list/search or delete an account, but cannot create customers or edit their
+// identity/profile data from the panel or API.
 
 // Soft delete: the row is kept (accounting / dispute history) but hidden.
 router.delete(
@@ -608,6 +563,67 @@ router.post(
   })
 );
 
+router.post(
+  "/upload-product-video",
+  requireAdminWrite,
+  rateLimit({ name: "product-video-upload", windowMs: 60 * 60 * 1000, max: 30 }),
+  (req, res, next) => {
+    uploadVideo.single("file")(req, res, (err) => {
+      if (!err) return next();
+      return res.status(400).json({
+        error:
+          err.code === "LIMIT_FILE_SIZE"
+            ? "حجم ویدئو نباید از ۱۰۰ مگابایت بیشتر باشد."
+            : err.message || "آپلود ویدئو انجام نشد.",
+      });
+    });
+  },
+  ah(async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "فایلی ارسال نشد." });
+    const filePath = path.join(VIDEO_DIR, req.file.filename);
+    if (!isRealVideo(filePath)) {
+      removeFile(filePath);
+      logActivity(req, {
+        action: "product-video.rejected",
+        target: req.file.originalname,
+        success: false,
+        status: 400,
+      });
+      return res.status(400).json({ error: "فایل ارسالی یک ویدئوی معتبر نیست." });
+    }
+    logActivity(req, {
+      action: "product-video.create",
+      target: req.file.filename,
+      status: 201,
+    });
+    res.status(201).json({ url: `/uploads/videos/${req.file.filename}` });
+  })
+);
+
+export function sanitizeDescriptionBlocks(input) {
+  if (!Array.isArray(input)) return [];
+  let textBudget = 24000;
+
+  return input
+    .slice(0, 40)
+    .map((raw) => {
+      const type = PRODUCT_DESCRIPTION_BLOCK_TYPES.includes(raw?.type)
+        ? raw.type
+        : "text";
+      const text = str(raw?.text, { max: Math.min(6000, textBudget) });
+      textBudget = Math.max(0, textBudget - text.length);
+      const rawSrc = str(raw?.src, { max: 600 });
+      const src =
+        type === "image"
+          ? (/^\/uploads\/products\/[A-Za-z0-9._-]+$/.test(rawSrc) ? rawSrc : "")
+          : type === "video"
+            ? (/^\/uploads\/videos\/[A-Za-z0-9._-]+$/.test(rawSrc) ? rawSrc : "")
+            : "";
+      return { type, text, src };
+    })
+    .filter((block) => (block.type === "text" ? block.text : block.src));
+}
+
 function sanitizeProduct(body, partial = false) {
   const textFields = {
     name: 120,
@@ -654,8 +670,11 @@ function sanitizeProduct(body, partial = false) {
     out.stock = int(body.stock, { min: 0, max: 1000000, fallback: 0 }) ?? 0;
   if (!partial || body.allowBackorder !== undefined)
     out.allowBackorder = bool(body.allowBackorder);
-  // Gallery: each entry goes through the same safeImage() check as the main
-  // image, so a crafted "javascript:" or off-site URL can never be stored.
+  if (!partial || body.descriptionBlocks !== undefined) {
+    out.descriptionBlocks = sanitizeDescriptionBlocks(body.descriptionBlocks);
+  }
+  // Legacy gallery: retained for existing data while products are migrated to
+  // ordered descriptionBlocks by the redesigned admin editor.
   if (!partial || body.gallery !== undefined) {
     const raw = Array.isArray(body.gallery) ? body.gallery : [];
     out.gallery = raw

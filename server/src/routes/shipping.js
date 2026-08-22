@@ -1,12 +1,14 @@
 import { Router } from "express";
 import Product from "../models/Product.js";
+import Settings from "../models/Settings.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
 import { int, bool } from "../utils/validate.js";
 import {
   PROVINCES,
   SHIPPING_METHODS,
-  FREE_SHIPPING_THRESHOLD,
+  DEFAULT_FREE_SHIPPING_THRESHOLD,
+  normaliseFreeShippingThreshold,
   quoteShipping,
   isProvince,
 } from "../utils/shipping.js";
@@ -15,23 +17,53 @@ const router = Router();
 const MAX_LINES = 50;
 const MAX_QTY = 99;
 
+// Only checkout information is exposed publicly. Internal zone/origin metadata
+// stays on the server and is used again when the order is priced and persisted.
+function toPublicQuote(quote) {
+  return {
+    weightGrams: quote.weightGrams,
+    billableKg: quote.billableKg,
+    freeThreshold: quote.freeThreshold,
+    freeRemaining: quote.freeRemaining,
+    options: quote.options.map((option) => ({
+      key: option.key,
+      label: option.label,
+      icon: option.icon,
+      desc: option.desc,
+      cost: option.cost,
+      listPrice: option.listPrice,
+      free: option.free,
+      insurance: option.insurance,
+      codFee: option.codFee,
+      weightGrams: option.weightGrams,
+      billableKg: option.billableKg,
+      etaDays: option.etaDays,
+    })),
+  };
+}
+
 // GET /api/shipping/options -> static catalogue for the checkout form
 router.get(
   "/options",
   rateLimit({ name: "shipping-options", windowMs: 60 * 1000, max: 120 }),
-  (_req, res) => {
+  ah(async (_req, res) => {
+    const settings = await Settings.getSingleton();
+    const freeThreshold = normaliseFreeShippingThreshold(
+      settings.shippingFreeThreshold ?? DEFAULT_FREE_SHIPPING_THRESHOLD
+    );
+    res.set("Cache-Control", "no-store");
     res.json({
       provinces: PROVINCES,
-      freeThreshold: FREE_SHIPPING_THRESHOLD,
-      methods: SHIPPING_METHODS.map((m) => ({
-        key: m.key,
-        label: m.label,
-        icon: m.icon,
-        desc: m.desc,
-        codSupported: m.codSupported,
+      freeThreshold,
+      methods: SHIPPING_METHODS.map((method) => ({
+        key: method.key,
+        label: method.label,
+        icon: method.icon,
+        desc: method.desc,
+        codSupported: method.codSupported,
       })),
     });
-  }
+  })
 );
 
 // ---------------------------------------------------------------------------
@@ -83,14 +115,17 @@ router.post(
     }));
     const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
 
+    const settings = await Settings.getSingleton();
     const quote = quoteShipping({
       province,
       items,
       subtotal,
       cod: bool(req.body?.cod),
+      freeShippingThreshold:
+        settings.shippingFreeThreshold ?? DEFAULT_FREE_SHIPPING_THRESHOLD,
     });
 
-    res.json({ province, subtotal, ...quote });
+    res.json({ province, subtotal, ...toPublicQuote(quote) });
   })
 );
 

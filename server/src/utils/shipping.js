@@ -7,8 +7,21 @@
 // in routes/orders.js. Otherwise a tampered request could pay 0 for shipping.
 // ---------------------------------------------------------------------------
 
-/** Free-shipping threshold in Toman (order subtotal, before shipping). */
-export const FREE_SHIPPING_THRESHOLD = 5_000_000;
+/** Fallback used only for legacy settings documents. */
+export const DEFAULT_FREE_SHIPPING_THRESHOLD = 5_000_000;
+
+/** The physical warehouse all courier zones are measured from. */
+const SHIPPING_ORIGIN = Object.freeze({
+  province: "البرز",
+  city: "محمدشهر",
+  label: "البرز، محمدشهر",
+});
+
+export function normaliseFreeShippingThreshold(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return DEFAULT_FREE_SHIPPING_THRESHOLD;
+  return Math.min(1e12, Math.round(amount));
+}
 
 /** Grams assumed per bottle when the product has no explicit weight. */
 const DEFAULT_ITEM_GRAMS = 450;
@@ -19,9 +32,9 @@ const PACKAGING_GRAMS = 250;
 // Zones — Iranian couriers price by distance zone, not by single flat rate.
 // ---------------------------------------------------------------------------
 export const ZONES = {
-  tehran: { key: "tehran", label: "تهران" },
-  near: { key: "near", label: "استان‌های هم‌جوار" },
-  far: { key: "far", label: "سایر استان‌ها" },
+  local: { key: "local", label: "ارسال درون‌استانی" },
+  near: { key: "near", label: "ارسال منطقه‌ای" },
+  far: { key: "far", label: "ارسال سراسری" },
 };
 
 export const PROVINCES = [
@@ -60,9 +73,9 @@ export const PROVINCES = [
 
 const PROVINCE_SET = new Set(PROVINCES);
 
-/** Provinces reachable overnight from the Tehran warehouse. */
+/** Provinces treated as near-zone destinations from the Mohammadshahr warehouse. */
 const NEAR_PROVINCES = new Set([
-  "البرز",
+  "تهران",
   "قم",
   "قزوین",
   "سمنان",
@@ -76,7 +89,7 @@ const NEAR_PROVINCES = new Set([
 
 export function zoneForProvince(province) {
   const p = String(province || "").trim();
-  if (p === "تهران") return "tehran";
+  if (p === SHIPPING_ORIGIN.province) return "local";
   if (NEAR_PROVINCES.has(p)) return "near";
   return "far";
 }
@@ -101,9 +114,9 @@ export const SHIPPING_METHODS = [
     label: "تیپاکس",
     icon: "truck",
     desc: "تحویل درب منزل با بارکد رهگیری، پوشش سراسری",
-    base: { tehran: 95_000, near: 135_000, far: 175_000 },
-    perKg: { tehran: 25_000, near: 35_000, far: 45_000 },
-    days: { tehran: [1, 2], near: [2, 3], far: [3, 5] },
+    base: { local: 95_000, near: 135_000, far: 175_000 },
+    perKg: { local: 25_000, near: 35_000, far: 45_000 },
+    days: { local: [1, 2], near: [2, 3], far: [3, 5] },
     insuranceRate: 0.005,
     codSupported: true,
     codFee: 30_000,
@@ -114,9 +127,9 @@ export const SHIPPING_METHODS = [
     label: "پست پیشتاز",
     icon: "box",
     desc: "اقتصادی‌ترین گزینه، تحویل توسط پست جمهوری اسلامی ایران",
-    base: { tehran: 62_000, near: 84_000, far: 110_000 },
-    perKg: { tehran: 18_000, near: 24_000, far: 32_000 },
-    days: { tehran: [2, 3], near: [3, 5], far: [4, 7] },
+    base: { local: 62_000, near: 84_000, far: 110_000 },
+    perKg: { local: 18_000, near: 24_000, far: 32_000 },
+    days: { local: [2, 3], near: [3, 5], far: [4, 7] },
     insuranceRate: 0.003,
     codSupported: false,
     codFee: 0,
@@ -127,9 +140,9 @@ export const SHIPPING_METHODS = [
     label: "چاپار اکسپرس",
     icon: "clock",
     desc: "ارسال سریع بین‌شهری با بیمه کامل محموله",
-    base: { tehran: 110_000, near: 150_000, far: 195_000 },
-    perKg: { tehran: 28_000, near: 38_000, far: 48_000 },
-    days: { tehran: [1, 1], near: [1, 2], far: [2, 4] },
+    base: { local: 110_000, near: 150_000, far: 195_000 },
+    perKg: { local: 28_000, near: 38_000, far: 48_000 },
+    days: { local: [1, 1], near: [1, 2], far: [2, 4] },
     insuranceRate: 0.007,
     codSupported: true,
     codFee: 35_000,
@@ -137,17 +150,17 @@ export const SHIPPING_METHODS = [
   },
   {
     key: "peyk",
-    label: "پیک موتوری تهران",
+    label: "پیک محلی",
     icon: "headset",
-    desc: "تحویل همان روز — فقط داخل شهر تهران",
-    base: { tehran: 120_000, near: 0, far: 0 },
-    perKg: { tehran: 0, near: 0, far: 0 },
-    days: { tehran: [0, 1], near: [0, 0], far: [0, 0] },
+    desc: "تحویل سریع محلی — ویژه مقصدهای تحت پوشش",
+    base: { local: 120_000, near: 0, far: 0 },
+    perKg: { local: 0, near: 0, far: 0 },
+    days: { local: [0, 1], near: [0, 0], far: [0, 0] },
     insuranceRate: 0,
     codSupported: true,
     codFee: 0,
     freeEligible: false,
-    zones: ["tehran"], // not offered outside Tehran
+    zones: ["local"], // local courier serves Alborz destinations only
   },
 ];
 
@@ -186,7 +199,16 @@ function roundToman(n) {
  * Quotes one courier.
  * @returns null when the courier does not serve the destination zone.
  */
-export function quoteMethod(method, { zone, grams, subtotal, cod = false }) {
+export function quoteMethod(
+  method,
+  {
+    zone,
+    grams,
+    subtotal,
+    cod = false,
+    freeShippingThreshold = DEFAULT_FREE_SHIPPING_THRESHOLD,
+  }
+) {
   if (!method) return null;
   if (Array.isArray(method.zones) && !method.zones.includes(zone)) return null;
 
@@ -201,8 +223,8 @@ export function quoteMethod(method, { zone, grams, subtotal, cod = false }) {
 
   // Free shipping only applies to the standard couriers, and never swallows
   // the cash-on-delivery surcharge.
-  const free =
-    method.freeEligible && (Number(subtotal) || 0) >= FREE_SHIPPING_THRESHOLD;
+  const threshold = normaliseFreeShippingThreshold(freeShippingThreshold);
+  const free = method.freeEligible && (Number(subtotal) || 0) >= threshold;
   const cost = free ? codFee : listPrice;
 
   const [dMin, dMax] = method.days[zone] ?? method.days.far;
@@ -225,11 +247,24 @@ export function quoteMethod(method, { zone, grams, subtotal, cod = false }) {
 }
 
 /** Quotes every courier that serves the destination. */
-export function quoteShipping({ province, items = [], subtotal = 0, cod = false }) {
+export function quoteShipping({
+  province,
+  items = [],
+  subtotal = 0,
+  cod = false,
+  freeShippingThreshold = DEFAULT_FREE_SHIPPING_THRESHOLD,
+}) {
   const zone = zoneForProvince(province);
   const grams = cartWeightGrams(items);
-  const options = SHIPPING_METHODS.map((m) =>
-    quoteMethod(m, { zone, grams, subtotal, cod })
+  const threshold = normaliseFreeShippingThreshold(freeShippingThreshold);
+  const options = SHIPPING_METHODS.map((method) =>
+    quoteMethod(method, {
+      zone,
+      grams,
+      subtotal,
+      cod,
+      freeShippingThreshold: threshold,
+    })
   ).filter(Boolean);
 
   return {
@@ -237,8 +272,8 @@ export function quoteShipping({ province, items = [], subtotal = 0, cod = false 
     zoneLabel: ZONES[zone].label,
     weightGrams: grams,
     billableKg: billableKg(grams),
-    freeThreshold: FREE_SHIPPING_THRESHOLD,
-    freeRemaining: Math.max(0, FREE_SHIPPING_THRESHOLD - (Number(subtotal) || 0)),
+    freeThreshold: threshold,
+    freeRemaining: Math.max(0, threshold - (Number(subtotal) || 0)),
     options,
   };
 }
@@ -247,8 +282,21 @@ export function quoteShipping({ province, items = [], subtotal = 0, cod = false 
  * Resolves the courier the customer picked, falling back to the cheapest
  * available option when the requested one does not serve the destination.
  */
-export function resolveShipping({ province, methodKey, items = [], subtotal = 0, cod = false }) {
-  const quote = quoteShipping({ province, items, subtotal, cod });
+export function resolveShipping({
+  province,
+  methodKey,
+  items = [],
+  subtotal = 0,
+  cod = false,
+  freeShippingThreshold = DEFAULT_FREE_SHIPPING_THRESHOLD,
+}) {
+  const quote = quoteShipping({
+    province,
+    items,
+    subtotal,
+    cod,
+    freeShippingThreshold,
+  });
   const chosen =
     quote.options.find((o) => o.key === methodKey) ||
     quote.options.find((o) => o.key === DEFAULT_SHIPPING_METHOD) ||

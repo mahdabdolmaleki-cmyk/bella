@@ -1,6 +1,23 @@
 import mongoose from "mongoose";
 import { nextSequence } from "./Counter.js";
 
+export const PRODUCT_DESCRIPTION_BLOCK_TYPES = ["text", "image", "video"];
+
+const descriptionBlockSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: PRODUCT_DESCRIPTION_BLOCK_TYPES,
+      default: "text",
+    },
+    // Main copy for text blocks; optional caption for image/video blocks.
+    text: { type: String, default: "", maxlength: 6000 },
+    // Uploaded image or video path. HTML is never accepted or stored.
+    src: { type: String, default: "", maxlength: 600 },
+  },
+  { _id: false },
+);
+
 const productSchema = new mongoose.Schema(
   {
     id: { type: Number, unique: true }, // unique already builds the index
@@ -40,9 +57,20 @@ const productSchema = new mongoose.Schema(
     scentType: { type: String, default: "", maxlength: 120 },      // نوع رایحه
     scentStructure: { type: String, default: "", maxlength: 160 }, // ساختار رایحه
     season: { type: String, default: "", maxlength: 80 },          // فصل پیشنهادی
-    // Long "توضیحات" tab body. `description` stays the short summary.
+    // Ordered rich content for the "توضیحات" tab. Text, uploaded images and
+    // uploaded videos can be interleaved without accepting unsafe raw HTML.
+    descriptionBlocks: {
+      type: [descriptionBlockSchema],
+      default: [],
+      validate: {
+        validator: (arr) => arr.length <= 40,
+        message: "حداکثر ۴۰ بلوک توضیحات مجاز است.",
+      },
+    },
+    // Legacy fields are retained only so existing MongoDB data remains readable
+    // until that product is edited and migrated to descriptionBlocks.
     longDescription: { type: String, default: "", maxlength: 6000 },
-    // Extra photos shown as thumbnails under the main image (max 6).
+    // Legacy extra photos shown as thumbnails under the main image (max 6).
     gallery: {
       type: [String],
       default: [],
@@ -94,6 +122,13 @@ productSchema.methods.toDTO = function () {
     scentType: this.scentType || "",
     scentStructure: this.scentStructure || "",
     season: this.season || "",
+    descriptionBlocks: Array.isArray(this.descriptionBlocks)
+      ? this.descriptionBlocks.map((block) => ({
+          type: block.type,
+          text: block.text || "",
+          src: block.src || "",
+        }))
+      : [],
     longDescription: this.longDescription || "",
     gallery: Array.isArray(this.gallery) ? this.gallery.filter(Boolean) : [],
   };

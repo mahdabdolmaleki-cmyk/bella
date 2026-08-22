@@ -26,6 +26,7 @@ import {
   LogIn,
   Mail,
   Smartphone,
+  Truck,
 } from "lucide-react";
 import {
   parseSocials,
@@ -79,6 +80,7 @@ const TABS = [
   { id: "icons", label: "آیکن‌ها و مزیت‌ها", icon: Shapes, tint: "text-fuchsia-300" },
   { id: "footer", label: "فوتر و نمادها", icon: PanelBottom, tint: "text-emerald-300" },
   { id: "loyalty", label: "باشگاه مشتریان", icon: Gem, tint: "text-violet-300" },
+  { id: "shipping", label: "ارسال", icon: Truck, tint: "text-sky-300" },
   { id: "categories", label: "دسته‌بندی فروشگاه", icon: LayoutGrid, tint: "text-lime-300" },
   { id: "contact", label: "تماس با ما", icon: Share2, tint: "text-rose-300" },
   { id: "maintenance", label: "پرداخت و نگهداری", icon: AlertCircle, tint: "text-orange-300" },
@@ -1068,6 +1070,42 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
           </div>
           {saveBar}
         </section>
+      )}
+
+      {/* ================= ارسال ================= */}
+      {tab === "shipping" && (
+        <div className="space-y-4">
+          <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
+            <div className="flex items-center gap-2 text-gold">
+              <Truck size={16} />
+              <h2 className="text-sm font-black">تنظیمات ارسال سفارش</h2>
+            </div>
+            <p className="mt-1 text-[11px] leading-6 text-sage">
+              هزینه و رایگان‌شدن ارسال همیشه در سرور محاسبه می‌شود و مشتری نمی‌تواند
+              مبلغ آن را تغییر دهد.
+            </p>
+
+            <div className="mt-4 max-w-xl">
+              <label className="block rounded-2xl border border-gold/15 p-4">
+                <span className="mb-1.5 block text-[11px] font-bold text-gold-soft">
+                  حداقل مبلغ سبد برای ارسال رایگان (تومان)
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={form.shippingFreeThreshold}
+                  onChange={(event) => set("shippingFreeThreshold", event.target.value)}
+                  className={inputCls}
+                />
+                <span className="mt-1.5 block text-[10px] leading-5 text-sage/70">
+                  عدد صفر یعنی تمام روش‌های واجدشرایط از هر مبلغی رایگان باشند.
+                </span>
+              </label>
+            </div>
+          </section>
+          {saveBar}
+        </div>
       )}
 
       {/* ================= دسته‌بندی فروشگاه ================= */}

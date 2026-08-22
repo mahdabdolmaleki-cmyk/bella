@@ -29,6 +29,10 @@ import notificationsRouter from "./routes/notifications.js";
 import backupRouter from "./routes/backup.js";
 import tutorialsRouter from "./routes/tutorials.js";
 import adminTutorialsRouter from "./routes/adminTutorials.js";
+import {
+  currentExclusiveOperation,
+  isMaintenanceInProgress,
+} from "./utils/restoreState.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,7 +90,23 @@ app.use(
 );
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "bella-server" });
+  const operation = currentExclusiveOperation();
+  res.status(operation ? 503 : 200).json({
+    ok: !operation,
+    maintenance: operation,
+    restoring: operation === "restore",
+    service: "bella-server",
+  });
+});
+
+// Full backup snapshots and restores are exclusive. Their own request passed
+// this middleware before acquiring the lock; every concurrent request waits.
+app.use((req, res, next) => {
+  if (!isMaintenanceInProgress()) return next();
+  return res.status(503).json({
+    error: "عملیات پشتیبان‌گیری در حال انجام است؛ چند لحظه دیگر دوباره تلاش کنید.",
+    maintenance: currentExclusiveOperation(),
+  });
 });
 
 // ---- Static uploads --------------------------------------------------------

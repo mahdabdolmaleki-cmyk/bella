@@ -1,7 +1,23 @@
 "use client";
 import { useRef, useState, type ReactNode } from "react";
-import { Plus, Pencil, Trash2, X, Eye, EyeOff, Star, Upload, ImageOff, Loader2 } from "lucide-react";
-import { formatToman } from "@/lib/data";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Eye,
+  EyeOff,
+  Star,
+  Upload,
+  ImageOff,
+  Loader2,
+  Type,
+  ImagePlus,
+  Film,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
+import { formatToman, type ProductDescriptionBlock } from "@/lib/data";
 import { ProductVisual } from "@/components/art";
 import type { Product } from "@/lib/types";
 
@@ -36,16 +52,31 @@ const EMPTY_FORM = {
   manufacturer: "",
   suitableFor: "",
   concentration: "",
-  originCountry: "",
   madeIn: "",
   scentType: "",
   scentStructure: "",
   season: "",
-  longDescription: "",
-  gallery: [] as string[],
+  descriptionBlocks: [] as ProductDescriptionBlock[],
 };
 
 type FormState = typeof EMPTY_FORM;
+
+function productDescriptionBlocks(p: Product): ProductDescriptionBlock[] {
+  if (p.descriptionBlocks?.length) {
+    return p.descriptionBlocks.map((block) => ({ ...block }));
+  }
+
+  // One-time, non-destructive migration for products created with the previous
+  // long-text + gallery form. Saving the product writes these in block order.
+  const blocks: ProductDescriptionBlock[] = [];
+  if (p.longDescription?.trim()) {
+    blocks.push({ type: "text", text: p.longDescription.trim(), src: "" });
+  }
+  for (const src of p.gallery || []) {
+    if (src) blocks.push({ type: "image", text: "", src });
+  }
+  return blocks;
+}
 
 function productToForm(p: Product): FormState {
   return {
@@ -74,13 +105,11 @@ function productToForm(p: Product): FormState {
     manufacturer: p.manufacturer || "",
     suitableFor: p.suitableFor || "",
     concentration: p.concentration || "",
-    originCountry: p.originCountry || "",
     madeIn: p.madeIn || "",
     scentType: p.scentType || "",
     scentStructure: p.scentStructure || "",
     season: p.season || "",
-    longDescription: p.longDescription || "",
-    gallery: p.gallery ? [...p.gallery] : [],
+    descriptionBlocks: productDescriptionBlocks(p),
   };
 }
 
@@ -100,10 +129,12 @@ export default function ProductsAdmin({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [uploadingBlock, setUploadingBlock] = useState<number | null>(null);
+  const [videoProgress, setVideoProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const blockImageInputRef = useRef<HTMLInputElement>(null);
+  const blockVideoInputRef = useRef<HTMLInputElement>(null);
 
   const openCreate = () => {
     setEditing(null);
@@ -144,34 +175,103 @@ export default function ProductsAdmin({
     }
   };
 
-  // Extra photos for the "توضیحات" tab and the thumbnail strip (max 6).
-  const uploadGalleryImage = async (file: File) => {
-    setError("");
-    if (form.gallery.length >= 6) {
-      setError("حداکثر ۶ تصویر تکمیلی مجاز است.");
+  const setDescriptionBlock = (
+    index: number,
+    patch: Partial<ProductDescriptionBlock>,
+  ) => {
+    setForm((current) => ({
+      ...current,
+      descriptionBlocks: current.descriptionBlocks.map((block, blockIndex) =>
+        blockIndex === index ? { ...block, ...patch } : block,
+      ),
+    }));
+  };
+
+  const addDescriptionBlock = (type: ProductDescriptionBlock["type"]) => {
+    if (form.descriptionBlocks.length >= 40) {
+      setError("حداکثر ۴۰ بخش توضیحات مجاز است.");
       return;
     }
-    setUploadingGallery(true);
+    setForm((current) => ({
+      ...current,
+      descriptionBlocks: [
+        ...current.descriptionBlocks,
+        { type, text: "", src: "" },
+      ],
+    }));
+  };
+
+  const removeDescriptionBlock = (index: number) =>
+    setForm((current) => ({
+      ...current,
+      descriptionBlocks: current.descriptionBlocks.filter((_, i) => i !== index),
+    }));
+
+  const moveDescriptionBlock = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= form.descriptionBlocks.length) return;
+    setForm((current) => {
+      const descriptionBlocks = [...current.descriptionBlocks];
+      [descriptionBlocks[index], descriptionBlocks[target]] = [
+        descriptionBlocks[target],
+        descriptionBlocks[index],
+      ];
+      return { ...current, descriptionBlocks };
+    });
+  };
+
+  const uploadBlockImage = async (index: number, file: File) => {
+    setError("");
+    setUploadingBlock(index);
     try {
       const body = new FormData();
       body.append("file", file);
       const res = await fetch("/api/admin/upload", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "خطا در آپلود عکس.");
-        setUploadingGallery(false);
-        return;
-      }
-      setForm((f) => ({ ...f, gallery: [...f.gallery, data.url].slice(0, 6) }));
-      setUploadingGallery(false);
-    } catch {
-      setError("خطا در برقراری ارتباط با سرور.");
-      setUploadingGallery(false);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.error || "آپلود عکس انجام نشد.");
+      setDescriptionBlock(index, { src: String(data.url) });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "آپلود عکس انجام نشد.");
+    } finally {
+      setUploadingBlock(null);
     }
   };
 
-  const removeGalleryImage = (url: string) =>
-    setForm((f) => ({ ...f, gallery: f.gallery.filter((item) => item !== url) }));
+  const uploadBlockVideo = (index: number, file: File) => {
+    setError("");
+    setUploadingBlock(index);
+    setVideoProgress(0);
+    const body = new FormData();
+    body.append("file", file);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/admin/upload-product-video");
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        setVideoProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      let data: { url?: string; error?: string } = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        // A non-JSON response becomes the generic upload error below.
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data.url) {
+        setDescriptionBlock(index, { src: data.url });
+      } else {
+        setError(data.error || "آپلود ویدئو انجام نشد.");
+      }
+      setUploadingBlock(null);
+      setVideoProgress(null);
+    };
+    xhr.onerror = () => {
+      setError("ارتباط هنگام آپلود ویدئو قطع شد.");
+      setUploadingBlock(null);
+      setVideoProgress(null);
+    };
+    xhr.send(body);
+  };
 
   const submit = async () => {
     setSaving(true);
@@ -185,7 +285,11 @@ export default function ProductsAdmin({
       sizeMl: Number(form.sizeMl),
       badge: form.badge || null,
       image: form.image || null,
-      gallery: form.gallery,
+      descriptionBlocks: form.descriptionBlocks,
+      // Clear the superseded fields only after their existing content has been
+      // migrated into descriptionBlocks by productToForm().
+      longDescription: "",
+      gallery: [],
     };
     try {
       const res = await fetch(
@@ -442,75 +546,208 @@ export default function ProductsAdmin({
                 />
               </Field>
 
-              <Field label="توضیحات کامل (تب «توضیحات» صفحه محصول)" className="mt-3">
-                <textarea
-                  rows={7}
-                  value={form.longDescription}
-                  onChange={(e) => set("longDescription", e.target.value)}
-                  placeholder="متن بلند معرفی محصول — داستان رایحه، موارد مصرف، نکات نگهداری…"
-                  className={inputCls}
-                />
-                <p className="mt-1 text-[10px] text-sage/70">
-                  هر خط خالی یک پاراگراف جدید می‌سازد. حداکثر ۶۰۰۰ کاراکتر.
-                </p>
-              </Field>
-
-              {/* ---------- گالری تصاویر ---------- */}
-              <div className="mt-4 rounded-xl glass-panel p-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-[11.5px] font-bold text-gold-soft">تصاویر تکمیلی</p>
-                    <p className="mt-0.5 text-[10px] text-sage/70">
-                      در نوار تصویر کوچک و در تب توضیحات نمایش داده می‌شوند (حداکثر ۶ عدد).
+              {/* ---------- توضیحات بلوکی: متن، عکس و ویدئو با ترتیب دلخواه ---------- */}
+              <div className="mt-4 rounded-2xl border border-gold/15 glass-panel p-3.5 sm:p-4">
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="ml-auto">
+                    <p className="text-xs font-black text-gold-soft">محتوای تب توضیحات</p>
+                    <p className="mt-1 text-[10px] leading-5 text-sage/70">
+                      متن، عکس و ویدئو را به ترتیب دلخواه اضافه و با فلش‌ها جابه‌جا کنید.
                     </p>
                   </div>
-                  <input
-                    ref={galleryInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) uploadGalleryImage(file);
-                      e.target.value = "";
-                    }}
-                  />
                   <button
                     type="button"
-                    onClick={() => galleryInputRef.current?.click()}
-                    disabled={uploadingGallery || form.gallery.length >= 6}
-                    className="flex items-center gap-1.5 rounded-lg border border-gold/25 px-3.5 py-2 text-xs font-bold text-gold-soft hover:bg-gold/10 disabled:opacity-50"
+                    onClick={() => addDescriptionBlock("text")}
+                    disabled={uploadingBlock !== null}
+                    className="flex items-center gap-1.5 rounded-full border border-gold/25 px-3 py-1.5 text-[11px] font-bold text-gold-soft hover:bg-gold/10 disabled:opacity-40"
                   >
-                    {uploadingGallery ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Upload size={14} />
-                    )}
-                    افزودن تصویر
+                    <Type size={13} /> متن
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addDescriptionBlock("image")}
+                    disabled={uploadingBlock !== null}
+                    className="flex items-center gap-1.5 rounded-full border border-sky-300/25 px-3 py-1.5 text-[11px] font-bold text-sky-200 hover:bg-sky-300/10 disabled:opacity-40"
+                  >
+                    <ImagePlus size={13} /> عکس
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addDescriptionBlock("video")}
+                    disabled={uploadingBlock !== null}
+                    className="flex items-center gap-1.5 rounded-full border border-emerald-300/25 px-3 py-1.5 text-[11px] font-bold text-emerald-200 hover:bg-emerald-300/10 disabled:opacity-40"
+                  >
+                    <Film size={13} /> ویدئو
                   </button>
                 </div>
 
-                {form.gallery.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {form.gallery.map((src) => (
-                      <div
-                        key={src}
-                        className="relative h-20 w-16 overflow-hidden rounded-lg border border-gold/20"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="h-full w-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removeGalleryImage(src)}
-                          title="حذف تصویر"
-                          className="absolute top-1 left-1 rounded-full bg-night/85 p-1 text-red-300 hover:text-red-200"
+                {form.descriptionBlocks.length === 0 ? (
+                  <div className="mt-4 rounded-xl border border-dashed border-gold/20 p-5 text-center text-[11px] leading-6 text-sage">
+                    هنوز محتوایی ساخته نشده است. یک بلوک متن، عکس یا ویدئو اضافه کنید.
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {form.descriptionBlocks.map((block, index) => {
+                      const isUploading = uploadingBlock === index;
+                      const label =
+                        block.type === "text"
+                          ? "متن"
+                          : block.type === "image"
+                            ? "عکس"
+                            : "ویدئو";
+                      return (
+                        <div
+                          key={`${block.type}-${index}`}
+                          className="rounded-2xl border border-gold/10 glass-soft p-3"
                         >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="mb-3 flex items-center gap-1.5">
+                            <span className="ml-auto text-[11px] font-black text-gold-soft">
+                              بخش {index + 1}: {label}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => moveDescriptionBlock(index, -1)}
+                              disabled={index === 0 || uploadingBlock !== null}
+                              title="انتقال به بالا"
+                              className="rounded-lg border border-gold/20 p-1.5 text-gold-soft disabled:opacity-30"
+                            >
+                              <ArrowUp size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveDescriptionBlock(index, 1)}
+                              disabled={
+                                index === form.descriptionBlocks.length - 1 ||
+                                uploadingBlock !== null
+                              }
+                              title="انتقال به پایین"
+                              className="rounded-lg border border-gold/20 p-1.5 text-gold-soft disabled:opacity-30"
+                            >
+                              <ArrowDown size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeDescriptionBlock(index)}
+                              disabled={uploadingBlock !== null}
+                              title="حذف این بخش"
+                              className="rounded-lg border border-red-400/25 p-1.5 text-red-300 hover:bg-red-400/10 disabled:opacity-30"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+
+                          {block.type === "image" && (
+                            <div className="mb-3">
+                              {block.src && (
+                                <div className="mb-2 overflow-hidden rounded-xl border border-gold/15 bg-night/40">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={block.src}
+                                    alt="پیش‌نمایش عکس توضیحات"
+                                    className="max-h-64 w-full object-contain"
+                                  />
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                disabled={uploadingBlock !== null}
+                                onClick={() => {
+                                  if (!blockImageInputRef.current) return;
+                                  blockImageInputRef.current.dataset.index = String(index);
+                                  blockImageInputRef.current.click();
+                                }}
+                                className="flex items-center gap-1.5 rounded-full border border-sky-300/25 px-3.5 py-2 text-[11px] font-bold text-sky-200 disabled:opacity-50"
+                              >
+                                {isUploading ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <ImagePlus size={13} />
+                                )}
+                                {block.src ? "تعویض عکس" : "آپلود عکس"}
+                              </button>
+                            </div>
+                          )}
+
+                          {block.type === "video" && (
+                            <div className="mb-3">
+                              {block.src && (
+                                <video
+                                  controls
+                                  preload="metadata"
+                                  src={block.src}
+                                  className="mb-2 max-h-72 w-full rounded-xl border border-gold/15 bg-black"
+                                />
+                              )}
+                              <button
+                                type="button"
+                                disabled={uploadingBlock !== null}
+                                onClick={() => {
+                                  if (!blockVideoInputRef.current) return;
+                                  blockVideoInputRef.current.dataset.index = String(index);
+                                  blockVideoInputRef.current.click();
+                                }}
+                                className="flex items-center gap-1.5 rounded-full border border-emerald-300/25 px-3.5 py-2 text-[11px] font-bold text-emerald-200 disabled:opacity-50"
+                              >
+                                {isUploading ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <Film size={13} />
+                                )}
+                                {isUploading && videoProgress !== null
+                                  ? `در حال آپلود ${videoProgress}٪`
+                                  : block.src
+                                    ? "تعویض ویدئو"
+                                    : "آپلود ویدئو"}
+                              </button>
+                              <p className="mt-1 text-[9.5px] text-sage/60">
+                                mp4، webm یا mov — حداکثر ۱۰۰ مگابایت
+                              </p>
+                            </div>
+                          )}
+
+                          <textarea
+                            rows={block.type === "text" ? 6 : 2}
+                            value={block.text}
+                            onChange={(event) =>
+                              setDescriptionBlock(index, { text: event.target.value })
+                            }
+                            placeholder={
+                              block.type === "text"
+                                ? "متن این بخش را بنویسید…"
+                                : "زیرنویس اختیاری…"
+                            }
+                            className={inputCls}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
+
+                <input
+                  ref={blockImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  hidden
+                  onChange={(event) => {
+                    const index = Number(event.currentTarget.dataset.index);
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file && Number.isInteger(index)) void uploadBlockImage(index, file);
+                  }}
+                />
+                <input
+                  ref={blockVideoInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime"
+                  hidden
+                  onChange={(event) => {
+                    const index = Number(event.currentTarget.dataset.index);
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file && Number.isInteger(index)) uploadBlockVideo(index, file);
+                  }}
+                />
               </div>
 
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -650,13 +887,6 @@ export default function ProductsAdmin({
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="کشور م��دأ برند">
-                    <input
-                      value={form.originCountry}
-                      onChange={(e) => set("originCountry", e.target.value)}
-                      className={inputCls}
-                    />
-                  </Field>
                   <Field label="کشور سازنده">
                     <input
                       value={form.madeIn}
@@ -724,10 +954,16 @@ export default function ProductsAdmin({
               </button>
               <button
                 onClick={submit}
-                disabled={saving}
+                disabled={saving || uploading || uploadingBlock !== null}
                 className="btn-emerald flex-1 rounded-full py-2.5 text-sm font-bold disabled:opacity-60"
               >
-                {saving ? "در حال ذخیره…" : editing ? "ذخیره تغییرات" : "افزودن محصول"}
+                {uploading || uploadingBlock !== null
+                  ? "ابتدا آپلود کامل شود…"
+                  : saving
+                    ? "در حال ذخیره…"
+                    : editing
+                      ? "ذخیره تغییرات"
+                      : "افزودن محصول"}
               </button>
             </div>
           </div>

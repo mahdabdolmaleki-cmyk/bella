@@ -58,7 +58,7 @@ type Ctx = {
 export const MAX_QTY = 99;
 const MAX_LINES = 50;
 
-/** Mirrors FREE_SHIPPING_THRESHOLD in server/src/utils/shipping.js. */
+/** Loading fallback; the authoritative threshold comes from the server quote. */
 const FREE_SHIPPING_THRESHOLD = 5_000_000;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
@@ -248,7 +248,11 @@ export function CartDrawer() {
   // ── v33: حالت به‌روزرسانی سایت ──────────────────────
   // تنظیمات عمومی هر بار که سبد باز می‌شود خوانده می‌شود، تا اگر مدیر
   // وسط کار فروش را بست، مشتری پیش از پرکردن فرم متوجه شود.
-  const [maintenance, setMaintenance] = useState({ off: false, note: "" });
+  const [maintenance, setMaintenance] = useState({
+    off: false,
+    note: "",
+    freeThreshold: FREE_SHIPPING_THRESHOLD,
+  });
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -256,9 +260,14 @@ export function CartDrawer() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!alive || !d?.settings) return;
+        const configuredThreshold = Number(d.settings.shippingFreeThreshold);
         setMaintenance({
           off: d.settings.paymentsDisabled === "1",
           note: String(d.settings.paymentsDisabledNote || ""),
+          freeThreshold:
+            Number.isFinite(configuredThreshold) && configuredThreshold >= 0
+              ? configuredThreshold
+              : FREE_SHIPPING_THRESHOLD,
         });
       })
       .catch(() => {});
@@ -283,7 +292,7 @@ export function CartDrawer() {
 
   // Free-shipping progress uses the server threshold once we have a quote,
   // and the mirrored constant before that (cart step, no province yet).
-  const freeThreshold = quote?.freeThreshold ?? FREE_SHIPPING_THRESHOLD;
+  const freeThreshold = quote?.freeThreshold ?? maintenance.freeThreshold;
   const freeShip = subtotal >= freeThreshold;
 
   // Whenever the signed-in identity changes (login, logout, account switch) the
@@ -839,7 +848,7 @@ export function CartDrawer() {
                         )}
                         {quote && (
                           <p className="px-1 text-[10px] text-sage/70">
-                            وزن تخمینی مرسوله: {toFa(quote.billableKg)} کیلوگرم · مقصد: {quote.zoneLabel}
+                            وزن تخمینی مرسوله: {toFa(quote.billableKg)} کیلوگرم
                             {quote.freeRemaining > 0 && (
                               <> · تا ارسال رایگان {formatToman(quote.freeRemaining)} دیگر</>
                             )}

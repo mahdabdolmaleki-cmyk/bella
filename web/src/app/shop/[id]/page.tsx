@@ -397,21 +397,124 @@ function FavoriteButton({ productId }: { productId: number }) {
 /*  Tab 1 — توضیحات                                                     */
 /* ==================================================================== */
 function DescriptionTab({ product }: { product: Product }) {
-  const long = product.longDescription?.trim();
+  const legacyBlocks = [
+    ...(product.longDescription?.trim()
+      ? [{ type: "text" as const, text: product.longDescription.trim(), src: "" }]
+      : []),
+    ...(product.gallery || []).map((src) => ({
+      type: "image" as const,
+      text: "",
+      src,
+    })),
+  ];
+  const blocks = product.descriptionBlocks?.length
+    ? product.descriptionBlocks
+    : legacyBlocks;
+  const intro = product.description?.trim();
+
+  if (!intro && blocks.length === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-sage">
+        توضیحات این محصول هنوز تکمیل نشده است.
+      </p>
+    );
+  }
+
   return (
-    <div className="space-y-4 text-[13.5px] leading-8 text-cream/85">
-      <p className="whitespace-pre-line">{product.description}</p>
-      {long && <div className="space-y-4 whitespace-pre-line border-t border-gold/10 pt-4">{long}</div>}
-      {product.gallery && product.gallery.length > 0 && (
-        <div className="grid gap-3 pt-2 sm:grid-cols-2">
-          {product.gallery.map((src) => (
-            <div key={src} className="relative aspect-4/3 overflow-hidden rounded-2xl border border-gold/15">
-              <Image src={src} alt={product.name} fill sizes="(max-width: 640px) 100vw, 320px" className="object-cover" />
-            </div>
-          ))}
+    <article className="mx-auto max-w-4xl space-y-7">
+      {intro && (
+        <div className="relative overflow-hidden rounded-2xl border border-gold/15 bg-gold/[0.035] px-5 py-5 sm:px-7">
+          <span className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold via-gold/50 to-transparent" />
+          <p
+            dir="auto"
+            className="whitespace-pre-line text-[14px] leading-8 text-cream/90 sm:text-[15px] sm:leading-9"
+          >
+            {intro}
+          </p>
         </div>
       )}
-    </div>
+
+      {blocks.map((block, index) => {
+        if (block.type === "text") {
+          const paragraphs = block.text
+            .split(/\n\s*\n/)
+            .map((paragraph) => paragraph.trim())
+            .filter(Boolean);
+          if (paragraphs.length === 0) return null;
+          return (
+            <section
+              key={`text-${index}`}
+              className="space-y-4 px-1 text-[14px] leading-8 text-cream/85 sm:px-3 sm:text-[15px] sm:leading-9"
+            >
+              {paragraphs.map((paragraph, paragraphIndex) => (
+                <p
+                  key={paragraphIndex}
+                  dir="auto"
+                  className="whitespace-pre-line break-words"
+                >
+                  {paragraph}
+                </p>
+              ))}
+            </section>
+          );
+        }
+
+        if (block.type === "image" && block.src) {
+          return (
+            <figure
+              key={`image-${index}-${block.src}`}
+              className="overflow-hidden rounded-3xl border border-gold/15 bg-night/35 shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
+            >
+              <Image
+                src={block.src}
+                alt={block.text || `${product.name} — تصویر توضیحات`}
+                width={1400}
+                height={900}
+                sizes="(max-width: 900px) 100vw, 900px"
+                className="h-auto max-h-[720px] w-full object-contain"
+              />
+              {block.text && (
+                <figcaption
+                  dir="auto"
+                  className="border-t border-gold/10 px-4 py-3 text-center text-xs leading-6 text-sage"
+                >
+                  {block.text}
+                </figcaption>
+              )}
+            </figure>
+          );
+        }
+
+        if (block.type === "video" && block.src) {
+          return (
+            <figure
+              key={`video-${index}-${block.src}`}
+              className="overflow-hidden rounded-3xl border border-gold/15 bg-black/40 shadow-[0_18px_60px_rgba(0,0,0,0.24)]"
+            >
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                src={block.src}
+                className="max-h-[720px] w-full bg-black object-contain"
+              >
+                مرورگر شما امکان پخش این ویدئو را ندارد.
+              </video>
+              {block.text && (
+                <figcaption
+                  dir="auto"
+                  className="border-t border-gold/10 px-4 py-3 text-center text-xs leading-6 text-sage"
+                >
+                  {block.text}
+                </figcaption>
+              )}
+            </figure>
+          );
+        }
+
+        return null;
+      })}
+    </article>
   );
 }
 
