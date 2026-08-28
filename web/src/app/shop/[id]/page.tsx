@@ -36,7 +36,10 @@ export default function ProductPage() {
   const id = Number(params?.id);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [tab, setTab] = useState<TabKey>("description");
-  const [summary, setSummary] = useState<{ average: number; count: number } | null>(null);
+  const [summary, setSummary] = useState<{
+    average: number;
+    count: number;
+  } | null>(null);
   const { add } = useCart();
 
   const load = useCallback(
@@ -50,7 +53,8 @@ export default function ProductPage() {
           setState({ kind: "ok", product: data.product });
         })
         .catch((err) => {
-          if ((err as { name?: string })?.name !== "AbortError") setState({ kind: "error" });
+          if ((err as { name?: string })?.name !== "AbortError")
+            setState({ kind: "error" });
         });
     },
     [id],
@@ -63,7 +67,7 @@ export default function ProductPage() {
     }
     const ctrl = new AbortController();
     load(ctrl.signal);
-    // The rating summary only drives the tab label, so a failure is ignored.
+
     fetch(`/api/reviews/${id}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setSummary({ average: d.average, count: d.count }))
@@ -83,7 +87,9 @@ export default function ProductPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-sm text-sage">
-          {state.kind === "notfound" ? "این محصول پیدا نشد." : "خطا در دریافت محصول."}
+          {state.kind === "notfound"
+            ? "این محصول پیدا نشد."
+            : "خطا در دریافت محصول."}
         </p>
         <div className="flex gap-2">
           {state.kind === "error" && (
@@ -117,24 +123,32 @@ export default function ProductPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 pt-24 pb-28 sm:px-6 md:pt-32">
-      {/* ---------- breadcrumb ---------- */}
+      {/* breadcrumb */}
       <nav className="flex items-center gap-1.5 text-[11px] text-sage">
-        <Link href="/" className="hover:text-gold">خانه</Link>
+        <Link href="/" className="hover:text-gold">
+          خانه
+        </Link>
         <ChevronLeft size={12} />
-        <Link href="/#shop" className="hover:text-gold">فروشگاه</Link>
+        <Link href="/#shop" className="hover:text-gold">
+          فروشگاه
+        </Link>
         <ChevronLeft size={12} />
         <span className="text-gold-soft">{product.name}</span>
       </nav>
 
       <div className="mt-6 grid gap-8 md:grid-cols-2 md:gap-10">
         <Gallery product={product} />
-        <Summary product={product} summary={summary} onAdd={() => add(product)} />
+        <Summary
+          product={product}
+          summary={summary}
+          onAdd={() => add(product)}
+        />
       </div>
 
-      {/* ---------- عطرهای مشابه ---------- */}
+      {/* عطرهای مشابه */}
       <RelatedProducts productId={product.id} />
 
-      {/* ---------- tabs ---------- */}
+      {/* tabs */}
       <div className="mt-12">
         <div className="flex gap-1 overflow-x-auto border-b border-gold/15 pb-px">
           {tabs.map((t) => (
@@ -176,9 +190,8 @@ export default function ProductPage() {
   );
 }
 
-/* ==================================================================== */
-/*  Gallery: main image + thumbnails                                    */
-/* ==================================================================== */
+/* Gallery */
+
 function Gallery({ product }: { product: Product }) {
   const images = [product.image, ...(product.gallery || [])].filter(
     (src): src is string => typeof src === "string" && src.length > 0,
@@ -190,7 +203,13 @@ function Gallery({ product }: { product: Product }) {
     <div>
       <div className="gold-ring relative flex aspect-4/5 items-center justify-center overflow-hidden rounded-3xl border border-gold/20 bg-gradient-to-b from-pine/25 to-night">
         {current ? (
-          <motion.div key={current} initial={{ opacity: 0, scale: 1.03 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="relative h-full w-full">
+          <motion.div
+            key={current}
+            initial={{ opacity: 0, scale: 1.03 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="relative h-full w-full"
+          >
             <Image
               src={current}
               alt={product.name}
@@ -198,6 +217,7 @@ function Gallery({ product }: { product: Product }) {
               sizes="(max-width: 768px) 100vw, 480px"
               className="object-contain p-6"
               priority
+              unoptimized
             />
           </motion.div>
         ) : (
@@ -224,10 +244,19 @@ function Gallery({ product }: { product: Product }) {
               key={src}
               onClick={() => setActive(index)}
               className={`relative h-20 w-16 shrink-0 overflow-hidden rounded-xl border transition-colors ${
-                index === active ? "border-gold" : "border-gold/20 hover:border-gold/50"
+                index === active
+                  ? "border-gold"
+                  : "border-gold/20 hover:border-gold/50"
               }`}
             >
-              <Image src={src} alt={`${product.name} ${index + 1}`} fill sizes="64px" className="object-cover" />
+              <Image
+                src={src}
+                alt={`${product.name} ${index + 1}`}
+                fill
+                sizes="64px"
+                className="object-cover"
+                unoptimized
+              />
             </button>
           ))}
         </div>
@@ -236,9 +265,8 @@ function Gallery({ product }: { product: Product }) {
   );
 }
 
-/* ==================================================================== */
-/*  Right column: price, notes, add to cart, favourite                  */
-/* ==================================================================== */
+/* Product details */
+
 function Summary({
   product,
   summary,
@@ -253,7 +281,9 @@ function Summary({
   return (
     <div>
       <p className="font-script text-lg text-gold-soft">{product.nameEn}</p>
-      <h1 className="mt-1 font-display text-3xl font-black text-cream sm:text-4xl">{product.name}</h1>
+      <h1 className="mt-1 font-display text-3xl font-black text-cream sm:text-4xl">
+        {product.name}
+      </h1>
       <p className="mt-2 text-sm leading-7 text-sage">{product.tagline}</p>
 
       {summary && summary.count > 0 && (
@@ -266,29 +296,39 @@ function Summary({
       )}
 
       <div className="mt-5 flex flex-wrap items-baseline gap-3">
-        <span className="font-display text-2xl font-black text-gold">{formatToman(product.price)}</span>
+        <span className="font-display text-2xl font-black text-gold">
+          {formatToman(product.price)}
+        </span>
         {product.oldPrice && (
-          <span className="text-sm text-sage line-through">{formatToman(product.oldPrice)}</span>
+          <span className="text-sm text-sage line-through">
+            {formatToman(product.oldPrice)}
+          </span>
         )}
         <span className="rounded-full border border-gold/25 px-2.5 py-0.5 text-[10.5px] text-sage">
           {toFa(product.sizeMl)} میلی‌لیتر
         </span>
         <span
           className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-bold ${
-            soldOut ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"
+            soldOut
+              ? "bg-red-500/15 text-red-300"
+              : "bg-emerald-500/15 text-emerald-300"
           }`}
         >
           {soldOut ? "فعلاً ناموجود" : "موجود در انبار"}
         </span>
       </div>
 
-      {/* notes */}
       <div className="mt-6 space-y-2.5 rounded-2xl glass-panel p-4">
         <NoteRow icon={Droplets} label="نُت آغازی" value={product.topNotes} />
         <NoteRow icon={Heart} label="نُت میانی" value={product.heartNotes} />
         <NoteRow icon={Flame} label="نُت پایانی" value={product.baseNotes} />
         <div className="grid grid-cols-2 gap-2 border-t border-gold/10 pt-2.5">
-          <NoteRow icon={Clock} label="ماندگاری" value={product.longevity} compact />
+          <NoteRow
+            icon={Clock}
+            label="ماندگاری"
+            value={product.longevity}
+            compact
+          />
           <NoteRow icon={Wind} label="پخش بو" value={product.sillage} compact />
         </div>
       </div>
@@ -323,7 +363,11 @@ function NoteRow({
   return (
     <div className="flex items-start gap-2.5">
       <Icon size={15} className="mt-0.5 shrink-0 text-gold" />
-      <p className={compact ? "text-[11.5px] text-sage" : "text-[12.5px] text-sage"}>
+      <p
+        className={
+          compact ? "text-[11.5px] text-sage" : "text-[12.5px] text-sage"
+        }
+      >
         <span className="font-bold text-cream/90">{label}: </span>
         {value}
       </p>
@@ -331,9 +375,8 @@ function NoteRow({
   );
 }
 
-/* ==================================================================== */
-/*  Favourite (علاقه‌مندی) toggle                                        */
-/* ==================================================================== */
+/* Favourite */
+
 function FavoriteButton({ productId }: { productId: number }) {
   const { user, refresh } = useAuth();
   const [on, setOn] = useState(false);
@@ -352,7 +395,7 @@ function FavoriteButton({ productId }: { productId: number }) {
     }
     setBusy(true);
     const next = !on;
-    setOn(next); // optimistic
+    setOn(next);
     try {
       const res = next
         ? await fetch("/api/account/favorites", {
@@ -360,7 +403,9 @@ function FavoriteButton({ productId }: { productId: number }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ productId }),
           })
-        : await fetch(`/api/account/favorites/${productId}`, { method: "DELETE" });
+        : await fetch(`/api/account/favorites/${productId}`, {
+            method: "DELETE",
+          });
       if (!res.ok) setOn(!next);
       else await refresh();
     } catch {
@@ -377,10 +422,15 @@ function FavoriteButton({ productId }: { productId: number }) {
         aria-pressed={on}
         title={on ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
         className={`flex h-[50px] w-[50px] items-center justify-center rounded-full border transition-colors ${
-          on ? "border-gold bg-gold/15 text-gold" : "border-gold/25 text-sage hover:text-gold"
+          on
+            ? "border-gold bg-gold/15 text-gold"
+            : "border-gold/25 text-sage hover:text-gold"
         }`}
       >
-        <motion.span animate={on ? { scale: [1, 1.35, 1] } : { scale: 1 }} transition={{ duration: 0.35 }}>
+        <motion.span
+          animate={on ? { scale: [1, 1.35, 1] } : { scale: 1 }}
+          transition={{ duration: 0.35 }}
+        >
           <Heart size={19} fill={on ? "currentColor" : "none"} />
         </motion.span>
       </button>
@@ -393,13 +443,18 @@ function FavoriteButton({ productId }: { productId: number }) {
   );
 }
 
-/* ==================================================================== */
-/*  Tab 1 — توضیحات                                                     */
-/* ==================================================================== */
+/* توضیحات */
+
 function DescriptionTab({ product }: { product: Product }) {
   const legacyBlocks = [
     ...(product.longDescription?.trim()
-      ? [{ type: "text" as const, text: product.longDescription.trim(), src: "" }]
+      ? [
+          {
+            type: "text" as const,
+            text: product.longDescription.trim(),
+            src: "",
+          },
+        ]
       : []),
     ...(product.gallery || []).map((src) => ({
       type: "image" as const,
@@ -518,9 +573,8 @@ function DescriptionTab({ product }: { product: Product }) {
   );
 }
 
-/* ==================================================================== */
-/*  Tab 2 — ویژگی‌های محصول (spec table)                              */
-/* ==================================================================== */
+/* ویژگی‌های محصول */
+
 function SpecsTab({ product }: { product: Product }) {
   const rows: Array<[string, string | undefined]> = [
     ["شرکت سازنده", product.manufacturer],
@@ -540,10 +594,16 @@ function SpecsTab({ product }: { product: Product }) {
     ["پخش بو", product.sillage],
     ["دسته‌بندی", product.category],
   ];
-  const filled = rows.filter(([, value]) => value && String(value).trim().length > 0);
+  const filled = rows.filter(
+    ([, value]) => value && String(value).trim().length > 0,
+  );
 
   if (filled.length === 0) {
-    return <p className="py-8 text-center text-sm text-sage">ویژگی‌های این محصول هنوز تکمیل نشده است.</p>;
+    return (
+      <p className="py-8 text-center text-sm text-sage">
+        ویژگی‌های این محصول هنوز تکمیل نشده است.
+      </p>
+    );
   }
 
   return (
@@ -556,12 +616,18 @@ function SpecsTab({ product }: { product: Product }) {
               initial={{ opacity: 0, x: 12 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.25) }}
-              // Alternating glass / clear keeps the zebra striping readable now
-              // that both tones would otherwise be the same glass surface.
+              transition={{
+                duration: 0.3,
+                delay: Math.min(index * 0.03, 0.25),
+              }}
               className={index % 2 === 0 ? "glass-soft" : "bg-transparent"}
             >
-              <th scope="row" className="w-40 px-4 py-3 font-bold text-sage sm:w-52">{label}</th>
+              <th
+                scope="row"
+                className="w-40 px-4 py-3 font-bold text-sage sm:w-52"
+              >
+                {label}
+              </th>
               <td className="px-4 py-3 leading-7 text-cream/90">{value}</td>
             </motion.tr>
           ))}
@@ -574,3 +640,4 @@ function SpecsTab({ product }: { product: Product }) {
     </div>
   );
 }
+
