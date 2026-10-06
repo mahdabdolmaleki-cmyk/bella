@@ -53,7 +53,7 @@ export const DEFAULT_SOCIALS: SocialLink[] = [
   { name: "تلگرام", href: "http" + "s://t.me/bellaperfume", icon: "telegram", color: "" },
   {
     name: "اینستاگرام",
-    href: "http" + "s://instagram.com/bella.perfume",
+    href: "http" + "s://instagram.com/bella_perfume1985",
     icon: "instagram",
     color: "",
   },

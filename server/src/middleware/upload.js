@@ -13,11 +13,14 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const ALLOWED = {
   "image/jpeg": "jpg",
+  // BUG FIX: خیلی از گوشی‌های اندروید/دوربین‌ها mimetype را «image/jpg»
+  // (بدون e) می‌فرستند؛ قبلاً همین باعث رد شدن عکس‌های کاملاً سالم می‌شد.
+  "image/jpg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
   "image/gif": "gif",
 };
-const ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+const ALLOWED_EXT = new Set([".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".webp", ".gif"]);
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
@@ -31,10 +34,17 @@ const storage = multer.diskStorage({
 
 export const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 10 }, // 5MB, one file
+  // 10MB, one file — BUG FIX: سقف ۵ مگابایت برای عکس‌های گوشی‌های امروزی
+  // کم است؛ عکس معمولی دوربین موبایل به‌راحتی از ۵ مگابایت رد می‌شود.
+  limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 10 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname || "").toLowerCase();
     if (ALLOWED[file.mimetype] && (ext === "" || ALLOWED_EXT.has(ext))) cb(null, true);
+    else if (file.mimetype === "image/heic" || file.mimetype === "image/heif" || ext === ".heic" || ext === ".heif") {
+      // آیفون‌ها به‌صورت پیش‌فرض HEIC می‌گیرند. مرورگرهای دسکتاپ این فرمت را
+      // نمایش نمی‌دهند، پس با پیام روشن رد می‌شود نه خطای مبهم ۵۰۰.
+      cb(new Error("عکس با فرمت HEIC پشتیبانی نمی‌شود. لطفاً در تنظیمات دوربین «Most Compatible» را انتخاب کنید یا عکس را به JPG تبدیل کنید."));
+    }
     else cb(new Error("فقط تصاویر jpg، png، webp یا gif مجاز است."));
   },
 });
@@ -136,3 +146,4 @@ export function isRealVideo(filePath) {
 export function removeFile(filePath) {
   fs.promises.unlink(filePath).catch(() => {});
 }
+

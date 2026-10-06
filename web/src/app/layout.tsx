@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Vazirmatn, Cormorant_Garamond, Great_Vibes, Alex_Brush } from "next/font/google";
+import { Vazirmatn, Cormorant_Garamond, Alex_Brush } from "next/font/google";
 import Shell from "@/components/Shell";
 import { getSiteSettings } from "@/lib/settings";
 import "./globals.css";
@@ -24,13 +24,6 @@ const cormorant = Cormorant_Garamond({
   display: "swap",
 });
 
-const vibes = Great_Vibes({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-vibes",
-  display: "swap",
-});
-
 /* brand wordmark font — matches the "Bella Perfume" gold script supplied by the client */
 const alexBrush = Alex_Brush({
   subsets: ["latin"],
@@ -40,9 +33,11 @@ const alexBrush = Alex_Brush({
 });
 
 export const metadata: Metadata = {
-  title: "بلا پرفیوم | مزون عطرهای لوکس",
+  title:"2217815",
   description:
     "بلا پرفیوم — افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده. کلکسیون عطرهای اورینتال با بسته‌بندی مخملی و دوخت طلایی.",
+  other: { enamad: "2217815" },
+
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
@@ -51,7 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html
       lang="fa"
       dir="rtl"
-      className={`${vazir.variable} ${cormorant.variable} ${vibes.variable} ${alexBrush.variable}`}
+      className={`${vazir.variable} ${cormorant.variable} ${alexBrush.variable}`}
     >
       <body className="bg-night text-cream antialiased">
         <Shell

@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Package,
-  ShoppingBag,
   Users,
   TrendingUp,
   MessageSquare,
@@ -18,6 +17,7 @@ import {
   PackageCheck,
   AlertTriangle,
   RefreshCw,
+  ShoppingBasket,
 } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import StatsCharts from "@/components/admin/StatsCharts";
@@ -242,7 +242,7 @@ export default function AdminDashboard() {
               label="کل سفارش‌ها"
               value={toFa(summary.orders.total)}
               hint={`امروز: ${toFa(summary.orders.today)} · ۷ روز: ${toFa(summary.orders.last7)}`}
-              icon={ShoppingBag}
+              icon={ShoppingBasket}
               href="/admin/orders"
             />
             <Tile
@@ -261,7 +261,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* ---------------- سفارش‌ها به تفکیک وضعیت ---------------- */}
-          <Section title="سفارش‌ها به تفکیک وضعیت" icon={ShoppingBag} href="/admin/orders">
+          <Section title="سفارش‌ها به تفکیک وضعیت" icon={ShoppingBasket} href="/admin/orders">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {ORDER_STATUS_ORDER.map((status) => {
                 const style = STATUS_STYLE[status];

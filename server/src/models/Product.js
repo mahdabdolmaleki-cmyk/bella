@@ -1,7 +1,21 @@
 import mongoose from "mongoose";
 import { nextSequence } from "./Counter.js";
+import { stripInvisible } from "../utils/validate.js";
 
 export const PRODUCT_DESCRIPTION_BLOCK_TYPES = ["text", "image", "video"];
+
+// نمادهای مجاز صفحهٔ محصول: نام فایل آیکن از پکیج خودمان (a-z, 0-9, خط تیره).
+export const PRODUCT_HIGHLIGHT_MAX = 8;
+
+const highlightSchema = new mongoose.Schema(
+  {
+    // نام آیکن از پکیج /icons (مثل truck، shield-check، zap).
+    icon: { type: String, default: "sparkles", maxlength: 40 },
+    // متن کنار آیکن — مثلاً «ارسال فوری تهران» یا «ضمانت اصالت».
+    text: { type: String, default: "", maxlength: 90 },
+  },
+  { _id: false },
+);
 
 const descriptionBlockSchema = new mongoose.Schema(
   {
@@ -12,6 +26,8 @@ const descriptionBlockSchema = new mongoose.Schema(
     },
     // Main copy for text blocks; optional caption for image/video blocks.
     text: { type: String, default: "", maxlength: 6000 },
+    // سرتیتر اختیاری بلوک — بالای باکسِ پاراگراف اول نمایش داده می‌شود.
+    heading: { type: String, default: "", maxlength: 120 },
     // Uploaded image or video path. HTML is never accepted or stored.
     src: { type: String, default: "", maxlength: 600 },
   },
@@ -67,16 +83,27 @@ const productSchema = new mongoose.Schema(
         message: "حداکثر ۴۰ بلوک توضیحات مجاز است.",
       },
     },
+    // نمادها و متن‌های ویژه‌ای که ادمین برای هر محصول در فرم انتخاب می‌کند و
+    // در صفحهٔ محصول (کنار دکمهٔ خرید) به‌صورت آیکن + متن نمایش داده می‌شوند.
+    highlights: {
+      type: [highlightSchema],
+      default: [],
+      validate: {
+        validator: (arr) => arr.length <= PRODUCT_HIGHLIGHT_MAX,
+        message: "حداکثر ۸ نماد برای هر محصول مجاز است.",
+      },
+    },
     // Legacy fields are retained only so existing MongoDB data remains readable
     // until that product is edited and migrated to descriptionBlocks.
     longDescription: { type: String, default: "", maxlength: 6000 },
-    // Legacy extra photos shown as thumbnails under the main image (max 6).
+    // Gallery: عکس‌های اضافهٔ محصول که در صفحهٔ فروشگاه به‌صورت گالری
+    // (تصویر اصلی + بندانگشتی‌ها) نمایش داده می‌شوند — حداکثر ۱۰ عکس.
     gallery: {
       type: [String],
       default: [],
       validate: {
-        validator: (arr) => arr.length <= 6,
-        message: "حداکثر ۶ تصویر مجاز است.",
+        validator: (arr) => arr.length <= 10,
+        message: "حداکثر ۱۰ تصویر در گالری مجاز است.",
       },
     },
   },
@@ -90,46 +117,56 @@ productSchema.pre("save", async function () {
 // PUBLIC DTO — deliberately contains NO stock numbers. Customers only see a
 // boolean availability flag, never how many units are left.
 productSchema.methods.toDTO = function () {
+  const clean = (v) => stripInvisible(v || "");
   return {
     id: this.id,
-    name: this.name,
-    nameEn: this.nameEn,
-    tagline: this.tagline,
-    description: this.description,
-    topNotes: this.topNotes,
-    heartNotes: this.heartNotes,
-    baseNotes: this.baseNotes,
-    longevity: this.longevity,
-    sillage: this.sillage,
+    name: clean(this.name),
+    nameEn: clean(this.nameEn),
+    tagline: clean(this.tagline),
+    description: clean(this.description),
+    topNotes: clean(this.topNotes),
+    heartNotes: clean(this.heartNotes),
+    baseNotes: clean(this.baseNotes),
+    longevity: clean(this.longevity),
+    sillage: clean(this.sillage),
     price: this.price,
     oldPrice: this.oldPrice ?? null,
     sizeMl: this.sizeMl,
     glass: this.glass,
     liquid: this.liquid,
-    category: this.category,
-    badge: this.badge ?? null,
+    category: clean(this.category),
+    badge: this.badge != null ? clean(this.badge) : null,
     bestseller: this.bestseller,
     active: this.active,
     image: this.image ?? null,
     inStock: this.allowBackorder || this.stock > 0,
     // Specification sheet
-    brand: this.brand || "",
-    manufacturer: this.manufacturer || "",
-    suitableFor: this.suitableFor || "",
-    concentration: this.concentration || "",
-    originCountry: this.originCountry || "",
-    madeIn: this.madeIn || "",
-    scentType: this.scentType || "",
-    scentStructure: this.scentStructure || "",
-    season: this.season || "",
+    brand: clean(this.brand),
+    manufacturer: clean(this.manufacturer),
+    suitableFor: clean(this.suitableFor),
+    concentration: clean(this.concentration),
+    originCountry: clean(this.originCountry),
+    madeIn: clean(this.madeIn),
+    scentType: clean(this.scentType),
+    scentStructure: clean(this.scentStructure),
+    season: clean(this.season),
+    // BUG FIX: متن بلوک‌ها هنگام خواندن هم از نویسه‌های نامرئی (کپی‌شده از
+    // Word/تلگرام) پاک می‌شود تا دیتای قدیمی هم درست رندر شود.
     descriptionBlocks: Array.isArray(this.descriptionBlocks)
       ? this.descriptionBlocks.map((block) => ({
           type: block.type,
-          text: block.text || "",
+          text: clean(block.text),
+          heading: clean(block.heading),
           src: block.src || "",
         }))
       : [],
-    longDescription: this.longDescription || "",
+    // نمادهای صفحهٔ محصول — متن هم مثل بقیهٔ متن‌ها از نویسه‌های نامرئی پاک می‌شود.
+    highlights: Array.isArray(this.highlights)
+      ? this.highlights
+          .map((h) => ({ icon: h.icon || "sparkles", text: clean(h.text) }))
+          .filter((h) => h.text)
+      : [],
+    longDescription: clean(this.longDescription),
     gallery: Array.isArray(this.gallery) ? this.gallery.filter(Boolean) : [],
   };
 };

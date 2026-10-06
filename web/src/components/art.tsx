@@ -27,7 +27,7 @@ export function BellaCrest({
       <defs>
         <linearGradient id={`cg-${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#f6e09b" />
-          <stop offset="45%" stopColor="#d4af37" />
+          <stop offset="45%" stopColor="#d4af7c" />
           <stop offset="100%" stopColor="#9a7b2a" />
         </linearGradient>
       </defs>
@@ -139,7 +139,7 @@ export function ProductVisual({
 /* ================================================================== */
 export function PerfumeBottle({
   glass = "#0d3b26",
-  liquid = "#d4af37",
+  liquid = "#d4af7c",
   className = "",
   showCrest = true,
   fillLevel = 1,
@@ -162,7 +162,7 @@ export function PerfumeBottle({
       <defs>
         <linearGradient id={`gold-${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#f6e09b" />
-          <stop offset="50%" stopColor="#d4af37" />
+          <stop offset="50%" stopColor="#d4af7c" />
           <stop offset="100%" stopColor="#8a6d22" />
         </linearGradient>
         <linearGradient id={`liq-${uid}`} x1="0" y1="0" x2="0" y2="1">

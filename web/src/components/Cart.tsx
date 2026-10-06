@@ -9,16 +9,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { jalaliFromIso } from "@/lib/jalali";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
   Plus,
   Minus,
-  ShoppingBag,
   Trash2,
   CheckCircle2,
   Truck,
   Loader2,
+  Gem,
+  BadgePercent,
   Check,
   UserRound,
   Phone,
@@ -26,6 +28,7 @@ import {
   Hash,
 } from "lucide-react";
 import { ProductVisual } from "./art";
+import { BasketIcon } from "./BasketIcon";
 import { useAuth } from "./AuthContext";
 import { formatToman, toFa } from "@/lib/data";
 import type { ShippingOption, ShippingQuote } from "@/lib/types";
@@ -214,6 +217,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const count = useMemo(() => items.reduce((s, i) => s + i.qty, 0), [items]);
 
+  // v36: ارسال سبد به سرور برای پیگیری سبد رها شده (2h / 12h)
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!user) return; // فقط کاربران لاگین
+    const payload = items.map((i) => ({ id: i.id, qty: i.qty }));
+    const timer = setTimeout(() => {
+      fetch("/api/cart/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ items: payload }),
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [items, hydrated, user]);
+
   return (
     <CartCtx.Provider value={{ items, count, add, setQty, remove, clear, open, setOpen, toast }}>
       {children}
@@ -243,7 +262,21 @@ export function CartDrawer() {
   const [provinces, setProvinces] = useState<string[]>([]);
   const [quote, setQuote] = useState<ShippingQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
+  // v40 — کد تخفیف (پیش‌نمایش زنده از طریق quote)
+  const [coupon, setCoupon] = useState("");
   const [method, setMethod] = useState("");
+  // ── v35: پس‌کرایه و باکس VIP ──────────────────────
+  const [codOn, setCodOn] = useState(false);
+  const [vipOn, setVipOn] = useState(false);
+  const [vipSetting, setVipSetting] = useState({
+    enabled: false,
+    title: "باکس ویژه VIP",
+    desc: "",
+    fee: 0,
+  });
+
+  // تایید قوانین و مقررات برای پرداخت
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // ── v33: حالت به‌روزرسانی سایت ──────────────────────
   // تنظیمات عمومی هر بار که سبد باز می‌شود خوانده می‌شود، تا اگر مدیر
@@ -261,6 +294,13 @@ export function CartDrawer() {
       .then((d) => {
         if (!alive || !d?.settings) return;
         const configuredThreshold = Number(d.settings.shippingFreeThreshold);
+        const vipFee = Number(d.settings.vipBoxFee);
+        setVipSetting({
+          enabled: d.settings.vipBoxEnabled === "1",
+          title: String(d.settings.vipBoxTitle || "باکس ویژه VIP"),
+          desc: String(d.settings.vipBoxDesc || ""),
+          fee: Number.isFinite(vipFee) && vipFee > 0 ? vipFee : 0,
+        });
         setMaintenance({
           off: d.settings.paymentsDisabled === "1",
           note: String(d.settings.paymentsDisabledNote || ""),
@@ -288,7 +328,14 @@ export function CartDrawer() {
   }, [quote, method]);
 
   const shippingCost = selected?.cost ?? 0;
-  const total = subtotal + shippingCost;
+  // تخفیف خرید اول (فقط نمایش — مرجع نهایی سرور است)
+  const qDiscount = quote?.discount ?? null;
+  const discountAmount = qDiscount?.amount ?? 0;
+  const payableGoods = Math.max(0, subtotal - discountAmount);
+  const vipFee = vipOn && vipSetting.enabled ? vipSetting.fee : 0;
+  // پس‌کرایه: کرایه درِ منزل داده می‌شود؛ آنلاین فقط کالا (+ باکس VIP).
+  const onlineTotal = codOn ? payableGoods + vipFee : payableGoods + vipFee + shippingCost;
+  const total = onlineTotal;
 
   // Free-shipping progress uses the server threshold once we have a quote,
   // and the mirrored constant before that (cart step, no province yet).
@@ -316,6 +363,7 @@ export function CartDrawer() {
     setErr("");
     setQuote(null);
     setMethod("");
+    setTermsAccepted(false);
     setBusy(false);
     // Intentionally keyed on the identity only: editing your own profile should
     // not wipe what you are currently typing at checkout.
@@ -359,6 +407,8 @@ export function CartDrawer() {
         body: JSON.stringify({
           province: form.province,
           items: items.map((i) => ({ id: i.id, qty: i.qty })),
+          phone: form.phone.trim(),
+          couponCode: coupon.trim(),
         }),
       })
         .then((r) => (r.ok ? r.json() : null))
@@ -384,7 +434,7 @@ export function CartDrawer() {
       alive = false;
       clearTimeout(timer);
     };
-  }, [step, form.province, cartKey, items]);
+  }, [step, form.province, cartKey, items, form.phone, coupon]);
 
   const submit = async () => {
     const name = form.name.trim();
@@ -418,6 +468,10 @@ export function CartDrawer() {
       setErr("روش ارسال را انتخاب کنید.");
       return;
     }
+    if (!termsAccepted) {
+      setErr("لطفاً برای ادامه و پرداخت، قوانین و مقررات سایت را تأیید کنید.");
+      return;
+    }
     if (items.length === 0 || busy) return;
 
     setBusy(true);
@@ -441,6 +495,10 @@ export function CartDrawer() {
           postalCode,
           address,
           shippingMethod: selected.key,
+          shippingCod: codOn,
+          couponCode: coupon.trim(),
+          vipBox: vipOn && vipSetting.enabled,
+          termsAccepted: true,
           items: items.map((i) => ({ id: i.id, qty: i.qty })),
         }),
       });
@@ -516,7 +574,7 @@ export function CartDrawer() {
           >
             <header className="flex items-center justify-between border-b border-gold/20 px-5 py-4">
               <h3 className="flex items-center gap-2 text-lg font-black text-cream">
-                <ShoppingBag size={18} className="text-gold" />
+                <BasketIcon size={18} className="text-gold" />
                 سبد خرید شما
               </h3>
               <button
@@ -558,7 +616,7 @@ export function CartDrawer() {
             ) : items.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gold/25 text-gold/60">
-                  <ShoppingBag size={34} />
+                  <BasketIcon size={34} />
                 </div>
                 <p className="text-sm text-sage">سبد خرید شما هنوز خالی است.</p>
                 <button
@@ -821,7 +879,12 @@ export function CartDrawer() {
                               <span className="flex-1">
                                 <span className="block text-xs font-bold text-cream">{o.label}</span>
                                 <span className="block text-[10px] text-sage">
-                                  {o.desc} · تحویل {toFa(o.etaDays.min)} تا {toFa(o.etaDays.max)} روز کاری
+                                  {o.desc}
+                                  {o.showEta !== false && o.etaText ? (
+                                    <> · تحویل {toFa(o.etaText)}</>
+                                  ) : o.showEta !== false && o.etaDays && (o.etaDays.min > 0 || o.etaDays.max > 0) ? (
+                                    <> · تحویل {o.etaDays.min === o.etaDays.max ? `${toFa(o.etaDays.max)} روز کاری` : `${toFa(o.etaDays.min)} تا ${toFa(o.etaDays.max)} روز کاری`}</>
+                                  ) : null}
                                 </span>
                               </span>
                               <span className="shrink-0 text-left">
@@ -841,6 +904,11 @@ export function CartDrawer() {
                             </button>
                           );
                         })}
+                        {!quoting && quote && quote.options.length === 0 && (
+                          <p className="rounded-xl bg-amber-500/10 px-3 py-3 text-[11px] leading-5 text-amber-200">
+                            در حال حاضر هیچ روش ارسالی برای این استان فعال نیست. لطفاً با پشتیبانی تماس بگیرید.
+                          </p>
+                        )}
                         {!quoting && !quote && (
                           <p className="rounded-xl bg-red-500/10 px-3 py-3 text-[11px] text-red-300">
                             محاسبه هزینه ارسال ممکن نشد. دوباره تلاش کنید.
@@ -854,7 +922,104 @@ export function CartDrawer() {
                             )}
                           </p>
                         )}
+
+                        {/* ── پس‌کرایه: پرداخت کرایه درِ منزل ── */}
+                        {selected?.codSupported && (
+                          <button
+                            type="button"
+                            onClick={() => setCodOn((v) => !v)}
+                            className={`mt-1 flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-right transition ${
+                              codOn
+                                ? "border-amber-300/60 bg-amber-300/10"
+                                : "border-amber-300/25 hover:border-amber-300/50"
+                            }`}
+                          >
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                                codOn ? "border-amber-300 bg-amber-300 text-night" : "border-sage/50"
+                              }`}
+                            >
+                              {codOn && <Check size={13} strokeWidth={3} />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-xs font-bold text-cream">
+                                پس‌کرایه — کرایه هنگام تحویل
+                              </span>
+                              <span className="mt-0.5 block text-[10px] leading-4 text-sage">
+                                هزینه ارسال را به‌همراه کرایهٔ درِ منزل، هنگام دریافت مرسوله به پیک می‌دهید؛
+                                آنلاین فقط قیمت ادکلن‌ها را می‌پردازید.
+                              </span>
+                            </span>
+                          </button>
+                        )}
+
+                        {/* ── باکس ویژه VIP ── */}
+                        {vipSetting.enabled && (
+                          <button
+                            type="button"
+                            onClick={() => setVipOn((v) => !v)}
+                            className={`mt-1 flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-right transition ${
+                              vipOn
+                                ? "border-gold bg-gold/10"
+                                : "border-gold/25 hover:border-gold/50"
+                            }`}
+                          >
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                                vipOn ? "border-gold bg-gold text-[#241a05]" : "border-sage/50"
+                              }`}
+                            >
+                              {vipOn && <Check size={13} strokeWidth={3} />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-xs font-bold text-cream">
+                                {vipSetting.title}
+                                {vipSetting.fee > 0 && (
+                                  <span className="mr-1.5 text-gold-soft">
+                                    (+{formatToman(vipSetting.fee)})
+                                  </span>
+                                )}
+                              </span>
+                              <span className="mt-0.5 block text-[10px] leading-4 text-sage">
+                                {vipSetting.desc}
+                              </span>
+                            </span>
+                            <Gem size={16} className="shrink-0 text-gold/70" />
+                          </button>
+                        )}
                       </div>
+                    )}
+                  </div>
+
+                  {/* ── کد تخفیف (v40) ── */}
+                  <div className="rounded-xl border border-gold/15 bg-black/10 px-4 py-3">
+                    <label className="mb-1.5 block text-[10.5px] font-bold text-gold-soft">
+                      کد تخفیف دارید؟
+                    </label>
+                    <input
+                      value={coupon}
+                      onChange={(e) => setCoupon(e.target.value.toUpperCase())}
+                      placeholder="مثلاً BELLA15"
+                      dir="ltr"
+                      className="w-full rounded-lg border border-gold/25 bg-transparent px-3 py-2 text-sm text-cream placeholder:text-sage/40 focus:border-gold focus:outline-none"
+                    />
+                    {coupon.trim() && quote?.coupon?.applied && (
+                      <p className="mt-1.5 text-[10.5px] font-bold text-emerald-300">
+                        ✓ کد تخفیف اعمال شد
+                        {quote.coupon.applied.percent
+                          ? ` (${toFa(quote.coupon.applied.percent)}٪)`
+                          : quote.coupon.applied.fixed
+                            ? ` (${toFa(quote.coupon.applied.fixed)} تومان)`
+                            : ""}
+                        {quote.coupon.applied.until
+                          ? ` — معتبر تا ${jalaliFromIso(quote.coupon.applied.until)}`
+                          : ""}
+                      </p>
+                    )}
+                    {coupon.trim() && quote?.coupon?.error && (
+                      <p className="mt-1.5 text-[10.5px] font-bold text-[#f2b8b8]">
+                        {quote.coupon.error}
+                      </p>
                     )}
                   </div>
 
@@ -864,17 +1029,75 @@ export function CartDrawer() {
                       <span>جمع سبد خرید</span>
                       <span className="text-cream">{formatToman(subtotal)}</span>
                     </div>
+                    {qDiscount && (
+                      <div className="flex items-center justify-between text-xs text-emerald-300">
+                        <span className="flex items-center gap-1">
+                          <BadgePercent size={12} />
+                          {qDiscount.source === "coupon"
+                            ? qDiscount.percent
+                              ? `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.percent)}٪)`
+                              : `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.fixed ?? 0)} تومان)`
+                            : `تخفیف خرید اول (${toFa(qDiscount.percent)}٪)`}
+                        </span>
+                        <span>−{formatToman(discountAmount)}</span>
+                      </div>
+                    )}
+                    {vipOn && vipSetting.enabled && vipFee > 0 && (
+                      <div className="flex items-center justify-between text-xs text-sage">
+                        <span className="flex items-center gap-1">
+                          <Gem size={12} className="text-gold" /> {vipSetting.title}
+                        </span>
+                        <span className="text-cream">{formatToman(vipFee)}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-xs text-sage">
                       <span>هزینه ارسال{selected ? ` (${selected.label})` : ""}</span>
-                      <span className={selected?.free ? "text-gold-soft" : "text-cream"}>
-                        {!selected ? "—" : selected.free ? "رایگان" : formatToman(selected.cost)}
-                      </span>
+                      {codOn && selected ? (
+                        <span className="text-amber-300">پس‌کرایه — درِ منزل</span>
+                      ) : (
+                        <span className={selected?.free ? "text-gold-soft" : "text-cream"}>
+                          {!selected ? "—" : selected.free ? "رایگان" : formatToman(selected.cost)}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center justify-between border-t border-gold/15 pt-2">
                       <span className="text-xs font-bold text-gold-soft">مبلغ قابل پرداخت</span>
                       <span className="text-base font-black text-gold-soft">{formatToman(total)}</span>
                     </div>
+                    {codOn && selected && (
+                      <p className="text-[10px] leading-4 text-amber-300/80">
+                        کرایهٔ ارسال ({selected.free ? formatToman(0) : formatToman(selected.cost)}) هنگام
+                        تحویل، جدا از مبلغ بالا به پیک پرداخت می‌شود.
+                      </p>
+                    )}
                   </div>
+
+                  {/* ── تایید قوانین و مقررات سایت ── */}
+                  <label className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 text-right select-none transition ${
+                    termsAccepted ? "border-gold/60 bg-gold/10" : "border-gold/25 bg-gold/[0.04] hover:border-gold/40"
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => {
+                        setTermsAccepted(e.target.checked);
+                        if (err) setErr("");
+                      }}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-gold/40 text-gold accent-[#d4af7c] focus:ring-gold"
+                    />
+                    <span className="text-[11.5px] leading-5 text-cream">
+                      <a
+                        href="/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-gold underline underline-offset-2 hover:text-gold-soft"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        قوانین و مقررات سایت
+                      </a>{" "}
+                      را مطالعه کرده‌ام و می‌پذیرم.
+                    </span>
+                  </label>
 
                   {err && <p className="text-xs text-red-400">{err}</p>}
                 </div>
@@ -887,14 +1110,25 @@ export function CartDrawer() {
                   </button>
                   <button
                     onClick={submit}
-                    disabled={busy || quoting || !selected || !form.name.trim() || !form.email.trim()}
-                    className="btn-emerald flex-1 rounded-full py-3 text-sm font-bold disabled:opacity-60"
+                    disabled={
+                      busy ||
+                      quoting ||
+                      !selected ||
+                      !form.name.trim() ||
+                      !form.email.trim() ||
+                      !termsAccepted
+                    }
+                    className="btn-emerald flex-1 rounded-full py-3 text-sm font-bold disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {busy
                       ? "در حال ثبت..."
                       : !selected
                         ? "انتخاب روش ارسال"
-                        : `پرداخت ${formatToman(total)}`}
+                        : !termsAccepted
+                          ? "تأیید قوانین برای پرداخت"
+                          : codOn
+                            ? `پرداخت ${formatToman(total)} + کرایه درِ منزل`
+                            : `پرداخت ${formatToman(total)}`}
                   </button>
                 </footer>
               </>

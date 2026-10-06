@@ -276,7 +276,7 @@ export default function NotificationsAdmin() {
                         type="checkbox"
                         checked={on}
                         onChange={() => toggle(p.id)}
-                        className="h-4 w-4 shrink-0 accent-[#d4af37]"
+                        className="h-4 w-4 shrink-0 accent-[#d4af7c]"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-bold text-cream">{p.name || "—"}</span>

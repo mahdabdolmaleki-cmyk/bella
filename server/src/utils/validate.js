@@ -2,13 +2,33 @@
 // Every value coming from a client is forced to a primitive first so that
 // object payloads such as {"$ne": null} can never reach Mongo.
 
+/**
+ * کاراکترهای نامرئی که رندر فارسی را به‌هم می‌ریزند.
+ *
+ * متن‌های کپی‌شده از Word / تلگرام / PDF اغلب نویسه‌های کنترلیِ دوجهته
+ * (LRM، RLM، LRE، RLE، PDF، LRI…PDI)، فاصلهٔ عرض صفر (ZWSP) و soft hyphen
+ * دارند. این نویسه‌ها دیده نمی‌شوند اما ترتیب نمایش کلمات و اتصال حروف را
+ * خراب می‌کنند — مثلاً جمله‌های اولِ آموزش/توضیحات به‌هم ریخته دیده می‌شوند.
+ * ZWJ (نیم‌فاصله، U+200C) عمداً حذف نمی‌شود چون بخشی از املای درست فارسی است.
+ */
+const INVISIBLE_CHARS =
+  /[\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c\ufeff\u00ad]/g;
+
+export function stripInvisible(value) {
+  return typeof value === "string" ? value.replace(INVISIBLE_CHARS, "") : value;
+}
+
 export function str(value, { max = 500, trim = true } = {}) {
   if (value === undefined || value === null) return "";
   if (typeof value === "object") return ""; // reject objects/arrays outright
-  let out = String(value);
+  // BUG FIX: ابتدا نویسه‌های نامرئی دوجهته حذف می‌شوند تا متن کپی‌شده از
+  // Word/تلگرام/PDF در سایت به‌هم‌ریخته رندر نشود.
+  let out = stripInvisible(String(value));
   if (trim) out = out.trim();
   // strip control characters (except newline / tab) to avoid log injection
   out = out.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+  // چند فاصله/تب پی‌درپی (جاافتاده از کپی) به یک فاصلهٔ دوتایی فشرده می‌شود
+  out = out.replace(/[ \t]{3,}/g, "  ");
   return out.slice(0, max);
 }
 
@@ -110,3 +130,4 @@ export function addressIssue(value) {
   }
   return "";
 }
+

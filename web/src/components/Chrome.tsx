@@ -4,17 +4,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Home,
   Store,
-  ShoppingBag,
   Phone,
+  Mail,
   User,
   MapPin,
   Clock,
   Send,
   CheckCircle2,
   GraduationCap,
+  MessageCircle,
 } from "lucide-react";
+import { BasketIcon } from "./BasketIcon";
 import Image from "next/image";
-import { parseFooterBadges, parseGuarantees } from "@/lib/settings";
+import { parseEnamadSeal, parseFooterBadges, parseGuarantees } from "@/lib/settings";
 import { DEFAULT_SOCIALS, socialColor, type SocialLink } from "@/lib/socials";
 import SocialGlyph from "./SocialGlyph";
 import { Field, TextField } from "./Field";
@@ -28,7 +30,7 @@ const NAV = [
   { href: "/", label: "خانه", icon: Home },
   { href: "/shop", label: "فروشگاه", icon: Store },
   { href: "/learn", label: "آموزش", icon: GraduationCap },
-  { href: "cart", label: "سبد خرید", icon: ShoppingBag },
+  { href: "cart", label: "سبد خرید", icon: BasketIcon },
   { href: "/contact", label: "تماس با ما", icon: Phone },
   { href: "/account", label: "پروفایل", icon: User },
 ];
@@ -73,15 +75,29 @@ export function Header() {
           </Link>
         </motion.div>
 
-        <motion.button
+        <motion.div
           initial={{ x: -90, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.85, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          onClick={() => setOpen(true)}
-          className="gold-ring relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gold/40 glass-soft text-gold active:scale-95 sm:h-11 sm:w-11"
-          aria-label="سبد خرید"
+          className="flex shrink-0 items-center gap-2"
         >
-          <ShoppingBag size={16} />
+          {/* مشاورهٔ عطر — همان «عطر شما کدام است؟» که حالا در پاپ‌آپ باز می‌شود */}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("bella:open-consult"))}
+            className="gold-ring flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gold/40 glass-soft text-gold transition-transform active:scale-95 sm:h-11 sm:w-11"
+            aria-label="مشاوره عطر بلا"
+            title="مشاوره عطر بلا"
+          >
+            <MessageCircle size={17} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="gold-ring relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gold/40 glass-soft text-gold transition-transform active:scale-95 sm:h-11 sm:w-11"
+            aria-label="سبد خرید"
+          >
+          <BasketIcon size={17} />
           <AnimatePresence>
             {count > 0 && (
               <motion.span
@@ -95,7 +111,8 @@ export function Header() {
               </motion.span>
             )}
           </AnimatePresence>
-        </motion.button>
+          </button>
+        </motion.div>
       </div>
     </motion.header>
   );
@@ -166,6 +183,7 @@ export function ContactSection({
   intro = "بلا را در شبکه‌های اجتماعی دنبال کنید",
   socials = DEFAULT_SOCIALS,
   phone = "۰۲۱ – ۲۲ ۴۴ ۶۶ ۸۸",
+  email = "",
   address = "تهران، خیابان فرشته، پاساژ رویال، واحد ۱۲",
   hours = "هر روز ۱۰ صبح تا ۱۰ شب",
 }: {
@@ -173,6 +191,7 @@ export function ContactSection({
   intro?: string;
   socials?: SocialLink[];
   phone?: string;
+  email?: string;
   address?: string;
   hours?: string;
 } = {}) {
@@ -214,7 +233,7 @@ export function ContactSection({
       const data = await res.json().catch(() => null);
       setErrMsg(
         res.status === 429
-          ? "پیام‌های زیادی ارسال کرده‌اید. کمی بع�� تلاش کنید."
+          ? "پیام‌های زیادی ارسال کرده‌اید. کمی بعد تلاش کنید."
           : data?.error ?? "ارسال پیام ناموفق بود.",
       );
       setState("err");
@@ -289,25 +308,45 @@ export function ContactSection({
           <Reveal className="md:col-span-2">
             <div className="space-y-4">
               {[
-                { icon: Phone, t: "تلفن مشاوره", d: phone },
-                { icon: MapPin, t: "بوتیک اصلی", d: address },
-                { icon: Clock, t: "ساعات پاسخگویی", d: hours },
+                { icon: Phone, t: "تلفن مشاوره", d: phone, href: "" },
+                // ایمیل از تنظیمات می‌آید؛ خالی = کارت نمایش داده نمی‌شود.
+                { icon: Mail, t: "ایمیل", d: email, href: `mailto:${email.trim()}` },
+                { icon: MapPin, t: "بوتیک اصلی", d: address, href: "" },
+                { icon: Clock, t: "ساعات پاسخگویی", d: hours, href: "" },
               ]
                 .filter((c) => c.d.trim())
-                .map((c) => (
-                <div
-                  key={c.t}
-                  className="flex items-center gap-4 rounded-2xl glass-panel p-4 transition-colors hover:border-gold/40"
-                >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
-                    <c.icon size={18} />
+                .map((c) => {
+                // کارت ایمیل کلیک‌پذیر است تا بازدیدکننده مستقیم نامه بنویسد.
+                const body = (
+                  <div
+                    className="flex items-center gap-4 rounded-2xl glass-panel p-4 transition-colors hover:border-gold/40"
+                  >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
+                      <c.icon size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-sage">{c.t}</p>
+                      <p
+                        dir={c.icon === Mail ? "ltr" : "auto"}
+                        className={`mt-0.5 font-bold text-cream ${
+                          c.icon === Mail
+                            ? "break-all text-left text-[13px]"
+                            : "text-sm"
+                        }`}
+                      >
+                        {c.d}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[11px] text-sage">{c.t}</p>
-                    <p className="mt-0.5 text-sm font-bold text-cream">{c.d}</p>
-                  </div>
-                </div>
-              ))}
+                );
+                return c.href ? (
+                  <a key={c.t} href={c.href} className="block">
+                    {body}
+                  </a>
+                ) : (
+                  <div key={c.t}>{body}</div>
+                );
+              })}
             </div>
           </Reveal>
 
@@ -414,7 +453,7 @@ export function Footer({
           </motion.p>
           <p className="mt-3 max-w-xs text-xs leading-6 text-sage">
             {aboutText ||
-              "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند."}
+              "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و رایحه‌های شرقی، حس‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند."}
           </p>
         </div>
         <div className="text-sm">
@@ -423,8 +462,9 @@ export function Footer({
             {[
               ["تجربه لوکس بلا", "/"],
               ["کلکسیون عطرها", "/shop"],
-              ["آکادمی بلا", "/learn"],
+              ["آموزش", "/learn"],
               ["تماس با ما", "/contact"],
+              ["قوانین و مقررات", "/terms"],
             ].map(([l, href]) => (
               <li key={href}>
                 <Link href={href} className="transition-colors hover:text-gold">
@@ -459,6 +499,9 @@ export function Footer({
             <h4 className="mb-4 text-xs font-black tracking-widest text-gold">نمادها و مجوزها</h4>
             <ul className="flex flex-wrap items-start gap-2.5">
               {badges.map((badge, i) => {
+                // اینماد مثل کد رسمی خودش: code روی تصویر و referrerpolicy=origin
+                // تا اینماد ببیند نماد روی همین دامنه نمایش داده/کلیک شده است.
+                const seal = parseEnamadSeal(badge.link);
                 const art = (
                   <span className="relative block h-[62px] w-[62px] overflow-hidden rounded-lg bg-white/90 p-1">
                     <Image
@@ -468,6 +511,8 @@ export function Footer({
                       sizes="72px"
                       className="object-contain p-1"
                       unoptimized
+                      referrerPolicy="origin"
+                      {...(seal ? ({ code: seal.code } as Record<string, string>) : {})}
                     />
                   </span>
                 );
@@ -477,9 +522,13 @@ export function Footer({
                       <a
                         href={badge.link}
                         target="_blank"
-                        // noopener/noreferrer: the badge issuer's page must not
-                        // get a window.opener handle back into the shop.
-                        rel="noopener noreferrer"
+                        // noopener: the badge issuer's page must not get a
+                        // window.opener handle back into the shop. No
+                        // "noreferrer": enamad/samandehi verify the click by
+                        // the referring origin (their code uses
+                        // referrerpolicy="origin"); only the origin is sent.
+                        rel="noopener"
+                        referrerPolicy="origin"
                         title={badge.title || "مشاهده گواهی"}
                         className="glass-soft block rounded-xl border border-gold/20 p-1.5 transition-transform hover:-translate-y-1 hover:border-gold/45"
                       >

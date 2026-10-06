@@ -74,6 +74,29 @@ const orderSchema = new mongoose.Schema(
 
     // ---- Payment (ZarinPal) ------------------------------------------------
     paymentStatus: { type: String, enum: PAYMENT_STATUSES, default: "unpaid", index: true },
+    // ---- تخفیف خرید اول (v35) / کد تخفیف (v40) ----
+    discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+    discountAmount: { type: Number, default: 0, min: 0 },
+    // کد تخفیفی که واقعاً روی این سفارش اعمال شده (وگرنه "" خالی).
+    couponCode: { type: String, default: "", maxlength: 24, trim: true },
+    // v42: چرا پرداخت انجام نشد؟ expired=sweeper | declined=درگاه | canceled=لغو در درگاه
+    paymentFailReason: {
+      type: String,
+      default: "",
+      enum: ["", "expired", "declined", "canceled"],
+      maxlength: 12,
+    },
+    couponFixed: { type: Number, default: 0, min: 0 }, // v41: مبلغ تومانِ کد تخفیفِ مبلغی
+    // true یعنی کرایه درِ منزل (پس‌کرایه) پرداخت می‌شود؛ آنلاین فقط کالا.
+    shippingCod: { type: Boolean, default: false },
+    // ---- باکس ویژه (VIP) ----
+    vipBox: { type: Boolean, default: false },
+    vipBoxFee: { type: Number, default: 0, min: 0 },
+    // درخواست لغو از سمت مشتری (v35) — ادمین در پنل می‌بیند و پاک می‌کند.
+    cancelRequested: { type: Boolean, default: false },
+    cancelRequestedAt: { type: Date, default: null },
+    // وقتی سفارش لغو می‌شود، ادمین می‌تواند آن را از گزارش فروش حذف کند (v36)
+    excludeFromSales: { type: Boolean, default: false, index: true },
     paymentMethod: { type: String, default: "online", maxlength: 20 },
     // Gateway transaction handle; unique per order, sparse so unpaid orders
     // do not collide on null.
@@ -117,6 +140,18 @@ orderSchema.methods.toDTO = function () {
       image: i.image ?? null,
     })),
     subtotal: this.subtotal ?? Math.max(0, this.total - (this.shippingCost || 0)),
+    discountPercent: this.discountPercent ?? 0,
+    discountAmount: this.discountAmount ?? 0,
+    couponCode: this.couponCode || "",
+    paymentFailReason: this.paymentFailReason || "",
+    couponPercent: this.couponCode ? this.discountPercent ?? 0 : 0,
+    couponFixed: this.couponCode ? this.couponFixed ?? 0 : 0,
+    shippingCod: Boolean(this.shippingCod),
+    vipBox: Boolean(this.vipBox),
+    vipBoxFee: this.vipBoxFee ?? 0,
+    cancelRequested: Boolean(this.cancelRequested),
+    cancelRequestedAt: this.cancelRequestedAt ?? null,
+    excludeFromSales: Boolean(this.excludeFromSales),
     shippingCost: this.shippingCost || 0,
     shippingMethod: this.shippingMethod || "",
     shippingLabel: this.shippingLabel || "",
@@ -124,6 +159,8 @@ orderSchema.methods.toDTO = function () {
     freeShipping: Boolean(this.freeShipping),
     trackingCode: this.trackingCode || "",
     total: this.total,
+    // v39: مبلغی که واقعاً آنلاین پرداخت می‌شود (با پس‌کرایه، کرایه کم می‌شود).
+    onlinePaid: this.onlinePayable(),
     status: this.status,
     timeline: (this.timeline || []).map((t) => ({ status: t.status, at: t.at })),
     paymentStatus: this.paymentStatus,
@@ -139,6 +176,12 @@ orderSchema.methods.toDTO = function () {
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ user: 1, createdAt: -1 });
 // Used by the stale-order sweeper (jobs/staleOrders.js).
+/** مبلغی که باید آنلاین پرداخت شود — با پس‌کرایه، کرایه از آن کم می‌شود. */
+orderSchema.methods.onlinePayable = function onlinePayable() {
+  const shipping = this.shippingCod ? Number(this.shippingCost || 0) : 0;
+  return Math.max(0, Number(this.total || 0) - shipping);
+};
+
 orderSchema.index({ paymentStatus: 1, stockCommitted: 1, createdAt: 1 });
 
 const Order = mongoose.model("Order", orderSchema);

@@ -117,15 +117,17 @@ router.post(
       rating,
       body,
       verifiedBuyer,
-      status: "pending",
+      // Published immediately; the admin can still reject or delete it from
+      // the reviews panel. The text is always rendered as plain text (no HTML).
+      status: "approved",
       ip: clientIp(req),
     });
     await review.save();
 
     res.status(201).json({
       ok: true,
-      pending: true,
-      message: "نقد شما با موفقیت ارسال شد و پس از تأیید مدیر نمایش داده می‌شود.",
+      pending: false,
+      message: "نقد شما با موفقیت ثبت و منتشر شد. ممنون از همراهی شما!",
     });
   })
 );

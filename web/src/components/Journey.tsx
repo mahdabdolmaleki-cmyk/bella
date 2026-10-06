@@ -7,9 +7,13 @@ import {
   ChevronDown,
   ChevronLeft,
   Sparkles,
+  BadgePercent,
   Gift,
   ArrowLeft,
   RotateCcw,
+  PartyPopper,
+  Tags,
+  Percent,
 } from "lucide-react";
 import Link from "next/link";
 import { parseJourneyStages, type JourneyStage } from "@/lib/settings";
@@ -156,18 +160,27 @@ function linesToBoxes(raw: string): Box[] {
 
 export default function Journey({
   festivalIcon,
+  discountsIcon,
   festivalActive = true,
   festivalTitle = "جشنواره خرید اول بلا",
   festivalSubtitle = "۲۵٪ تخفیف + اتومایزر هدیه",
+  discountsActive = false,
+  discountsTitle = "تخفیف‌های بلا",
+  discountsSubtitle = "ادکلن‌های مشمول تخفیف را ببینید",
   journeyStages = "",
   bottleGlass = "#0d3b26",
-  bottleLiquid = "#d4af37",
+  bottleLiquid = "#d4af7c",
   bottleImage = "",
 }: {
   festivalIcon?: string;
+  discountsIcon?: string;
   festivalActive?: boolean;
   festivalTitle?: string;
   festivalSubtitle?: string;
+  /** کارت دوم — تخفیف‌ها (جدا از بنر جشنواره). */
+  discountsActive?: boolean;
+  discountsTitle?: string;
+  discountsSubtitle?: string;
   /** JSON list of stage texts coming from the admin settings page. */
   journeyStages?: string;
   bottleGlass?: string;
@@ -429,7 +442,8 @@ export default function Journey({
             >
               Bella Perfume
             </motion.h1>
-            <p className="mt-3 max-w-xs text-[13px] leading-6 text-cream/90 sm:max-w-md sm:text-base">
+            {/* درخواست مدیر: فونت این زیرنویس کوچکتر شود */}
+            <p className="mt-3 max-w-xs text-[11px] leading-5 text-cream/90 sm:max-w-md sm:text-[13px]">
               افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده
             </p>
 
@@ -472,7 +486,7 @@ export default function Journey({
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: [0, 0.9, 0], scale: [0, 1.5, 2.1] }}
                   transition={{ duration: 0.8, delay: 1.15, ease: "easeOut" }}
-                  className="pointer-events-none absolute inset-0 rounded-full bg-gold/40 blur-2xl"
+                  className="pointer-events-none absolute inset-0 rounded-full bg-red-500/55 blur-2xl"
                 />
                 {/* small sparks flying outward */}
                 {[
@@ -480,6 +494,8 @@ export default function Journey({
                   { x: 40, y: -26 },
                   { x: -30, y: 20 },
                   { x: 44, y: 18 },
+                  { x: -62, y: 0 },
+                  { x: 60, y: -4 },
                 ].map((p, idx) => (
                   <motion.span
                     key={idx}
@@ -487,7 +503,11 @@ export default function Journey({
                     initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
                     animate={{ opacity: [0, 1, 0], x: p.x, y: p.y, scale: [0, 1, 0.4] }}
                     transition={{ duration: 0.7, delay: 1.2 + idx * 0.03, ease: "easeOut" }}
-                    className="pointer-events-none absolute top-1/2 left-1/2 h-1.5 w-1.5 rounded-full bg-gold shadow-[0_0_8px_rgba(212,175,55,0.9)]"
+                    className={`pointer-events-none absolute top-1/2 left-1/2 h-1.5 w-1.5 rounded-full ${
+                      idx % 2
+                        ? "bg-red-400 shadow-[0_0_10px_rgba(255,70,70,0.95)]"
+                        : "bg-gold shadow-[0_0_8px_rgba(212,175,55,0.9)]"
+                    }`}
                   />
                 ))}
 
@@ -495,32 +515,49 @@ export default function Journey({
                     the entrance animation is over. */}
                 <motion.span
                   aria-hidden
-                  animate={{ opacity: [0.35, 0.7, 0.35], scale: [0.97, 1.04, 0.97] }}
-                  transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
-                  className="pointer-events-none absolute -inset-2 rounded-[28px] bg-gold/25 blur-2xl"
+                  animate={{ opacity: [0.45, 0.85, 0.5, 0.85, 0.45], scale: [0.97, 1.05, 1, 1.05, 0.97] }}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                  className="pointer-events-none absolute -inset-2 rounded-[28px] bg-red-600/45 blur-2xl"
                 />
 
-                <div className="festival-banner glass-card gold-ring relative w-full overflow-hidden rounded-2xl px-4 py-3.5 text-right">
-                  {/* light sweeping across the glass */}
+                <div className="festival-red relative w-full overflow-hidden rounded-2xl px-4 py-3.5 text-right">
+                  {/* light sweeping across the card */}
                   <span aria-hidden className="festival-sheen pointer-events-none absolute inset-0" />
+                  {/* embers rising from the bottom edge */}
+                  {[12, 30, 52, 71, 88].map((left, idx) => (
+                    <span
+                      key={left}
+                      aria-hidden
+                      className="festival-ember"
+                      style={{
+                        left: `${left}%`,
+                        animationDelay: `${idx * 0.65}s`,
+                        ["--dx" as string]: `${idx % 2 ? -8 : 8}px`,
+                      }}
+                    />
+                  ))}
 
                   <div className="relative flex items-center gap-3">
                     <motion.span
                       animate={{ rotate: [0, -8, 8, 0], scale: [1, 1.12, 1] }}
                       transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gold/45 bg-gradient-to-br from-gold/35 to-gold/5 text-gold shadow-[0_0_18px_rgba(212,175,55,0.35)]"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/40 bg-gradient-to-br from-white/25 to-white/5 text-[#ffe3a3] shadow-[0_0_18px_rgba(255,90,90,0.55)]"
                     >
-                      <SiteIcon name={festivalIcon} fallback="gift" size={19} />
+                      <SiteIcon name={festivalIcon} fallback="bow" size={20} />
                     </motion.span>
 
                     <div className="min-w-0 flex-1">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[9px] font-black tracking-widest text-gold">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[9px] font-black tracking-widest text-red-700 shadow-[0_2px_10px_rgba(0,0,0,0.25)]">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-600" />
+                        </span>
                         <Sparkles size={9} /> جشنواره
                       </span>
-                      <p className="gold-text mt-1 truncate text-[13.5px] font-black sm:text-[15px]">
+                      <p className="mt-1 truncate text-[13.5px] font-black text-white [text-shadow:0_2px_10px_rgba(0,0,0,0.35)] sm:text-[15px]">
                         {festivalTitle}
                       </p>
-                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-5 text-cream/85">
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-5 text-[#ffe3c2]">
                         {festivalSubtitle}
                       </p>
                     </div>
@@ -536,6 +573,36 @@ export default function Journey({
                 </div>
               </motion.div>
             )}
+              {/* ---- کارت دوم: تخفیف‌ها (جدا از جشنواره) ---- */}
+              {discountsActive && (
+                <motion.div
+                  initial={{ opacity: 0, y: 26 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 1.45, ease: [0.22, 1, 0.36, 1] }}
+                  className="relative mt-3 w-full max-w-sm"
+                >
+                  <Link
+                    href="/shop?discount=1"
+                    className="glass-card gold-ring group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-right transition-transform active:scale-[0.98]"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/40 bg-gradient-to-br from-emerald-300/25 to-emerald-300/5 text-emerald-300">
+                      <SiteIcon name={discountsIcon} fallback="percent" size={18} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-black text-cream sm:text-[14.5px]">
+                        {discountsTitle}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] leading-5 text-sage">
+                        {discountsSubtitle}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-300/40 px-3 py-1.5 text-[10.5px] font-black text-emerald-300 transition-colors group-hover:bg-emerald-300/10">
+                      دیدن تخفیف‌ها
+                      <ChevronLeft size={12} />
+                    </span>
+                  </Link>
+                </motion.div>
+              )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -647,7 +714,7 @@ export default function Journey({
               <motion.path
                 d="M62 80 L218 80 L203 228 L77 228 Z"
                 fill="url(#jvelvet)"
-                stroke="#d4af37"
+                stroke="#d4af7c"
                 strokeWidth="3"
                 initial={{ pathLength: 0 }}
                 animate={{ pathLength: 1 }}
@@ -655,7 +722,7 @@ export default function Journey({
               />
               <motion.path
                 d="M73 90 L207 90 L194 218 L86 218 Z"
-                stroke="#e8cd85"
+                stroke="#d4af7c"
                 strokeWidth="1.3"
                 strokeDasharray="5 6"
                 initial={{ opacity: 0 }}
@@ -742,15 +809,15 @@ export default function Journey({
                     initial={{ opacity: 0, y: fromTop ? -46 : 46, scale: 0.9, filter: "blur(6px)" }}
                     animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
                     transition={{ duration: 0.5, delay: 0.15 + k * 0.11, ease: [0.22, 1, 0.36, 1] }}
-                    className="glass-card glow-border rounded-xl px-3 py-2.5 sm:px-4 sm:py-3"
+                    className="journey-tile rounded-xl px-3 py-2.5 sm:px-4 sm:py-3"
                     style={{ animationDelay: `${settleAt}s` }}
                   >
-                    <p className="flex items-center gap-1.5 text-[11px] font-black text-gold-soft sm:text-[13px]">
-                      <span className="h-1 w-1 shrink-0 rounded-full bg-gold" />
+                    <p className="flex items-center gap-1.5 text-[11px] font-black text-[#0b2417] sm:text-[13px]">
+                      <span className="h-1 w-1 shrink-0 rounded-full bg-[#b8912c]" />
                       {bx.t}
                     </p>
-                    <p className="mt-1 text-[10px] leading-[1.7] text-sage sm:text-[11.5px]">{bx.d}</p>
-                    <span className="mt-1.5 block text-[8px] tracking-widest text-gold/40">0{k + 1}</span>
+                    <p className="mt-1 text-[10px] leading-[1.7] text-[#33503f] sm:text-[11.5px]">{bx.d}</p>
+                    <span className="mt-1.5 block text-[8px] tracking-widest text-[#0b2417]/45">0{k + 1}</span>
                   </motion.div>
                 );
               })}

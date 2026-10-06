@@ -1,6 +1,9 @@
 import { Router } from "express";
 import path from "path";
-import Product, { PRODUCT_DESCRIPTION_BLOCK_TYPES } from "../models/Product.js";
+import Product, {
+  PRODUCT_DESCRIPTION_BLOCK_TYPES,
+  PRODUCT_HIGHLIGHT_MAX,
+} from "../models/Product.js";
 import Order, { ORDER_STATUSES } from "../models/Order.js";
 import Message from "../models/Message.js";
 import Settings, { NUMERIC_SETTINGS } from "../models/Settings.js";
@@ -35,6 +38,9 @@ import {
 } from "../utils/validate.js";
 import { ADMIN_COOKIE, clearCookieOptions } from "../utils/auth.js";
 import { requestedLoginMethods } from "../utils/loginMethods.js";
+import { notifySms, sendOtpWithTemplate, sendEventSms, getSmsCredit, getLastSmsError } from "../utils/sms.js";
+import { notifyEmail } from "../utils/emailNotify.js";
+import { isPhone } from "../utils/validate.js";
 
 const router = Router();
 
@@ -208,8 +214,12 @@ router.patch(
     // only the status, or both in one request.
     const hasTracking = req.body?.trackingCode !== undefined;
     const trackingCode = str(req.body?.trackingCode, { max: 60 });
+    // «بررسی شد» — پرچم درخواست لغوی مشتری پاک می‌شود (وضعیت دست‌نخورده).
+    const clearCancelRequest = req.body?.clearCancelRequest === true;
+    const hasExclude = req.body?.excludeFromSales !== undefined;
+    const excludeFromSales = req.body?.excludeFromSales === true;
     if (id === null) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0646\u0627\u0645\u0639\u062a\u0628\u0631." });
-    if (!status && !hasTracking) {
+    if (!status && !hasTracking && !clearCancelRequest && !hasExclude) {
       return res.status(400).json({ error: "\u062a\u063a\u06cc\u06cc\u0631\u06cc \u0628\u0631\u0627\u06cc \u0627\u0639\u0645\u0627\u0644 \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062f\u0647 \u0627\u0633\u062a." });
     }
     if (status && !ORDER_STATUSES.includes(status)) {
@@ -224,12 +234,22 @@ router.patch(
     if (status === CANCELLED && order.status !== CANCELLED) {
       await releaseOrderStock(order);
       if (order.paymentStatus !== "paid") order.paymentStatus = "failed";
+      // لغو شد → به‌صورت پیش‌فرض از گزارش فروش حذف می‌شود (v36)
+      order.excludeFromSales = true;
     }
 
     if (hasTracking) order.trackingCode = trackingCode;
+    if (clearCancelRequest) {
+      order.cancelRequested = false;
+      order.cancelRequestedAt = null;
+    }
+    if (hasExclude) {
+      order.excludeFromSales = excludeFromSales;
+    }
     // `order.status` is only touched when a status was actually sent, so a
     // tracking-code-only PATCH can never reset the workflow step. The model's
     // pre-save hook appends the timeline entry.
+    const previousStatus = order.status;
     if (status) order.status = status;
     await order.save();
     logActivity(req, {
@@ -238,6 +258,19 @@ router.patch(
       status: 200,
       meta: `${status || order.status}${hasTracking ? ` tracking=${trackingCode || "-"}` : ""}`,
     });
+
+    // پیامک + ایمیل «وضعیت سفارش تغییر کرد» — فقط برای تغییر واقعی وضعیت
+    if (status && status !== previousStatus) {
+      notifySms("orderStatus", order.phone, {
+        name: order.customerName || "",
+        orderId: order.code,
+        status,
+      }).catch(() => {});
+      notifyEmail("orderStatus", order.email, {
+        orderId: order.code,
+        status,
+      }).catch(() => {});
+    }
     res.json({ order: order.toDTO() });
   })
 );
@@ -295,6 +328,33 @@ router.get(
     const statsById = new Map(agg.map((a) => [String(a._id), a]));
 
     res.json({ users: users.map((u) => customerDTO(u, statsById.get(String(u._id)))) });
+  })
+);
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/users/:id/orders  (v39)
+//
+// فاکتورهای خرید یک مشتری برای پنل «مدیریت مشتریان» — دقیقاً همان DTOای
+// که خود مشتری در حساب می‌بیند (جمع‌ها و تفکیک‌ها یکی باشند).
+// ---------------------------------------------------------------------------
+router.get(
+  "/users/:id/orders",
+  ah(async (req, res) => {
+    const user = await User.findById(req.params.id).select("_id");
+    if (!user) return res.status(404).json({ error: "کاربر یافت نشد." });
+
+    const limit = int(req.query?.limit, { min: 1, max: 200, fallback: 50 }) || 50;
+    const orders = await Order.find({ user: user._id })
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    logActivity(req, {
+      action: "customer.invoices",
+      target: String(user._id),
+      status: 200,
+      meta: `count=${orders.length}`,
+    });
+    res.json({ orders: orders.map((o) => o.toDTO()) });
   })
 );
 
@@ -373,7 +433,7 @@ router.get(
   "/settings",
   ah(async (_req, res) => {
     const doc = await Settings.getSingleton();
-    res.json({ settings: doc.toDTO() });
+    res.json({ settings: doc.toDTO(true) });
   })
 );
 
@@ -416,6 +476,7 @@ router.put(
       contactSocialIntro: 300,
       contactSocials: 8000,
       contactPhone: 120,
+      contactEmail: 190,
       contactAddress: 300,
       contactHours: 120,
       // ستون ضمانت‌ها در فوتر و حالت تعمیر پرداخت (v33).
@@ -423,9 +484,93 @@ router.put(
       footerGuarantees: 1200,
       paymentsDisabled: 4,
       paymentsDisabledNote: 300,
+      zarinpalAutoVerify: 4,
+      // صفحهٔ قوانین و مقررات (v34).
+      termsTitle: 160,
+      termsText: 20000,
+      // کارت تخفیف‌ها و تخفیف خرید اول
+      discountsBoxActive: 4,
+      discountsBoxTitle: 80,
+      discountsBoxSubtitle: 160,
+      firstPurchaseDiscountEnabled: 4,
+      firstPurchasePercent: 4,
+      // کدهای تخفیف (v40)
+      couponEnabled: 4,
+      couponCodesJson: 8000,
+      vipBoxEnabled: 4,
+      vipBoxTitle: 80,
+      vipBoxDesc: 200,
+      vipBoxFee: 9,
+      // زمان تحویل سفارش
+      deliveryEstimateEnabled: 4,
+      deliveryDaysPishtaz: 20,
+      deliveryDaysTipax: 20,
+      deliveryDaysChapar: 20,
+      deliveryDaysPeyk: 20,
+      shippingTipaxEnabled: 1,
+      shippingPishtazEnabled: 1,
+      shippingChaparEnabled: 1,
+      shippingPeykEnabled: 1,
+      // پیامک‌ها — sms.ir.
+      smsirLine: 20,
+      smsirTemplateId: 12,
+      smsirOtpParam: 30,
+      smsOtpEnabled: 1,
+      smsirOrderPlacedTemplate: 12,
+      smsirAdminOrderTemplate: 12,
+      smsirOrderStatusTemplate: 12,
+      smsirOrderPlacedParams: 150,
+      smsirAdminOrderParams: 150,
+      smsirOrderStatusParams: 150,
+      smsOrderPlacedEnabled: 1,
+      smsAdminNotifyEnabled: 1,
+      smsAdminPhone: 20,
+      smsOrderStatusEnabled: 1,
+      abandonedCartEnabled: 1,
+      abandonedCartFirstHours: 4,
+      abandonedCartSecondHours: 4,
+      smsirAbandonedFirstTemplate: 12,
+      smsirAbandonedSecondTemplate: 12,
+      smsirAbandonedFirstParams: 150,
+      smsirAbandonedSecondParams: 150,
+      smsAbandonedFirstEnabled: 1,
+      smsAbandonedSecondEnabled: 1,
+      smsirCancelAdminTemplate: 12,
+      smsirCancelAdminParams: 150,
+      smsCancelAdminEnabled: 1,
+      emailAdmin: 190,
+      emailOtpEnabled: 1,
+      emailOrderPlacedEnabled: 1,
+      emailAdminNotifyEnabled: 1,
+      emailOrderStatusEnabled: 1,
+      emailAbandonedFirstEnabled: 1,
+      emailAbandonedSecondEnabled: 1,
+      emailCancelAdminEnabled: 1,
     };
     for (const [key, max] of Object.entries(limits)) {
       if (req.body?.[key] !== undefined) doc[key] = str(req.body[key], { max });
+    }
+    // روش‌های ارسال: فقط "1" یا "" ذخیره می‌شود و حداقل یک روش باید فعال بماند،
+    // وگرنه مشتری هیچ راهی برای ثبت سفارش ندارد.
+    const SHIPPING_TOGGLES = [
+      "shippingTipaxEnabled",
+      "shippingPishtazEnabled",
+      "shippingChaparEnabled",
+      "shippingPeykEnabled",
+    ];
+    for (const key of SHIPPING_TOGGLES) {
+      if (req.body?.[key] !== undefined) doc[key] = doc[key] === "1" ? "1" : "";
+    }
+    if (SHIPPING_TOGGLES.every((key) => doc[key] === "")) {
+      return res
+        .status(400)
+        .json({ error: "حداقل یک روش ارسال باید فعال باشد." });
+    }
+    // شمارهٔ موبایل مدیر برای اطلاع‌رسانی سفارش — اگر پر شده، معتبر باید باشد.
+    if (doc.smsAdminNotifyEnabled === "1" && (doc.smsAdminPhone || "").trim()) {
+      if (!isPhone(doc.smsAdminPhone)) {
+        return res.status(400).json({ error: "شماره موبایل مدیر معتبر نیست (مثل 09121234567)." });
+      }
     }
     // Loyalty-club numbers are validated as numbers, not text.
     for (const [key, range] of Object.entries(NUMERIC_SETTINGS)) {
@@ -537,9 +682,104 @@ router.put(
     }
     await doc.save();
     logActivity(req, { action: "settings.update", status: 200 });
-    res.json({ settings: doc.toDTO() });
+    res.json({ settings: doc.toDTO(true) });
   })
 );
+
+// ---------------------------------------------------------------------------
+// SMS — تست ارسال و بررسی اعتبار (تنظیمات ← پیامک‌ها)
+// ---------------------------------------------------------------------------
+// نمونه‌مقدارهایی که در پیامک تست جای متغیرها می‌نشینند.
+const SMS_TEST_SAMPLES = {
+  otp: { code: "123456", minutes: "5" },
+  orderPlaced: { name: "مشتری نمونه", orderId: "BL-TEST12", total: "6,490,000" },
+  orderPlacedAdmin: { name: "مشتری نمونه", orderId: "BL-TEST12", total: "6,490,000", phone: "09120000000" },
+  orderStatus: { name: "مشتری نمونه", orderId: "BL-TEST12", status: "ارسال شد" },
+  abandonedFirst: { name: "مشتری نمونه", total: "6,490,000" },
+  abandonedSecond: { name: "مشتری نمونه", total: "6,490,000" },
+  cancelAdmin: { name: "مشتری نمونه", orderId: "BL-TEST12", total: "6,490,000", phone: "09120000000" },
+};
+
+router.post(
+  "/sms/test",
+  requireAdminWrite,
+  ah(async (req, res) => {
+    const phone = isPhone(str(req.body?.phone, { max: 20 }));
+    const activity = str(req.body?.activity, { max: 20 });
+    if (!phone) return res.status(400).json({ error: "شماره موبایل معتبر نیست." });
+    const samples = SMS_TEST_SAMPLES[activity];
+    if (!samples) return res.status(400).json({ error: "نوع پیامک نامعتبر است." });
+
+    const doc = await Settings.getSingleton();
+    const settings = doc.toDTO(true);
+
+    if (activity === "otp") {
+      if (settings.smsOtpEnabled !== "1") {
+        return res.json({ ok: false, preview: "", error: "پیامک کد تأیید در تنظیمات خاموش است." });
+      }
+      const delivered = await sendOtpWithTemplate(phone, samples.code, samples);
+      const templateId = String(settings.smsirTemplateId || "").replace(/\D/g, "");
+      // نام پارامتر همان‌طور که واقعاً ارسال می‌شود نمایش داده شود (بدون # و فاصله).
+      const paramName = String(settings.smsirOtpParam || "Code").replace(/[#\s]+/g, "") || "Code";
+      return res.json({
+        ok: delivered,
+        preview: templateId
+          ? `قالب ${templateId} — ${paramName}=${samples.code}`
+          : "ارسال با متن پیش‌فرض از خط اختصاصی (بدون قالب)",
+        error: delivered ? "" : `ارسال پیامک ناموفق بود. ${getLastSmsError()}`,
+      });
+    }
+
+    const enabledKey =
+      activity === "orderPlaced"
+        ? "smsOrderPlacedEnabled"
+        : activity === "orderPlacedAdmin"
+          ? "smsAdminNotifyEnabled"
+          : activity === "orderStatus"
+            ? "smsOrderStatusEnabled"
+            : activity === "abandonedFirst"
+              ? "smsAbandonedFirstEnabled"
+              : activity === "abandonedSecond"
+                ? "smsAbandonedSecondEnabled"
+                : "smsCancelAdminEnabled";
+    if (settings[enabledKey] !== "1") {
+      return res.json({ ok: false, preview: "", error: "این پیامک در تنظیمات خاموش است؛ اول آن را روشن کنید." });
+    }
+    const r = await sendEventSms(activity, phone, samples);
+    res.json({
+      ok: r.ok,
+      preview: r.preview ? `پارامترها: ${r.preview}` : "",
+      error: r.ok ? "" : `ارسال پیامک ناموفق بود. ${r.error || ""}`,
+    });
+  })
+);
+
+router.get(
+  "/sms/credit",
+  ah(async (_req, res) => {
+    const result = await getSmsCredit();
+    res.json(result);
+  })
+);
+
+router.post(
+  "/email/test",
+  requireAdminWrite,
+  ah(async (req, res) => {
+    const { isEmail } = await import("../utils/validate.js");
+    const to = isEmail(String(req.body?.email || "").trim());
+    const activity = String(req.body?.activity || "").trim();
+    if (!to) return res.status(400).json({ error: "ایمیل معتبر وارد کنید." });
+    const { sendTestEmail } = await import("../utils/emailNotify.js");
+    const result = await sendTestEmail(activity, to);
+    if (!result.ok) {
+      return res.json({ ok: false, error: result.error || "ارسال ایمیل تست ناموفق بود." });
+    }
+    res.json({ ok: true, messageId: result.messageId || "" });
+  })
+);
+
+
 
 // ---------------------------------------------------------------------------
 // Upload
@@ -548,7 +788,21 @@ router.post(
   "/upload",
   requireAdminWrite,
   rateLimit({ name: "admin-upload", windowMs: 60 * 60 * 1000, max: 60 }),
-  upload.single("file"),
+  // BUG FIX: قبلاً upload.single مستقیم در زنجیره بود؛ خطای fileFilter
+  // (مثل فرمت HEIC یا mimetype نامعتبر) از نوع Error ساده است نه MulterError،
+  // پس به هندلر مرکزی می‌افتاد و ادمین «خطای داخلی سرور» (۵۰۰) می‌دید.
+  // حالا خودمان می‌گیریم و پیام فارسی درست برمی‌گردانیم — دقیقاً مثل روت ویدئو.
+  (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (!err) return next();
+      const tooBig = err.code === "LIMIT_FILE_SIZE";
+      return res.status(400).json({
+        error: tooBig
+          ? "حجم عکس نباید بیشتر از ۱۰ مگابایت باشد."
+          : err.message || "آپلود عکس انجام نشد.",
+      });
+    });
+  },
   ah(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "\u0641\u0627\u06cc\u0644\u06cc \u0627\u0631\u0633\u0627\u0644 \u0646\u0634\u062f." });
 
@@ -612,6 +866,8 @@ export function sanitizeDescriptionBlocks(input) {
         : "text";
       const text = str(raw?.text, { max: Math.min(6000, textBudget) });
       textBudget = Math.max(0, textBudget - text.length);
+      // سرتیتر اختیاری هر بلوک (فقط متن معنا دارد؛ برای عکس/ویدئو نادیده گرفته می‌شود).
+      const heading = type === "text" ? str(raw?.heading, { max: 120 }) : "";
       const rawSrc = str(raw?.src, { max: 600 });
       const src =
         type === "image"
@@ -619,7 +875,7 @@ export function sanitizeDescriptionBlocks(input) {
           : type === "video"
             ? (/^\/uploads\/videos\/[A-Za-z0-9._-]+$/.test(rawSrc) ? rawSrc : "")
             : "";
-      return { type, text, src };
+      return { type, text, heading, src };
     })
     .filter((block) => (block.type === "text" ? block.text : block.src));
 }
@@ -673,12 +929,26 @@ function sanitizeProduct(body, partial = false) {
   if (!partial || body.descriptionBlocks !== undefined) {
     out.descriptionBlocks = sanitizeDescriptionBlocks(body.descriptionBlocks);
   }
-  // Legacy gallery: retained for existing data while products are migrated to
-  // ordered descriptionBlocks by the redesigned admin editor.
+  // نمادها و متن‌های ویژهٔ صفحهٔ محصول (آیکن از پکیج خودمان + متن کوتاه).
+  if (!partial || body.highlights !== undefined) {
+    const rawHighlights = Array.isArray(body.highlights) ? body.highlights : [];
+    out.highlights = rawHighlights
+      .slice(0, PRODUCT_HIGHLIGHT_MAX)
+      .map((h) => {
+        const icon = str(h?.icon, { max: 40 });
+        return {
+          icon: /^[a-z0-9-]{1,40}$/.test(icon) ? icon : "sparkles",
+          text: str(h?.text, { max: 90 }),
+        };
+      })
+      .filter((h) => h.text.trim().length > 0);
+  }
+  // گالری محصول: عکس‌های اضافه‌ای که ادمین در فرم محصول آپلود می‌کند و در
+  // صفحهٔ فروشگاه به‌صورت گالری نمایش داده می‌شوند (حداکثر ۱۰ عکس).
   if (!partial || body.gallery !== undefined) {
     const raw = Array.isArray(body.gallery) ? body.gallery : [];
     out.gallery = raw
-      .slice(0, 6)
+      .slice(0, 10)
       .map((value) => safeImage(value))
       .filter((value) => typeof value === "string" && value.length > 0);
   }

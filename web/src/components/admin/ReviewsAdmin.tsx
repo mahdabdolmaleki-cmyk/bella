@@ -21,7 +21,7 @@ import type { AdminReview, ReviewStatus } from "@/lib/types";
 /* ==================================================================== */
 
 const FILTERS: Array<{ key: ReviewStatus | "all"; label: string }> = [
-  { key: "pending", label: "در انتطار تأیید" },
+  { key: "pending", label: "در انتظار تأیید" },
   { key: "approved", label: "تأییدشده" },
   { key: "rejected", label: "ردشده" },
   { key: "all", label: "همه" },
@@ -40,7 +40,9 @@ const STATUS_LABEL: Record<ReviewStatus, string> = {
 };
 
 export default function ReviewsAdmin() {
-  const [filter, setFilter] = useState<ReviewStatus | "all">("pending");
+  // Reviews are published immediately now, so the newest ones (all statuses)
+  // are shown first instead of an always-empty "pending" list.
+  const [filter, setFilter] = useState<ReviewStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<AdminReview[] | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -321,3 +323,4 @@ export default function ReviewsAdmin() {
     </div>
   );
 }
+

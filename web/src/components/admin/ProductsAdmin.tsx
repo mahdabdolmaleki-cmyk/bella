@@ -10,6 +10,7 @@ import {
   Star,
   Upload,
   ImageOff,
+  Images,
   Loader2,
   Type,
   ImagePlus,
@@ -17,9 +18,12 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
-import { formatToman, type ProductDescriptionBlock } from "@/lib/data";
+import { formatToman, toFa, type ProductDescriptionBlock } from "@/lib/data";
+import { prepareImageForUpload, uploadForm } from "@/lib/prepareUpload";
 import { ProductVisual } from "@/components/art";
-import type { Product } from "@/lib/types";
+import SiteIcon from "@/components/SiteIcon";
+import { ICON_NAMES, ICON_LABELS, type IconName } from "@/lib/icons";
+import type { Product, ProductHighlight } from "@/lib/types";
 
 // دسته‌بندی‌های پیش‌فرض فقط زمانی استفاده می‌شوند که ادمین هنوز دستهٔ خودش را
 // در تنظیمات نساخته باشد. لیست واقعی از طریق prop به این کامپوننت می‌رسد.
@@ -41,12 +45,18 @@ const EMPTY_FORM = {
   stock: "0",
   allowBackorder: false,
   glass: "#0e3b26",
-  liquid: "#d4af37",
+  liquid: "#d4af7c",
   category: DEFAULT_CATEGORIES[0],
   badge: "",
   bestseller: false,
   active: true,
   image: "",
+  // گالری: عکس‌های اضافهٔ محصول (تا ۱۰ عکس) که در فروشگاه به‌صورت بندانگشتی
+  // زیر/کنار عکس اصلی نمایش داده می‌شوند.
+  gallery: [] as string[],
+  // نمادها و متن‌های ویژه: آیکن + متن کوتاه که در صفحهٔ محصول کنار دکمهٔ
+  // خرید نمایش داده می‌شوند (مثل «ارسال فوری»، «ضمانت اصالت»).
+  highlights: [] as ProductHighlight[],
   // ---- جدول "ویژگی‌های محصول" ----
   brand: "",
   manufacturer: "",
@@ -67,13 +77,11 @@ function productDescriptionBlocks(p: Product): ProductDescriptionBlock[] {
   }
 
   // One-time, non-destructive migration for products created with the previous
-  // long-text + gallery form. Saving the product writes these in block order.
+  // long-text form. گالری عمداً به بلوک‌ها مهاجرت نمی‌کند: خودِ گالری
+  // جای اصلی نمایش عکس‌های اضافه است و در فرم جداگانه مدیریت می‌شود.
   const blocks: ProductDescriptionBlock[] = [];
   if (p.longDescription?.trim()) {
     blocks.push({ type: "text", text: p.longDescription.trim(), src: "" });
-  }
-  for (const src of p.gallery || []) {
-    if (src) blocks.push({ type: "image", text: "", src });
   }
   return blocks;
 }
@@ -101,6 +109,8 @@ function productToForm(p: Product): FormState {
     bestseller: p.bestseller,
     active: p.active,
     image: p.image || "",
+    gallery: [...(p.gallery || [])],
+    highlights: (p.highlights || []).map((h) => ({ icon: h.icon || "sparkles", text: h.text || "" })),
     brand: p.brand || "",
     manufacturer: p.manufacturer || "",
     suitableFor: p.suitableFor || "",
@@ -134,6 +144,7 @@ export default function ProductsAdmin({
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const blockImageInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const blockVideoInputRef = useRef<HTMLInputElement>(null);
 
   const openCreate = () => {
@@ -158,11 +169,15 @@ export default function ProductsAdmin({
     setError("");
     setUploading(true);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) {
+      // BUG FIX: عکس‌های سنگین/HEIC گوشی قبل از ارسال به JPEG بهینه تبدیل
+      // می‌شوند تا آپلود ادکلن‌ها هرگز به‌خاطر حجم یا فرمت شکست نخورد.
+      const prepared = await prepareImageForUpload(file);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: uploadForm(prepared),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) {
         setError(data.error || "خطا در آپلود عکس.");
         setUploading(false);
         return;
@@ -173,6 +188,107 @@ export default function ProductsAdmin({
       setError("خطا در برقراری ارتباط با سرور.");
       setUploading(false);
     }
+  };
+
+  /* ---------- گالری تصاویر محصول (چند عکس با ترتیب دلخواه) ---------- */
+
+  const GALLERY_MAX = 10;
+
+  const uploadGalleryImages = async (files: File[] | FileList) => {
+    const list = Array.from(files);
+    if (list.length === 0) return;
+    const room = GALLERY_MAX - form.gallery.length;
+    if (room <= 0) {
+      setError(`گالری حداکثر ${toFa(GALLERY_MAX)} عکس می‌گیرد؛ اول یکی را حذف کنید.`);
+      return;
+    }
+    if (list.length > room) {
+      setError(`فقط ${toFa(room)} عکس دیگر جا می‌شود؛ بقیه نادیده گرفته شد.`);
+    } else {
+      setError("");
+    }
+    setUploading(true);
+    const uploaded: string[] = [];
+    try {
+      for (const file of list.slice(0, room)) {
+        // همان فشرده‌سازی عکس اصلی: عکس سنگین/HEIC گوشی به JPEG بهینه تبدیل می‌شود.
+        const prepared = await prepareImageForUpload(file);
+        const res = await fetch("/api/admin/upload", {
+          method: "POST",
+          body: uploadForm(prepared),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) {
+          setError(data.error || "آپلود یکی از عکس‌های گالری انجام نشد.");
+          break;
+        }
+        uploaded.push(String(data.url));
+      }
+      if (uploaded.length > 0) {
+        setForm((f) => ({
+          ...f,
+          gallery: [...f.gallery, ...uploaded].slice(0, GALLERY_MAX),
+        }));
+      }
+    } catch {
+      setError("خطا در برقراری ارتباط با سرور.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeGalleryImage = (index: number) =>
+    setForm((f) => ({
+      ...f,
+      gallery: f.gallery.filter((_, i) => i !== index),
+    }));
+
+  const moveGalleryImage = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= form.gallery.length) return;
+    setForm((f) => {
+      const gallery = [...f.gallery];
+      [gallery[index], gallery[target]] = [gallery[target], gallery[index]];
+      return { ...f, gallery };
+    });
+  };
+
+  /* ---------- نمادها و متن‌های ویژهٔ صفحهٔ محصول ---------- */
+
+  const HIGHLIGHT_MAX = 8;
+
+  const setHighlight = (index: number, patch: Partial<ProductHighlight>) =>
+    setForm((f) => ({
+      ...f,
+      highlights: f.highlights.map((h, i) => (i === index ? { ...h, ...patch } : h)),
+    }));
+
+  const addHighlight = () => {
+    if (form.highlights.length >= HIGHLIGHT_MAX) {
+      setError(`حداکثر ${toFa(HIGHLIGHT_MAX)} نماد مجاز است.`);
+      return;
+    }
+    setError("");
+    setForm((f) => ({
+      ...f,
+      highlights: [...f.highlights, { icon: "zap", text: "" }],
+    }));
+  };
+
+  const removeHighlight = (index: number) =>
+    setForm((f) => ({
+      ...f,
+      highlights: f.highlights.filter((_, i) => i !== index),
+    }));
+
+  const moveHighlight = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= form.highlights.length) return;
+    setForm((f) => {
+      const highlights = [...f.highlights];
+      [highlights[index], highlights[target]] = [highlights[target], highlights[index]];
+      return { ...f, highlights };
+    });
   };
 
   const setDescriptionBlock = (
@@ -196,7 +312,7 @@ export default function ProductsAdmin({
       ...current,
       descriptionBlocks: [
         ...current.descriptionBlocks,
-        { type, text: "", src: "" },
+        { type, text: "", heading: "", src: "" },
       ],
     }));
   };
@@ -224,9 +340,12 @@ export default function ProductsAdmin({
     setError("");
     setUploadingBlock(index);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body });
+      // همان فشرده‌سازی عکس اصلی برای عکس‌های داخل توضیحات محصول.
+      const prepared = await prepareImageForUpload(file);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: uploadForm(prepared),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.url) throw new Error(data.error || "آپلود عکس انجام نشد.");
       setDescriptionBlock(index, { src: String(data.url) });
@@ -286,10 +405,11 @@ export default function ProductsAdmin({
       badge: form.badge || null,
       image: form.image || null,
       descriptionBlocks: form.descriptionBlocks,
-      // Clear the superseded fields only after their existing content has been
-      // migrated into descriptionBlocks by productToForm().
+      // longDescription فقط در محصول‌های قدیمی پر است و محتوایش هنگام ویرایش
+      // به بلوک‌های متنی مهاجرت کرده؛ در غیر این صورت خالی می‌شود.
       longDescription: "",
-      gallery: [],
+      // گالری عکس‌های اضافه — دیگر پاک نمی‌شود بلکه از فرم ارسال می‌شود.
+      gallery: form.gallery,
     };
     try {
       const res = await fetch(
@@ -524,6 +644,201 @@ export default function ProductsAdmin({
                 </div>
               </div>
 
+              {/* ---------- گالری تصاویر محصول ---------- */}
+              <div className="mt-4 rounded-2xl border border-gold/15 glass-panel p-3.5 sm:p-4">
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="ml-auto">
+                    <p className="text-xs font-black text-gold-soft">گالری تصاویر محصول</p>
+                    <p className="mt-1 text-[10px] leading-5 text-sage/70">
+                      تا ۱۰ عکس اضافه — در صفحهٔ فروشگاه به‌صورت بندانگشتی کنار عکس اصلی نمایش داده می‌شود.
+                    </p>
+                  </div>
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (files && files.length > 0) void uploadGalleryImages(files);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={uploading || form.gallery.length >= GALLERY_MAX}
+                    className="flex items-center gap-1.5 rounded-lg border border-sky-300/25 px-3.5 py-2 text-xs font-bold text-sky-200 hover:bg-sky-300/10 disabled:opacity-60"
+                  >
+                    {uploading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Images size={14} />
+                    )}
+                    {uploading
+                      ? "در حال آپلود…"
+                      : form.gallery.length > 0
+                        ? "افزودن عکس بیشتر"
+                        : "افزودن عکس به گالری"}
+                  </button>
+                </div>
+
+                {form.gallery.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-gold/20 p-4 text-center text-[11px] leading-6 text-sage">
+                    هنوز عکسی در گالری نیست. می‌توانید چند عکس هم‌زمان انتخاب کنید.
+                  </p>
+                ) : (
+                  <>
+                    <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                      {form.gallery.map((src, index) => (
+                        <div
+                          key={src}
+                          className="group relative overflow-hidden rounded-xl border border-gold/15 bg-night/40"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={src}
+                            alt={`عکس گالری ${index + 1}`}
+                            className="aspect-3/4 w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeGalleryImage(index)}
+                            disabled={uploading}
+                            title="حذف این عکس"
+                            className="absolute top-1 left-1 rounded-full bg-red-500/90 p-1 text-white transition-transform hover:scale-110 disabled:opacity-50"
+                          >
+                            <X size={11} />
+                          </button>
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-night/85 py-1">
+                            <button
+                              type="button"
+                              onClick={() => moveGalleryImage(index, -1)}
+                              disabled={index === 0 || uploading}
+                              title="انتقال به ابتدای گالری"
+                              className="rounded-md p-1 text-gold-soft hover:bg-gold/15 disabled:opacity-30"
+                            >
+                              <ArrowUp size={11} />
+                            </button>
+                            <span className="text-[9px] font-bold text-sage">
+                              {toFa(index + 1)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => moveGalleryImage(index, 1)}
+                              disabled={index === form.gallery.length - 1 || uploading}
+                              title="انتقال به انتهای گالری"
+                              className="rounded-md p-1 text-gold-soft hover:bg-gold/15 disabled:opacity-30"
+                            >
+                              <ArrowDown size={11} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[10px] text-sage">
+                      {toFa(form.gallery.length)} از {toFa(GALLERY_MAX)} عکس — با فلش‌ها ترتیب نمایش را عوض کنید.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* ---------- نمادها و متن‌های ویژهٔ صفحهٔ محصول ---------- */}
+              <div className="mt-4 rounded-2xl border border-gold/15 glass-panel p-3.5 sm:p-4">
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="ml-auto">
+                    <p className="text-xs font-black text-gold-soft">نمادها و متن‌های ویژه</p>
+                    <p className="mt-1 text-[10px] leading-5 text-sage/70">
+                      آیکن + متن دلخواه (تا ۸ مورد) که در صفحهٔ محصول زیر دکمهٔ خرید نمایش داده می‌شود.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addHighlight}
+                    disabled={form.highlights.length >= HIGHLIGHT_MAX}
+                    className="flex items-center gap-1.5 rounded-lg border border-gold/25 px-3.5 py-2 text-xs font-bold text-gold-soft hover:bg-gold/10 disabled:opacity-60"
+                  >
+                    <Plus size={14} /> نماد جدید
+                  </button>
+                </div>
+
+                {form.highlights.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-gold/20 p-4 text-center text-[11px] leading-6 text-sage">
+                    هنوز نمادی اضافه نشده — مثلاً «ارسال فوری تهران» با آیکن برق.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {form.highlights.map((h, index) => (
+                      <div
+                        key={index}
+                        className="flex flex-wrap items-center gap-2 rounded-xl border border-gold/10 glass-soft p-2.5"
+                      >
+                        <span
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold/20 bg-night/50"
+                          title={ICON_LABELS[h.icon as IconName] ?? h.icon}
+                        >
+                          <SiteIcon name={h.icon} size={19} />
+                        </span>
+
+                        <select
+                          value={ICON_NAMES.includes(h.icon as IconName) ? h.icon : "sparkles"}
+                          onChange={(e) => setHighlight(index, { icon: e.target.value })}
+                          className="rounded-lg border border-gold/20 bg-night px-2.5 py-2 text-[11px] text-cream focus:border-gold/50 focus:outline-none"
+                          aria-label="انتخاب آیکن"
+                        >
+                          {ICON_NAMES.map((name) => (
+                            <option key={name} value={name}>
+                              {ICON_LABELS[name]}
+                            </option>
+                          ))}
+                        </select>
+
+                        <input
+                          value={h.text}
+                          onChange={(e) => setHighlight(index, { text: e.target.value })}
+                          placeholder="متن نماد — مثلاً ارسال فوری تهران"
+                          maxLength={90}
+                          className="min-w-[140px] flex-1 rounded-lg border border-gold/20 bg-night px-3 py-2 text-[12px] text-cream placeholder:text-sage/40 focus:border-gold/50 focus:outline-none"
+                        />
+
+                        <div className="mr-auto flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => moveHighlight(index, -1)}
+                            disabled={index === 0}
+                            title="انتقال به بالا"
+                            className="rounded-lg border border-gold/20 p-1.5 text-gold-soft hover:bg-gold/10 disabled:opacity-30"
+                          >
+                            <ArrowUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveHighlight(index, 1)}
+                            disabled={index === form.highlights.length - 1}
+                            title="انتقال به پایین"
+                            className="rounded-lg border border-gold/20 p-1.5 text-gold-soft hover:bg-gold/10 disabled:opacity-30"
+                          >
+                            <ArrowDown size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeHighlight(index)}
+                            title="حذف این نماد"
+                            className="rounded-lg border border-red-400/25 p-1.5 text-red-300 hover:bg-red-400/10"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-sage">
+                      {toFa(form.highlights.length)} از {toFa(HIGHLIGHT_MAX)} نماد — نماد خالی هنگام ذخیره حذف می‌شود.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <Field label="نام فارسی">
                   <input value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} />
@@ -705,6 +1020,19 @@ export default function ProductsAdmin({
                             </div>
                           )}
 
+                          {block.type === "text" && (
+                            <input
+                              value={block.heading ?? ""}
+                              maxLength={120}
+                              onChange={(event) =>
+                                setDescriptionBlock(index, {
+                                  heading: event.target.value,
+                                })
+                              }
+                              placeholder="سرتیتر این بخش (اختیاری) — با طلاییِ برجسته بالای باکس نشان داده می‌شود"
+                              className={`${inputCls} mb-2 border-gold/25 font-bold`}
+                            />
+                          )}
                           <textarea
                             rows={block.type === "text" ? 6 : 2}
                             value={block.text}
@@ -713,7 +1041,7 @@ export default function ProductsAdmin({
                             }
                             placeholder={
                               block.type === "text"
-                                ? "متن این بخش را بنویسید…"
+                                ? "متن این بخش را بنویسید… (پاراگراف‌ها را با خط خالی جدا کنید؛ همه در یک باکس، زیر سرتیتر، نمایش داده می‌شوند)"
                                 : "زیرنویس اختیاری…"
                             }
                             className={inputCls}
@@ -810,7 +1138,7 @@ export default function ProductsAdmin({
                       type="checkbox"
                       checked={form.allowBackorder}
                       onChange={(e) => set("allowBackorder", e.target.checked)}
-                      className="h-4 w-4 accent-[#d4af37]"
+                      className="h-4 w-4 accent-[#d4af7c]"
                     />
                     حتی با موجودی صفر قابل سفارش باشد
                   </label>
@@ -927,7 +1255,7 @@ export default function ProductsAdmin({
                     type="checkbox"
                     checked={form.bestseller}
                     onChange={(e) => set("bestseller", e.target.checked)}
-                    className="h-4 w-4 accent-[#d4af37]"
+                    className="h-4 w-4 accent-[#d4af7c]"
                   />
                   نمایش در «پرفروش‌ترین‌ها»
                 </label>
@@ -936,7 +1264,7 @@ export default function ProductsAdmin({
                     type="checkbox"
                     checked={form.active}
                     onChange={(e) => set("active", e.target.checked)}
-                    className="h-4 w-4 accent-[#d4af37]"
+                    className="h-4 w-4 accent-[#d4af7c]"
                   />
                   نمایش در فروشگاه (فعال)
                 </label>

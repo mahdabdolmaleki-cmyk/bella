@@ -24,6 +24,7 @@ export default async function ContactPage() {
         intro={settings.contactSocialIntro}
         socials={socials}
         phone={settings.contactPhone}
+        email={settings.contactEmail}
         address={settings.contactAddress}
         hours={settings.contactHours}
       />

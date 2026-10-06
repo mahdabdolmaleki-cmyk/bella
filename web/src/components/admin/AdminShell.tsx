@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Package,
-  ShoppingBag,
+  ShoppingBasket,
   Settings,
   Users,
   ScrollText,
@@ -13,7 +13,8 @@ import {
   Send,
   GraduationCap,
   DatabaseBackup,
-  LogOut,
+  Sparkles,
+    LogOut,
   ExternalLink,
   Menu,
   X,
@@ -40,7 +41,7 @@ const NAV: NavItem[] = [
     tint: "text-sky-300",
   },
   { href: "/admin/products", label: "محصولات", icon: Package, tint: "text-amber-300" },
-  { href: "/admin/orders", label: "سفارش‌ها", icon: ShoppingBag, tint: "text-emerald-300" },
+  { href: "/admin/orders", label: "سفارش‌ها", icon: ShoppingBasket, tint: "text-emerald-300" },
   {
     href: "/admin/reviews",
     label: "نقد و بررسی‌ها",
@@ -62,7 +63,7 @@ const NAV: NavItem[] = [
     label: "پشتیبان‌گیری",
     icon: DatabaseBackup,
     tint: "text-rose-300",
-  },
+  }
 ];
 
 export default function AdminShell({ children }: { children: ReactNode }) {

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import Otp, { OTP_MAX_ATTEMPTS, OTP_TTL_SECONDS } from "../models/Otp.js";
-import { sendSms, otpMessage } from "./sms.js";
+import { sendOtpWithTemplate } from "./sms.js";
+import Settings from "../models/Settings.js";
 import { sendMail, otpMail } from "./mailer.js";
 import { clientIp } from "./activityLog.js";
 import { normalizePhone } from "../config/superAdmin.js";
@@ -94,6 +95,28 @@ export async function issueOtp(req, phoneInput, purpose, options = {}) {
     return { ok: false, status: 400, error: "شناسه دریافت کد معتبر نیست." };
   }
 
+  // ادمین می‌تواند پیامک و ایمیل کد تأیید را جداگانه از تنظیمات خاموش کند
+  // تنها رشتهٔ خالیِ صریح غیرفعال است — سندهای قدیمی = فعال.
+  try {
+    const doc = await Settings.getSingleton();
+    if (channel === "sms" && doc?.smsOtpEnabled === "") {
+      return {
+        ok: false,
+        status: 503,
+        error: "پیامک کد تأیید موقتاً غیرفعال است. از روش ایمیل استفاده کنید.",
+      };
+    }
+    if (channel === "email" && doc?.emailOtpEnabled === "") {
+      return {
+        ok: false,
+        status: 503,
+        error: "ایمیل کد تأیید موقتاً غیرفعال است. از روش پیامک استفاده کنید.",
+      };
+    }
+  } catch {
+    // تنظیمات در دسترس نیست — مسیر عادی ادامه یابد.
+  }
+
   // Issuing a fresh code invalidates every older code for this identity/purpose,
   // even if the user changed the proposed e-mail between requests.
   const scope = scopedFilter(phone, purpose, {
@@ -149,7 +172,9 @@ export async function issueOtp(req, phoneInput, purpose, options = {}) {
     const mail = otpMail(code);
     delivered = await sendMail(email, mail.subject, mail.text, mail.html);
   } else {
-    delivered = await sendSms(phone, otpMessage(code));
+    delivered = await sendOtpWithTemplate(phone, code, {
+      minutes: Math.round(OTP_TTL_SECONDS / 60),
+    });
   }
 
   if (!delivered) {

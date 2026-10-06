@@ -168,6 +168,26 @@ const METHOD_MAP = new Map(SHIPPING_METHODS.map((m) => [m.key, m]));
 
 export const DEFAULT_SHIPPING_METHOD = "tipax";
 
+/** کلید تنظیمات پنل که فعال/غیرفعال بودن هر روش ارسال را نگه می‌دارد. */
+export const SHIPPING_ENABLED_KEYS = Object.freeze({
+  tipax: "shippingTipaxEnabled",
+  "post-pishtaz": "shippingPishtazEnabled",
+  chapar: "shippingChaparEnabled",
+  peyk: "shippingPeykEnabled",
+});
+
+/**
+ * آیا مدیر این روش ارسال را در پنل فعال گذاشته است؟
+ * نبودِ تنظیمات (سند قدیمی) یعنی فعال — تا رفتار قبلی سایت تغییر نکند.
+ */
+export function isMethodEnabled(method, settings = null) {
+  if (!method) return false;
+  if (!settings) return true;
+  const field = SHIPPING_ENABLED_KEYS[method.key];
+  if (!field) return true;
+  return settings[field] !== "";
+}
+
 export function getShippingMethod(key) {
   return METHOD_MAP.get(String(key || "").trim()) || null;
 }
@@ -195,6 +215,41 @@ function roundToman(n) {
   return Math.round(n / 1000) * 1000;
 }
 
+export function parseEtaDays(val, fallbackDays = [2, 3]) {
+  if (typeof val !== "string" || !val.trim()) {
+    const min = fallbackDays[0];
+    const max = fallbackDays[1];
+    return {
+      min,
+      max,
+      text: min === max ? `${min} روز کاری` : `${min} تا ${max} روز کاری`,
+    };
+  }
+  const digits = val
+    .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .match(/\d+/g);
+
+  if (!digits || digits.length === 0) {
+    const min = fallbackDays[0];
+    const max = fallbackDays[1];
+    return {
+      min,
+      max,
+      text: min === max ? `${min} روز کاری` : `${min} تا ${max} روز کاری`,
+    };
+  }
+
+  if (digits.length === 1) {
+    const d = Math.max(1, Math.min(60, parseInt(digits[0], 10)));
+    return { min: d, max: d, text: `${d} روز کاری` };
+  }
+
+  const d1 = Math.max(1, Math.min(60, parseInt(digits[0], 10)));
+  const d2 = Math.max(d1, Math.min(60, parseInt(digits[1], 10)));
+  return { min: d1, max: d2, text: d1 === d2 ? `${d1} روز کاری` : `${d1} تا ${d2} روز کاری` };
+}
+
 /**
  * Quotes one courier.
  * @returns null when the courier does not serve the destination zone.
@@ -207,6 +262,7 @@ export function quoteMethod(
     subtotal,
     cod = false,
     freeShippingThreshold = DEFAULT_FREE_SHIPPING_THRESHOLD,
+    settings = null,
   }
 ) {
   if (!method) return null;
@@ -227,13 +283,23 @@ export function quoteMethod(
   const free = method.freeEligible && (Number(subtotal) || 0) >= threshold;
   const cost = free ? codFee : listPrice;
 
-  const [dMin, dMax] = method.days[zone] ?? method.days.far;
+  const showEta = settings ? settings.deliveryEstimateEnabled !== "" : true;
+  let customDaysVal = null;
+  if (settings) {
+    if (method.key === "tipax") customDaysVal = settings.deliveryDaysTipax;
+    else if (method.key === "post-pishtaz") customDaysVal = settings.deliveryDaysPishtaz;
+    else if (method.key === "chapar") customDaysVal = settings.deliveryDaysChapar;
+    else if (method.key === "peyk") customDaysVal = settings.deliveryDaysPeyk;
+  }
+  const defaultZoneDays = method.days[zone] ?? method.days.far;
+  const eta = parseEtaDays(customDaysVal, defaultZoneDays);
 
   return {
     key: method.key,
     label: method.label,
     icon: method.icon,
     desc: method.desc,
+    codSupported: Boolean(method.codSupported),
     cost,
     listPrice,
     free,
@@ -242,7 +308,9 @@ export function quoteMethod(
     weightGrams: grams,
     billableKg: kg,
     zone,
-    etaDays: { min: dMin, max: dMax },
+    showEta,
+    etaDays: showEta ? { min: eta.min, max: eta.max } : { min: 0, max: 0 },
+    etaText: showEta ? eta.text : "",
   };
 }
 
@@ -253,19 +321,25 @@ export function quoteShipping({
   subtotal = 0,
   cod = false,
   freeShippingThreshold = DEFAULT_FREE_SHIPPING_THRESHOLD,
+  settings = null,
 }) {
   const zone = zoneForProvince(province);
   const grams = cartWeightGrams(items);
   const threshold = normaliseFreeShippingThreshold(freeShippingThreshold);
-  const options = SHIPPING_METHODS.map((method) =>
+  const options = SHIPPING_METHODS.filter((method) =>
+    isMethodEnabled(method, settings)
+  ).map((method) =>
     quoteMethod(method, {
       zone,
       grams,
       subtotal,
       cod,
       freeShippingThreshold: threshold,
+      settings,
     })
   ).filter(Boolean);
+
+  const showEta = settings ? settings.deliveryEstimateEnabled !== "" : true;
 
   return {
     zone,
@@ -274,6 +348,7 @@ export function quoteShipping({
     billableKg: billableKg(grams),
     freeThreshold: threshold,
     freeRemaining: Math.max(0, threshold - (Number(subtotal) || 0)),
+    showEta,
     options,
   };
 }
@@ -289,6 +364,7 @@ export function resolveShipping({
   subtotal = 0,
   cod = false,
   freeShippingThreshold = DEFAULT_FREE_SHIPPING_THRESHOLD,
+  settings = null,
 }) {
   const quote = quoteShipping({
     province,
@@ -296,6 +372,7 @@ export function resolveShipping({
     subtotal,
     cod,
     freeShippingThreshold,
+    settings,
   });
   const chosen =
     quote.options.find((o) => o.key === methodKey) ||

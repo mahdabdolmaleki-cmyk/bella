@@ -21,7 +21,7 @@ export const DEFAULT_BRANDS: BrandCard[] = [
   { en: "Amouage", fa: "آمواژ", country: "عمان", year: "۱۹۸۳", d: "کندر و عود عمانی در غلیظ‌ترین شکل ممکن." },
   { en: "Guerlain", fa: "گرلن", country: "فرانسه", year: "۱۸۲۸", d: "میراث وانیل و تونکا؛ امضای گورلیناد افسانه‌ای." },
   { en: "Byredo", fa: "بایردو", country: "سوئد", year: "۲۰۰۶", d: "مینیمال اسکاندیناوی با رایحه‌های مفهومی." },
-  { en: "Xerjoff", fa: "زرجف", country: "ایتالیا", year: "۲۰۰۳", d: "هنر ایتالیایی و اسانس‌های نادر کلکسیونی." },
+  { en: "Xerjoff", fa: "زرجف", country: "ایتالیا", year: "۲۰۰۳", d: "هنر ایتالیایی و رایحه‌های نادر کلکسیونی." },
 ];
 
 export function BrandsSection({

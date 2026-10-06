@@ -8,8 +8,8 @@ import type { Review, ReviewSummary } from "@/lib/types";
 
 /* ==================================================================== */
 /*  نقد و بررسی‌ها — public review list + submit form                      */
-/*  Reviews are moderated: a new one is stored as "pending" and only     */
-/*  appears here after an admin approves it in the panel.                */
+/*  New reviews are published immediately (status "approved"); the admin */
+/*  can still reject or delete them in the panel.                        */
 /* ==================================================================== */
 
 export function Stars({ value, size = 14 }: { value: number; size?: number }) {
@@ -92,10 +92,12 @@ export default function Reviews({ productId }: { productId: number }) {
         setSending(false);
         return;
       }
-      setSent(payload.message || "نقد شما ارسال شد.");
+      setSent(payload.message || "نقد شما ثبت و منتشر شد.");
       setBody("");
       setRating(5);
       setSending(false);
+      // نقد بلافاصله منتشر می‌شود؛ فهرست و میانگین امتیاز تازه شود.
+      load();
     } catch {
       setFormError("خطا در برقراری ارتباط با سرور.");
       setSending(false);
@@ -252,7 +254,7 @@ export default function Reviews({ productId }: { productId: number }) {
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-[10.5px] leading-6 text-sage/80">
-                  نقدها پس از بررسی مدیر منتشر می‌شوند.
+                  نقد شما بلافاصله پس از ارسال منتشر می‌شود.
                   {!user && " با ورود به حساب، نشان «خرید تأییدشده» می‌گیرید."}
                 </p>
                 <button

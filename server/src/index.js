@@ -9,6 +9,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { connectDB } from "./config/db.js";
 import { startStaleOrderSweeper } from "./jobs/staleOrders.js";
+import { startAbandonedCartSweeper } from "./jobs/abandonedCarts.js";
 import { startLogRetention } from "./utils/fileLog.js";
 import { securityHeaders, sanitizeRequest, originGuard } from "./middleware/security.js";
 import { rateLimit } from "./middleware/rateLimit.js";
@@ -29,6 +30,8 @@ import notificationsRouter from "./routes/notifications.js";
 import backupRouter from "./routes/backup.js";
 import tutorialsRouter from "./routes/tutorials.js";
 import adminTutorialsRouter from "./routes/adminTutorials.js";
+import cartRouter from "./routes/cart.js";
+import consultationsRouter from "./routes/consultations.js";
 import {
   currentExclusiveOperation,
   isMaintenanceInProgress,
@@ -155,6 +158,9 @@ app.use("/api/shipping", shippingRouter);
 app.use("/api/reviews", reviewsRouter);
 app.use("/api/tutorials", tutorialsRouter);
 app.use("/api/account", accountRouter);
+app.use("/api/cart", cartRouter);
+app.use("/api/consultations", consultationsRouter);
+app.use("/api/admin/consultations", consultationsRouter);
 app.use("/api/track", trackRouter);
 
 // ---- 404 (was missing: unknown routes hung or returned HTML) ---------------
@@ -205,6 +211,8 @@ async function start() {
 
   // Releases stock reserved by orders that never reached the gateway.
   startStaleOrderSweeper();
+  // Sends 2h / 12h abandoned-cart reminders (v36)
+  startAbandonedCartSweeper();
   // Deletes activity log files older than LOG_RETENTION_DAYS (default 30).
   startLogRetention();
 

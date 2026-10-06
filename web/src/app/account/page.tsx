@@ -11,6 +11,7 @@ import {
   Package,
   Check,
   Mail,
+  Phone,
   MessageSquare,
   Heart,
   Gem,
@@ -23,6 +24,7 @@ import {
   Truck,
   ShieldCheck,
   XCircle,
+  BellRing,
   CreditCard,
   MapPin,
   ChevronDown,
@@ -40,6 +42,7 @@ import {
 } from "@/components/AuthContext";
 import PageHero from "@/components/PageHero";
 import { ProductVisual } from "@/components/art";
+import { InvoiceLines } from "@/components/InvoiceLines";
 import { formatToman, toFa, type ProductDTO } from "@/lib/data";
 import type { LoyaltyInfo, Order, TierInfo } from "@/lib/types";
 
@@ -496,15 +499,15 @@ function Profile() {
             </div>
           </div>
 
-          <div className="mt-2 flex w-full min-w-0 gap-1.5 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
+          <div className="mt-2 grid w-full min-w-0 grid-cols-2 gap-1.5 md:flex md:flex-col md:flex-nowrap">
             {SECTIONS.map(({ key, label, icon: Icon, tint }) => {
               const active = section === key;
               return (
                 <button
                   key={key}
                   onClick={() => setSection(key)}
-                  className={`relative flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-colors ${
-                    active ? "text-gold" : "text-sage hover:text-cream"
+                  className={`relative flex items-center justify-start gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-colors ${
+                    active ? "text-gold border border-gold/40 bg-gold/10" : "text-sage hover:text-cream border border-transparent"
                   }`}
                 >
                   {active && (
@@ -570,7 +573,7 @@ function Overview({
       {/* loyalty card */}
       <div
         className="gold-ring relative overflow-hidden rounded-3xl border border-gold/25 glass-soft p-4 sm:p-6"
-        style={{ boxShadow: `inset 0 0 90px -40px ${current?.color ?? "#d4af37"}` }}
+        style={{ boxShadow: `inset 0 0 90px -40px ${current?.color ?? "#d4af7c"}` }}
       >
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div>
@@ -591,8 +594,8 @@ function Overview({
           <span
             className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-black sm:px-3.5 sm:text-xs"
             style={{
-              borderColor: `${current?.color ?? "#d4af37"}66`,
-              color: current?.color ?? "#d4af37",
+              borderColor: `${current?.color ?? "#d4af7c"}66`,
+              color: current?.color ?? "#d4af7c",
             }}
           >
             <span className="text-base leading-none">{current?.icon ?? "✦"}</span>
@@ -612,7 +615,7 @@ function Overview({
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-night/70">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-l from-gold to-gold-deep"
+                className="h-full rounded-full bg-gradient-to-l from-[#b89ba7] to-[#d4af7c]"
                 initial={{ width: 0 }}
                 animate={{ width: `${loyalty.next.progress}%` }}
                 transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
@@ -665,53 +668,47 @@ const ORDER_STEPS = [
     hint: "سفارش ثبت شد و در صف بررسی است.",
     // Each stage owns a colour so progress is readable at a glance instead of
     // four identical gold circles.
-    done: "border-amber-300 bg-gradient-to-br from-amber-200 to-amber-500",
-    glow: "shadow-lg shadow-amber-400/30",
-    ring: "border-amber-300",
-    text: "text-amber-200",
-    soft: "border-amber-300/25 bg-amber-400/10 text-amber-100",
+    done: "border-[#c9a44e]/60 bg-gradient-to-br from-[#8a4a6d] to-[#4e1e39]",
+    /*v26*/
+    glow: "shadow-md shadow-[#6b2c4e]/30",
+    ring: "border-[#6b2c4e]",
+    text: "text-[#241a22]",
+    soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
   {
     status: "در حال آماده‌سازی",
     icon: PackageCheck,
     hint: "عطرها بسته‌بندی و مهروموم می‌شوند.",
-    done: "border-sky-300 bg-gradient-to-br from-sky-200 to-sky-500",
-    glow: "shadow-lg shadow-sky-400/30",
-    ring: "border-sky-300",
-    text: "text-sky-200",
-    soft: "border-sky-300/25 bg-sky-400/10 text-sky-100",
+    done: "border-[#c9a44e]/60 bg-gradient-to-br from-[#8a4a6d] to-[#4e1e39]",
+    /*v26*/
+    glow: "shadow-md shadow-[#6b2c4e]/30",
+    ring: "border-[#6b2c4e]",
+    text: "text-[#241a22]",
+    soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
   {
     status: "ارسال شد",
     icon: Truck,
     hint: "مرسوله تحویل مامور ارسال شده است.",
-    done: "border-violet-300 bg-gradient-to-br from-violet-200 to-violet-500",
-    glow: "shadow-lg shadow-violet-400/30",
-    ring: "border-violet-300",
-    text: "text-violet-200",
-    soft: "border-violet-300/25 bg-violet-400/10 text-violet-100",
+    done: "border-[#c9a44e]/60 bg-gradient-to-br from-[#8a4a6d] to-[#4e1e39]",
+    /*v26*/
+    glow: "shadow-md shadow-[#6b2c4e]/30",
+    ring: "border-[#6b2c4e]",
+    text: "text-[#241a22]",
+    soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
   {
     status: "تحویل داده شد",
     icon: ShieldCheck,
     hint: "سفارش به دست شما رسید. نوش جانتان!",
-    done: "border-emerald-300 bg-gradient-to-br from-emerald-200 to-emerald-500",
-    glow: "shadow-lg shadow-emerald-400/30",
-    ring: "border-emerald-300",
-    text: "text-emerald-200",
-    soft: "border-emerald-300/25 bg-emerald-400/10 text-emerald-100",
+    done: "border-[#c9a44e]/60 bg-gradient-to-br from-[#8a4a6d] to-[#4e1e39]",
+    /*v26*/
+    glow: "shadow-md shadow-[#6b2c4e]/30",
+    ring: "border-[#6b2c4e]",
+    text: "text-[#241a22]",
+    soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
 ] as const;
-
-const CANCELLED_STATUS = "لغو شد";
-
-const PAYMENT_BADGE: Record<string, { label: string; cls: string }> = {
-  paid: { label: "پرداخت شده", cls: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" },
-  pending: { label: "در انتظار پرداخت", cls: "border-amber-400/40 bg-amber-400/10 text-amber-300" },
-  unpaid: { label: "پرداخت نشده", cls: "border-gold/30 bg-gold/5 text-sage" },
-  failed: { label: "پرداخت ناموفق", cls: "border-red-400/40 bg-red-400/10 text-red-300" },
-  refunded: { label: "مسترد شد", cls: "border-sky-400/40 bg-sky-400/10 text-sky-300" },
-};
 
 function faDate(value?: string | Date | null) {
   if (!value) return "";
@@ -753,7 +750,7 @@ function OrderTracker({ order }: { order: Order }) {
         <div>
           <p className="text-xs font-bold text-red-300">این سفارش لغو شده است</p>
           <p className="mt-0.5 text-[11px] text-sage">
-            {faDate(timelineAt(CANCELLED_STATUS)) || "مبلغ پ��داختی در صورت وجود مسترد می‌شود."}
+            {faDate(timelineAt(CANCELLED_STATUS)) || "مبلغ پرداختی در صورت وجود مسترد می‌شود."}
           </p>
         </div>
       </div>
@@ -763,9 +760,9 @@ function OrderTracker({ order }: { order: Order }) {
   return (
     <div className="relative">
       {/* Rail behind the bubbles. The gold overlay grows with progress. */}
-      <div className="absolute right-5 left-5 top-5 h-[2px] bg-gold/15" aria-hidden />
+      <div className="absolute right-5 left-5 top-5 h-[2px] bg-[#e9e2d2]" aria-hidden />
       <motion.div
-        className="absolute right-5 top-5 h-[2px] bg-gradient-to-l from-amber-300 via-violet-400 to-emerald-300"
+        className="absolute right-5 top-5 h-[2px] bg-gradient-to-l from-[#4e1e39] via-[#6b2c4e] to-[#d4af7c]"
         initial={{ width: 0 }}
         animate={{
           width:
@@ -790,7 +787,7 @@ function OrderTracker({ order }: { order: Order }) {
                 transition={{ delay: 0.1 + i * 0.08, type: "spring", stiffness: 260, damping: 18 }}
                 className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
                   done
-                    ? `${step.done} ${step.glow} text-[#0b1a12]`
+                    ? `${step.done} ${step.glow} text-[#f6ecd9]`
                     : "glass-soft border-gold/20 text-sage/60"
                 }`}
               >
@@ -829,14 +826,66 @@ function OrderTracker({ order }: { order: Order }) {
 }
 
 /** One expandable order card. */
+/** وضعیت‌هایی که مشتری خودش می‌تواند درخواست لغو بدهد (مثل سرور) - تا قبل از «ارسال شد» (v36) */
+const CANCELLED_STATUS = "لغو شد" as const;
+const SHIPPED_STATUSES = ["ارسال شد", "تحویل داده شد", "لغو شد"] as const;
+function isCancelRequestable(status: string) {
+  return !(SHIPPED_STATUSES as readonly string[]).includes(status);
+}
+
 function OrderCard({ order, index }: { order: Order; index: number }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  // ── درخواست لغو (v35) ──
+  const [cancelBox, setCancelBox] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelDone, setCancelDone] = useState<{
+    ok: boolean;
+    adminPhone: string;
+    adminEmail: string;
+  } | null>(null);
 
-  const badge = PAYMENT_BADGE[order.paymentStatus ?? "unpaid"] ?? PAYMENT_BADGE.unpaid;
+  const requestCancel = async () => {
+    if (cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      const res = await fetch(`/api/account/orders/${order.code}/cancel-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setCancelDone({
+          ok: true,
+          adminPhone: String(data?.adminPhone || ""),
+          adminEmail: String(data?.adminEmail || ""),
+        });
+        setCancelBox(false);
+      } else {
+        setCancelDone({
+          ok: false,
+          adminPhone: String(data?.adminPhone || ""),
+          adminEmail: String(data?.adminEmail || ""),
+        });
+        setCancelBox(false);
+      }
+    } catch {
+      setCancelDone({ ok: false, adminPhone: "", adminEmail: "" });
+      setCancelBox(false);
+    }
+    setCancelBusy(false);
+  };
+
+  // v43: برچسب وضعیت پرداخت («پرداخت شده/ناموفق/…») طبق خواسته از روی فاکتورها حذف شد.
   // Older orders were stored before shipping existed, so fall back gracefully.
   const shippingCost = order.shippingCost ?? 0;
   const subtotal = order.subtotal ?? Math.max(0, order.total - shippingCost);
+  // v39: فاکتور دقیق — همان فرمول سرور: total = کالا − تخفیف + ارسال + باکس VIP
+  const discountAmount = order.discountAmount ?? 0;
+  const vipBoxFee = order.vipBoxFee ?? 0;
+  const shippingCod = Boolean(order.shippingCod);
+  const onlineAmount = Math.max(0, order.total - (shippingCod ? shippingCost : 0));
 
   const copyCode = async () => {
     try {
@@ -856,12 +905,12 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
       className="gold-ring overflow-hidden rounded-2xl glass-panel"
     >
       {/* Header: code, date, payment state */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gold/10 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#d4af7c]/55 bg-[#f4f1e6] px-4 py-3">
         <div className="flex items-center gap-2">
           <button
             onClick={copyCode}
             title="کپی کد سفارش"
-            className="flex items-center gap-1.5 rounded-lg bg-pine/40 px-2 py-1 font-mono text-xs text-gold-soft transition hover:bg-gold/10"
+            className="flex items-center gap-1.5 rounded-lg bg-[#e8dde3] px-2 py-1 font-mono text-xs text-[#241a22] transition hover:bg-[#dcd0d6]"
           >
             {copied ? <Check size={12} /> : <Copy size={12} />}
             {order.code}
@@ -870,14 +919,96 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
             <span className="text-[10px] text-sage/70">{faDate(order.createdAt)}</span>
           )}
         </div>
-        <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${badge.cls}`}>
-          {badge.label}
-        </span>
       </div>
 
       {/* Stage tracker */}
       <div className="px-4 py-5">
         <OrderTracker order={order} />
+
+        {/* ── درخواست لغو سفارش (v35 → v36: تا قبل از ارسال شد) ── */}
+        {isCancelRequestable(order.status) && !order.cancelRequested && !cancelDone?.ok && (
+          <button
+            type="button"
+            onClick={() => setCancelBox((v) => !v)}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[#c53546]/45 px-4 py-2 text-[11px] font-bold text-[#b3233a] transition-colors hover:bg-[#c53546]/10"
+          >
+            <XCircle size={13} /> درخواست لغو سفارش
+          </button>
+        )}
+
+        {order.cancelRequested && !cancelDone?.ok && (
+          <p className="mt-4 flex items-center gap-2 rounded-xl border border-[#b09371]/55 bg-[#f3e9d2] px-3 py-2.5 text-[11px] font-bold text-[#241a22]">
+            <BellRing size={13} /> درخواست لغو شما ثبت شده و در انتظار بررسی است.
+          </p>
+        )}
+
+        {/* باکس تأیید درخواست لغو */}
+        {cancelBox && (
+          <div className="mt-3 rounded-2xl border border-[#c53546]/35 bg-[#c53546]/5 p-4">
+            <p className="text-xs font-bold text-[#b3233a]">درخواست لغو این سفارش را ثبت می‌کنید؟</p>
+            <p className="mt-1.5 text-[11px] leading-5 text-sage">
+              بعد از ثبت، درخواست شما برای مدیر فروشگاه ارسال می‌شود. برای هماهنگی سریع‌تر می‌توانید
+              مستقیم هم تماس بگیرید.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={requestCancel}
+                disabled={cancelBusy}
+                className="rounded-full bg-[#c53546] px-4 py-2 text-[11px] font-black text-[#fff2ee] transition hover:bg-[#b3233a] disabled:opacity-50"
+              >
+                {cancelBusy ? "در حال ثبت…" : "بله، ثبت درخواست لغو"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelBox(false)}
+                className="btn-ghost rounded-full px-4 py-2 text-[11px] font-bold"
+              >
+                انصراف
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* نتیجهٔ ثبت درخواست — با شمارهٔ تماس مدیر */}
+        {cancelDone && (
+          <div
+            className={`mt-3 rounded-2xl border p-4 ${
+              cancelDone.ok
+                ? "border-amber-400/30 bg-amber-400/10"
+                : "border-red-400/30 bg-red-500/5"
+            }`}
+          >
+            <p className={`text-xs font-bold ${cancelDone.ok ? "text-[#241a22]" : "text-[#b3233a]"}`}>
+              {cancelDone.ok
+                ? "درخواست لغو شما ثبت شد و به مدیر فروشگاه ارسال شد."
+                : "در این مرحله، لغو فقط از طریق پشتیبانی امکان‌پذیر است."}
+            </p>
+            <p className="mt-1.5 text-[11px] leading-6 text-sage">
+              برای پیگیری با پشتیبانی تماس بگیرید:
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {cancelDone.adminPhone && (
+                <a
+                  href={`tel:${cancelDone.adminPhone}`}
+                  dir="ltr"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-4 py-2 text-[12px] font-black text-gold-soft"
+                >
+                  <Phone size={13} /> {cancelDone.adminPhone}
+                </a>
+              )}
+              {cancelDone.adminEmail && (
+                <a
+                  href={`mailto:${cancelDone.adminEmail}`}
+                  dir="ltr"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 px-4 py-2 text-[12px] font-bold text-sage"
+                >
+                  <Mail size={13} /> {cancelDone.adminEmail}
+                </a>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Shipping summary */}
@@ -906,7 +1037,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
       )}
 
       {/* Collapsed footer: total + toggle */}
-      <div className="flex items-center justify-between border-t border-gold/10 px-4 py-3">
+      <div className="flex items-center justify-between border-t border-[#d4af7c]/55 bg-[#faf8f1] px-4 py-3">
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-1 text-[11px] font-bold text-gold-soft hover:text-gold"
@@ -916,7 +1047,14 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
             <ChevronDown size={14} />
           </motion.span>
         </button>
-        <span className="text-sm font-black text-gold-soft">{formatToman(order.total)}</span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-sm font-black text-gold-soft">
+            {formatToman(shippingCod ? onlineAmount : order.total)}
+          </span>
+          {shippingCod && shippingCost > 0 && (
+            <span className="text-[10px] text-sage">+ پس‌کرایه {formatToman(shippingCost)}</span>
+          )}
+        </div>
       </div>
 
       <AnimatePresence initial={false}>
@@ -929,11 +1067,11 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
             className="overflow-hidden border-t border-gold/10 glass-soft"
           >
             <div className="space-y-3 px-4 py-4">
-              {/* Line items with their bottle artwork */}
+              {/* Line items with their bottle artwork - fix default image for cancelled orders (v36) */}
               {(order.items ?? []).map((it) => (
                 <div key={it.id} className="flex items-center gap-3">
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-pine/40">
-                    <ProductVisual />
+                    <ProductVisual image={it.image ?? null} alt={it.name} className="h-full w-full object-contain" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold text-cream">{it.name}</p>
@@ -945,24 +1083,9 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
                 </div>
               ))}
 
-              {/* Invoice breakdown — identical to the checkout drawer */}
-              <div className="space-y-1.5 border-t border-gold/10 pt-3 text-[11px]">
-                <div className="flex justify-between text-sage">
-                  <span>جمع کالاها</span>
-                  <span className="text-cream">{formatToman(subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sage">
-                  <span>هزینه ارسال</span>
-                  <span className={order.freeShipping ? "text-gold-soft" : "text-cream"}>
-                    {order.freeShipping || shippingCost === 0
-                      ? "رایگان"
-                      : formatToman(shippingCost)}
-                  </span>
-                </div>
-                <div className="flex justify-between border-t border-gold/10 pt-1.5 font-bold text-gold-soft">
-                  <span>مبلغ کل</span>
-                  <span>{formatToman(order.total)}</span>
-                </div>
+              {/* Invoice breakdown — نسخهٔ مشترک فاکتور (v41) */}
+              <div className="border-t border-gold/10 pt-3">
+                <InvoiceLines order={order} tone="dark" />
               </div>
 
               {/* Delivery details captured at checkout */}

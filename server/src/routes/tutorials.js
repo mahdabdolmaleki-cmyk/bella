@@ -163,7 +163,7 @@ router.get(
 );
 
 /**
- * POST /api/tutorials/:id/comments — هر نظر در صف تأیید می‌نشیند.
+ * POST /api/tutorials/:id/comments — نظر بلافاصله منتشر می‌شود (مدیر می‌تواند رد/حذف کند).
  * عمداً هیچ امتیاز ستاره‌ای دریافت نمی‌کند.
  */
 router.post(
@@ -190,15 +190,16 @@ router.post(
       user: req.user?._id ?? null,
       name,
       body,
-      status: "pending",
+      // Published immediately; the admin can still reject or delete it.
+      status: "approved",
       ip: clientIp(req),
     });
     await comment.save();
 
     res.status(201).json({
       ok: true,
-      pending: true,
-      message: "نظر شما ثبت شد و پس از تأیید مدیر نمایش داده می‌شود.",
+      pending: false,
+      message: "نظر شما ثبت و منتشر شد. ممنون از همراهی شما!",
     });
   }),
 );

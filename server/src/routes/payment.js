@@ -11,7 +11,11 @@ import {
   requestPayment,
   verifyPayment,
   isZarinpalConfigured,
+  zarinpalMode,
+  zarinpalErrorText,
+  ZARINPAL_MAX_TOMAN,
 } from "../utils/zarinpal.js";
+import { notifyOrderPlaced } from "../utils/orderNotify.js";
 
 /**
  * An order code alone used to be enough to start a payment or read someone
@@ -50,12 +54,35 @@ const PUBLIC_BASE_URL = (
   .trim()
   .replace(/\/$/, "");
 
-const API_BASE_URL = (
-  process.env.API_BASE_URL ||
-  `http://localhost:${process.env.PORT || 4000}`
-)
+// آدرسی که زرین‌پال مشتری را بعد از پرداخت به آن برمی‌گرداند.
+// BUG FIX: پیش‌فرض قبلی http://localhost:4000 بود؛ یعنی اگر API_BASE_URL در
+// .env نبود، مرورگر مشتری بعد از پرداخت به localhost خودش می‌رفت و سفارش
+// هرگز تأیید نمی‌شد. حالا پیش‌فرض همان دامنهٔ سایت است (مسیر /api از طریق
+// Next/nginx به بک‌اند می‌رسد) و دامنه با دامنهٔ ثبت‌شده در زرین‌پال یکی است.
+const API_BASE_URL = (process.env.API_BASE_URL || PUBLIC_BASE_URL)
   .trim()
   .replace(/\/$/, "");
+const CALLBACK_URL = `${API_BASE_URL}/api/payment/callback`;
+
+// یک خط در لاگ PM2 هنگام راه‌اندازی تا وضعیت درگاه بدون حدس معلوم باشد.
+{
+  const mode = zarinpalMode();
+  if (mode.configured) {
+    console.log(
+      `💳 ZarinPal: ${mode.sandbox ? "SANDBOX (آزمایشی)" : "LIVE (واقعی)"} · ` +
+        `merchant ${mode.merchantHint} · currency ${mode.currency} · callback ${CALLBACK_URL}`
+    );
+    if (/localhost|127\.0\.0\.1/.test(CALLBACK_URL) && process.env.NODE_ENV === "production") {
+      console.warn("⚠️  ZarinPal callback روی localhost است — FRONTEND_URL یا PUBLIC_BASE_URL را تنظیم کنید.");
+    }
+  } else {
+    console.log(
+      mode.merchantHint
+        ? "⚠️  ZarinPal: ZARINPAL_MERCHANT_ID نامعتبر است (باید ۳۶ کاراکتر مثل xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx باشد)."
+        : "💳 ZarinPal: پیکربندی نشده — سفارش‌ها بدون پرداخت آنلاین ثبت می‌شوند."
+    );
+  }
+}
 
 function resultRedirect(params) {
   const qs = new URLSearchParams(params).toString();
@@ -117,6 +144,9 @@ router.post(
       });
     }
 
+    // «تنظیمات تراکنش» (v37): خودکار = اعتبارسنجی توسط زرین‌پال در پایان روز.
+    const autoVerify = siteSettings?.zarinpalAutoVerify === "1";
+
     const code = str(req.body?.code, {
       max: 32,
     });
@@ -165,17 +195,28 @@ router.post(
       });
     }
 
-    if (order.total <= 0) {
+    // پس‌کرایه: آنلاین فقط قیمت کالاها پرداخت می‌شود؛ کرایه درِ منزل.
+    const payable = order.onlinePayable();
+    if (payable <= 0) {
       return res.status(400).json({
         error: "مبلغ سفارش معتبر نیست.",
       });
     }
 
+    if (payable > ZARINPAL_MAX_TOMAN) {
+      return res.status(400).json({
+        error: "سقف هر پرداخت آنلاین ۱۰۰ میلیون تومان است. لطفاً سفارش را در چند بخش ثبت کنید یا با پشتیبانی تماس بگیرید.",
+      });
+    }
+
     const out = await requestPayment({
-      amount: order.total,
+      amount: payable,
       description: `پرداخت سفارش ${order.code} — بلا پرفیوم`,
-      callbackUrl: `${API_BASE_URL}/api/payment/callback`,
+      callbackUrl: CALLBACK_URL,
       mobile: order.phone,
+      email: order.email || undefined,
+      orderId: order.code,
+      autoVerify,
     });
 
     if (!out.ok) {
@@ -184,23 +225,27 @@ router.post(
         target: order.code,
         success: false,
         status: 502,
-        meta: `code=${out.code ?? "-"}`,
+        meta: `code=${out.code ?? "-"} ${zarinpalErrorText(out.code)}`,
       });
+      console.warn(`ZarinPal request failed for ${order.code}: ${out.code ?? "-"} ${zarinpalErrorText(out.code)}`);
 
       return res.status(502).json({
         error: out.error,
       });
     }
 
-    order.authority = out.authority;
-    order.paymentStatus = "pending";
-
-    await order.save();
+    // به‌جای order.save() کامل، آپدیت شرطیِ هدفمند: اگر سفارش در فاصلهٔ
+    // درخواستِ درگاه منقضی/لغو شده، همین‌جا به «pending» برنمی‌گردد.
+    await Order.updateOne(
+      { _id: order._id, paymentStatus: { $in: ["unpaid", "pending"] } },
+      { $set: { authority: out.authority, paymentStatus: "pending" } }
+    );
 
     logActivity(req, {
       action: "payment.request",
       target: order.code,
       status: 200,
+      meta: `auto_verify=${autoVerify ? "خودکار" : "غیرخودکار"}`,
     });
 
     return res.json({
@@ -371,10 +416,61 @@ router.get(
     // We still DO NOT trust the browser.
     // Verify directly with ZarinPal.
     // -----------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // سفارش پیش از بازگشت مشتری منقضی شده است (sweeper موجودی را آزاد کرده).
+    //
+    // عمداً verify نمی‌کنیم. در حالت «غیرخودکار» زرین‌پال پایان‌روز پول را
+    // خودکار به مشتری برمی‌گرداند. در حالت «خودکار» (تنظیمات تراکنشِ پنل)
+    // مبلغ برداشت می‌شود و عودتش دستی از پنل زرین‌پال است — در لاگ مشخص می‌شود.
+    // -----------------------------------------------------------------------
+    const fresh = await Order.findById(order._id).select("paymentStatus stockCommitted code refId");
+    if (fresh?.paymentStatus === "paid") {
+      return res.redirect(
+        resultRedirect({ status: "ok", code: fresh.code, ref: fresh.refId || "" })
+      );
+    }
+    if (!fresh || !["unpaid", "pending"].includes(fresh.paymentStatus) || !fresh.stockCommitted) {
+      const curSettings = await Settings.getSingleton();
+      const expiredInAutoMode = curSettings?.zarinpalAutoVerify === "1";
+      logActivity(req, {
+        action: "payment.expired_not_verified",
+        target: order.code,
+        success: false,
+        status: 410,
+        meta: expiredInAutoMode
+          ? "حالت خودکار: مبلغ تا پایان روز برداشت می‌شود — برای عودت به مشتری از پنل زرین‌پال اقدام کنید"
+          : "حالت غیرخودکار: مبلغ تأییدنشده پایان‌روز خودکار به مشتری عودت می‌شود",
+      });
+      return res.redirect(resultRedirect({ status: "expired", code: order.code }));
+    }
+
+    // پس‌کرایه: مبلغ درگاه همان مبلغ آنلاین کالاهاست، نه کل سفارش.
     const verified = await verifyPayment({
-      amount: order.total,
+      amount: order.onlinePayable(),
       authority,
     });
+
+    if (!verified.ok && verified.transport) {
+      // v38: درگاه در لحظهٔ verify در دسترس نبود (timeout/network).
+      // وضعیت پرداخت «نامعلوم» است — نه رد‌شده. سفارش را pending نگه
+      // می‌داریم و موجودی قفل می‌ماند تا sweeper (که خودش یک verify
+      // امتحان می‌کند) یا دکمهٔ «بررسی دوباره» مشتری تکلیفش را روشن کند.
+      // اگر پرداخت واقعاً انجام نشده باشد، sweeper بعداً منقضی می‌کند و
+      // در حالت غیرخودکار پول همان‌طور که هست به مشتری برمی‌گردد.
+      logActivity(req, {
+        action: "payment.verify.unreachable",
+        target: order.code,
+        success: false,
+        status: 502,
+        meta: "وضعیت نامعلوم — سفارش pending ماند",
+      });
+      return res.redirect(
+        resultRedirect({
+          status: "retry",
+          code: order.code,
+        })
+      );
+    }
 
     if (!verified.ok) {
       // The payment was not verified.
@@ -431,7 +527,7 @@ router.get(
         target: order.code,
         success: false,
         status: 402,
-        meta: `code=${verified.code ?? "-"}`,
+        meta: `code=${verified.code ?? "-"} ${zarinpalErrorText(verified.code)}`,
       });
 
       return res.redirect(
@@ -501,6 +597,45 @@ router.get(
         );
       }
 
+      // -------------------------------------------------------------------
+      // پول همین حالا verify و برداشت شده، ولی در همان چند میلی‌ثانیه
+      // sweeper سفارش را منقضی کرد. رها کردنش یعنی «پول گرفته شد، سفارشی
+      // نیست». پس موجودی را دوباره رزرو و سفارش را پرداخت‌شده می‌کنیم.
+      // (ممکن است موجودی یک واحد منفی شود؛ مدیر در لاگ می‌بیند.)
+      // -------------------------------------------------------------------
+      const recovered = await Order.findOneAndUpdate(
+        { _id: order._id, paymentStatus: "failed", stockCommitted: false },
+        {
+          $set: {
+            paymentStatus: "paid",
+            stockCommitted: true,
+            refId: verified.refId,
+            cardPan: verified.cardPan || null,
+            paidAt: new Date(),
+          },
+        },
+        { new: true }
+      );
+      if (recovered) {
+        await Promise.all(
+          (recovered.items || []).map((item) =>
+            Product.updateOne({ id: item.id }, { $inc: { stock: -item.qty } })
+          )
+        ).catch((error) =>
+          console.error("payment.recovered: could not re-reserve stock", recovered.code, error?.message)
+        );
+        logActivity(req, {
+          action: "payment.paid.recovered",
+          target: recovered.code,
+          status: 200,
+          meta: `ref=${verified.refId} amount=${recovered.total} (سفارش منقضی‌شده بازیابی شد — موجودی را بررسی کنید)`,
+        });
+        notifyOrderPlaced(recovered);
+        return res.redirect(
+          resultRedirect({ status: "ok", code: recovered.code, ref: verified.refId })
+        );
+      }
+
       logActivity(req, {
         action: "payment.paid.race_rejected",
         target: order.code,
@@ -529,6 +664,10 @@ router.get(
       meta: `ref=${verified.refId} amount=${paidOrder.total}`,
     });
 
+    // پیامک/ایمیل «سفارش ثبت شد» به مشتری + خبر سفارش جدید به مدیر —
+    // فقط یک بار، همین‌جا که پرداخت واقعاً تأیید شده است.
+    if (!verified.alreadyVerified) notifyOrderPlaced(paidOrder);
+
     return res.redirect(
       resultRedirect({
         status: "ok",
@@ -536,6 +675,157 @@ router.get(
         ref: verified.refId,
       })
     );
+  })
+);
+
+// ---------------------------------------------------------------------------
+// POST /api/payment/recheck/:code   { phone? }
+//
+// v38: «بررسی دوبارهٔ پرداخت» — برای سفارش‌های pending که callback-شان در
+// میانهٔ قطعی درگاه گم شده. همان verify سرور-به-سرور و همان گذار اتمیِ
+// callback؛ هیچ داده‌ای از مرورگر باور نمی‌شود.
+// ---------------------------------------------------------------------------
+router.post(
+  "/recheck/:code",
+  rateLimit({
+    name: "payment-recheck",
+    windowMs: 5 * 60 * 1000,
+    max: 10,
+    message: "بررسی دوباره بیش از حد مجاز است. کمی بعد تلاش کنید.",
+  }),
+  optionalUser,
+  ah(async (req, res) => {
+    const code = str(req.params?.code, { max: 32 });
+    const order = code ? await Order.findOne({ code }) : null;
+
+    if (!order || !mayAccessOrder(req, order, str(req.body?.phone, { max: 20 }))) {
+      return res.status(404).json({ error: "سفارش پیدا نشد." });
+    }
+
+    if (order.paymentStatus === "paid") {
+      return res.json({ paymentStatus: "paid", refId: order.refId || null });
+    }
+
+    if (order.paymentStatus !== "pending" || !order.authority) {
+      return res.status(409).json({
+        error:
+          order.paymentStatus === "failed"
+            ? "مهلت این سفارش تمام شده است. در صورت کسر مبلغ، تا پایان روز خودکار به حسابتان برمی‌گردد."
+            : "این سفارش در وضعیت پرداخت نیست.",
+      });
+    }
+
+    const verified = await verifyPayment({
+      amount: order.onlinePayable(),
+      authority: order.authority,
+    });
+
+    if (!verified.ok) {
+      if (verified.transport) {
+        return res.status(502).json({
+          paymentStatus: "pending",
+          error: "درگاه فعلاً در دسترس نیست. چند دقیقه دیگر دوباره بررسی کنید.",
+        });
+      }
+      // درگاه صریحاً گفت پرداخت موفق نیست → همان رفتار callback: رد + آزادسازی
+      const failedOrder = await Order.findOneAndUpdate(
+        {
+          _id: order._id,
+          paymentStatus: { $in: ["unpaid", "pending"] },
+          stockCommitted: true,
+        },
+        { $set: { paymentStatus: "failed" } },
+        { new: true }
+      );
+      if (failedOrder) {
+        try {
+          await releaseStock(failedOrder);
+          await Order.updateOne(
+            { _id: failedOrder._id, paymentStatus: "failed", stockCommitted: true },
+            { $set: { stockCommitted: false } }
+          );
+        } catch (error) {
+          console.error("payment.recheck: could not release stock", failedOrder.code, error?.message);
+        }
+      }
+      logActivity(req, {
+        action: "payment.recheck.failed",
+        target: order.code,
+        success: false,
+        status: 402,
+        meta: `code=${verified.code ?? "-"}`,
+      });
+      return res.status(402).json({
+        paymentStatus: "failed",
+        error: "پرداخت در بانک تأیید نشد. اگر مبلغی کسر شده، تا پایان روز خودکار عودت می‌شود.",
+      });
+    }
+
+    let paidOrder = await Order.findOneAndUpdate(
+      {
+        _id: order._id,
+        paymentStatus: { $in: ["unpaid", "pending"] },
+        stockCommitted: true,
+      },
+      {
+        $set: {
+          paymentStatus: "paid",
+          refId: verified.refId,
+          cardPan: verified.cardPan || null,
+          paidAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    // sweeper قبلاً منقضی‌اش کرده — همان مسیر بازیابی callback (موجودی دوباره
+    // رزرو و سفارش پرداخت‌شده می‌شود؛ ممکن است موجودی یک واحد منفی شود).
+    if (!paidOrder) {
+      paidOrder = await Order.findOneAndUpdate(
+        { _id: order._id, paymentStatus: "failed", stockCommitted: false },
+        {
+          $set: {
+            paymentStatus: "paid",
+            stockCommitted: true,
+            refId: verified.refId,
+            cardPan: verified.cardPan || null,
+            paidAt: new Date(),
+          },
+        },
+        { new: true }
+      );
+      if (paidOrder) {
+        await Promise.all(
+          (paidOrder.items || []).map((item) =>
+            Product.updateOne({ id: item.id }, { $inc: { stock: -item.qty } })
+          )
+        ).catch((error) =>
+          console.error("payment.recheck: could not re-reserve stock", paidOrder.code, error?.message)
+        );
+        logActivity(req, {
+          action: "payment.paid.recovered",
+          target: paidOrder.code,
+          status: 200,
+          meta: `ref=${verified.refId} (از مسیر recheck — موجودی را بررسی کنید)`,
+        });
+        notifyOrderPlaced(paidOrder);
+        return res.json({ paymentStatus: "paid", refId: verified.refId });
+      }
+      const current = await Order.findById(order._id).select("paymentStatus refId");
+      if (current?.paymentStatus === "paid") {
+        return res.json({ paymentStatus: "paid", refId: current.refId || verified.refId });
+      }
+      return res.status(409).json({ paymentStatus: current?.paymentStatus, error: "وضعیت سفارش تغییر کرد." });
+    }
+
+    logActivity(req, {
+      action: "payment.paid",
+      target: paidOrder.code,
+      status: 200,
+      meta: `ref=${verified.refId} amount=${paidOrder.total} (recheck)`,
+    });
+    notifyOrderPlaced(paidOrder);
+    return res.json({ paymentStatus: "paid", refId: verified.refId });
   })
 );
 
@@ -561,7 +851,7 @@ router.get(
       code,
     }).select(
       "code total subtotal shippingCost shippingLabel shippingEtaDays " +
-        "freeShipping paymentStatus refId paidAt status timeline user phone"
+        "freeShipping shippingCod paymentStatus refId paidAt status timeline user phone"
     );
 
     if (!order) {
@@ -597,6 +887,9 @@ router.get(
         ),
 
       shippingCost: order.shippingCost || 0,
+      shippingCod: Boolean(order.shippingCod),
+      // مبلغی که واقعاً از درگاه پرداخت شده/می‌شود (با پس‌کرایه، بدون کرایه).
+      onlinePaid: order.onlinePayable(),
       shippingLabel: order.shippingLabel || "",
       shippingEtaDays: order.shippingEtaDays || 0,
       freeShipping: Boolean(order.freeShipping),

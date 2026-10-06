@@ -6,6 +6,8 @@ export type TutorialBlockType = "text" | "image" | "video" | "note";
 export type TutorialBlock = {
   type: TutorialBlockType;
   text: string;
+  /** سرتیتر اختیاری بلوک متن/نکته — مثل تب توضیحات محصول. */
+  heading?: string;
   src: string;
 };
 

@@ -75,8 +75,11 @@ function parseBlocks(input) {
     .map((raw) => {
       const type = TUTORIAL_BLOCK_TYPES.includes(raw?.type) ? raw.type : "text";
       const text = str(raw?.text, { max: 6000 });
+      // سرتیتر فقط برای بلوک‌های متنی/نکته معنا دارد.
+      const heading =
+        type === "text" || type === "note" ? str(raw?.heading, { max: 120 }) : "";
       const src = type === "image" ? safePicture(raw?.src) : safeMedia(raw?.src);
-      return { type, text, src };
+      return { type, text, heading, src };
     })
     .filter((b) => (b.type === "text" || b.type === "note" ? b.text : b.src));
 }

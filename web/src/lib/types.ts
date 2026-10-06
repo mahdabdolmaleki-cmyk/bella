@@ -4,6 +4,9 @@ import type { ProductDTO } from "./data";
 // shapes returned by the Express API.
 export type Product = ProductDTO;
 
+// نمادها و متن‌های ویژهٔ صفحهٔ محصول (آیکن + متن کوتاه).
+export type { ProductHighlight } from "./data";
+
 // Admin-only view of a product: includes the inventory fields that are never
 // sent to customers.
 export type AdminProduct = ProductDTO & {
@@ -39,6 +42,22 @@ export type Order = {
   items: OrderItem[];
   /** Goods only, before shipping. */
   subtotal?: number;
+  /** تخفیف خرید اول (درصد و مبلغ). */
+  discountPercent?: number;
+  discountAmount?: number;
+  /** کد تخفیف اعمال‌شده روی همین سفارش (v40). */
+  couponCode?: string;
+  couponFixed?: number;
+  /** پس‌کرایه: کرایه درِ منزل پرداخت می‌شود. */
+  shippingCod?: boolean;
+  /** باکس ویژه VIP. */
+  vipBox?: boolean;
+  vipBoxFee?: number;
+  /** درخواست لغو از سمت مشتری. */
+  cancelRequested?: boolean;
+  cancelRequestedAt?: string | Date | null;
+  /** حذف از گزارش فروش (v36) */
+  excludeFromSales?: boolean;
   shippingCost?: number;
   shippingMethod?: string;
   shippingLabel?: string;
@@ -74,6 +93,8 @@ export type ShippingOption = {
   /** Icon file name in /public/icons (see lib/icons.ts). */
   icon: string;
   desc: string;
+  /** این روش ارسال پس‌کرایه (پرداخت کرایه درِ منزل) دارد. */
+  codSupported?: boolean;
   /** What the customer actually pays (0 when free shipping applies). */
   cost: number;
   /** Undiscounted price, shown struck through when the order ships free. */
@@ -83,16 +104,28 @@ export type ShippingOption = {
   codFee: number;
   weightGrams: number;
   billableKg: number;
-  etaDays: { min: number; max: number };
+  etaDays?: { min: number; max: number };
+  showEta?: boolean;
+  etaText?: string;
 };
 
 export type ShippingQuote = {
   province: string;
   subtotal: number;
+  /** تخفیف خرید اول — فقط برای نمایش در فاکتور سبد. */
+  firstPurchaseDiscount?: { percent: number; amount: number } | null;
+  /** v40: تخفیف برتر (کد یا خرید اول) — همان چیزی که سرور اعمال می‌کند. */
+  discount?: { source: "first" | "coupon"; percent: number; amount: number; fixed?: number; code: string } | null;
+  coupon?: {
+    input: string;
+    applied: { code: string; percent: number; amount: number; fixed?: number; until?: string } | null;
+    error: string;
+  } | null;
   weightGrams: number;
   billableKg: number;
   freeThreshold: number;
   freeRemaining: number;
+  showEta?: boolean;
   options: ShippingOption[];
 };
 

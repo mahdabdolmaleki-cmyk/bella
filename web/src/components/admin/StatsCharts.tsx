@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
-  ShoppingBag,
+  ShoppingBasket,
   Eye,
   Loader2,
   RefreshCw,
@@ -39,14 +39,14 @@ const METRICS: Array<{
     key: "revenue",
     label: "فروش",
     icon: TrendingUp,
-    from: "#d4af37",
+    from: "#d4af7c",
     to: "#9a7b2a",
     format: (n) => formatToman(n),
   },
   {
     key: "orders",
     label: "تعداد سفارش",
-    icon: ShoppingBag,
+    icon: ShoppingBasket,
     from: "#7fd6a8",
     to: "#1a4630",
     format: (n) => `${toFa(n)} سفارش`,
@@ -60,6 +60,18 @@ const METRICS: Array<{
     format: (n) => `${toFa(n)} بازدید`,
   },
 ];
+
+/**
+ * عدد کوتاه بالای هر ستون — «۱۲٬۴۵۰٬۰۰۰ تومان» جا نمی‌شود. فرمت فشردهٔ
+ * fa-IR خود Intl کلمهٔ کامل «میلیون» را می‌نویسد که باز هم بلند است؛ پس
+ * به‌صورت دستی کوتاه می‌کنیم: «۱۲ م» و «۹۵۰ ه». مقدار کامل در title است.
+ */
+function shortFa(value: number): string {
+  if (value >= 1e9) return `${toFa((value / 1e9).toFixed(1).replace(/\.0$/, ""))} میلیارد`;
+  if (value >= 1e6) return `${toFa((value / 1e6).toFixed(1).replace(/\.0$/, ""))} م`;
+  if (value >= 1e3) return `${toFa(Math.round(value / 1e3))} هـ`;
+  return toFa(value);
+}
 
 /** Turns a bucket key into a short Persian axis label. */
 function axisLabel(key: string, range: RangeKey) {
@@ -214,8 +226,10 @@ export default function StatsCharts() {
             // LAYOUT FIX: the columns must STRETCH to the full chart height,
             // otherwise each column is only as tall as its own labels and the
             // percentage-height bars collapse to nothing (Firefox especially).
+            // «روزانه» = ۷ ستون؛ با عرض ثابت اجباری اسکرولی می‌شد. عرض کمینه
+            // فقط برای بازه‌های ۸ ستون به بالا (هفتگی/ماهانه در صفحهٔ کوچک).
             className="flex h-64 min-w-full items-stretch justify-between gap-1.5 sm:gap-2.5"
-            style={{ minWidth: series.length * 46 }}
+            style={series.length > 7 ? { minWidth: series.length * 52 } : undefined}
           >
             {series.map((bucket, index) => {
               const value = Number(bucket[metric]) || 0;
@@ -225,9 +239,13 @@ export default function StatsCharts() {
                   key={bucket.key}
                   className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5"
                 >
-                  {/* value label, appears on hover/focus */}
-                  <span className="text-[9.5px] font-bold whitespace-nowrap text-gold opacity-0 transition-opacity group-hover:opacity-100">
-                    {active.format(value)}
+                  {/* درخواست مدیر: تعداد/مقدار هر ستون همیشه بالایش نوشته شود
+                      (قبلاً فقط با hover دیده می‌شد). مقدار کامل در title هست. */}
+                  <span
+                    title={active.format(value)}
+                    className="text-[9.5px] font-bold whitespace-nowrap text-gold"
+                  >
+                    {metric === "revenue" ? shortFa(value) : toFa(value)}
                   </span>
 
                   {/* The track owns the height; the bar is absolutely
@@ -272,8 +290,8 @@ export default function StatsCharts() {
 }
 
 const STATUS_TINT: Record<string, string> = {
-  "در انتطار تأیید": "#e8cd85",
-  "در انتزار تأیید": "#e8cd85",
+  "در انتطار تأیید": "#d4af7c",
+  "در انتزار تأیید": "#d4af7c",
   "در حال آماده‌سازی": "#8fd3ff",
   "ارسال شد": "#b39ddb",
   "تحویل داده شد": "#7fd6a8",
@@ -296,7 +314,7 @@ function StatusBars({ counts }: { counts: StatusCounts }) {
       ) : (
         <div className="mt-4 space-y-2.5">
           {rows.map((row, index) => {
-            const tint = STATUS_TINT[row.status] || "#d4af37";
+            const tint = STATUS_TINT[row.status] || "#d4af7c";
             return (
               <div key={row.status} className="flex items-center gap-3">
                 <span className="w-28 shrink-0 truncate text-[11px] font-bold text-sage sm:w-36">

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { nextSequence } from "./Counter.js";
+import { stripInvisible } from "../utils/validate.js";
 
 /**
  * مطلب آموزشی (آکادمی بلا).
@@ -20,6 +21,8 @@ const blockSchema = new mongoose.Schema(
     type: { type: String, enum: TUTORIAL_BLOCK_TYPES, default: "text" },
     // متن بلوک متنی/نکته، یا زیرنویس عکس و ویدئو.
     text: { type: String, default: "", maxlength: 6000 },
+    // سرتیتر اختیاری بلوک متن/نکته — مثل تب توضیحات محصول.
+    heading: { type: String, default: "", maxlength: 120 },
     // نشانی عکس (آپلودشده) یا ویدئو.
     src: { type: String, default: "", maxlength: 600 },
   },
@@ -65,9 +68,9 @@ tutorialSchema.pre("save", async function () {
 tutorialSchema.methods.toCardDTO = function () {
   return {
     id: this.id,
-    title: this.title,
-    category: this.category,
-    excerpt: this.excerpt,
+    title: stripInvisible(this.title || ""),
+    category: stripInvisible(this.category || ""),
+    excerpt: stripInvisible(this.excerpt || ""),
     cover: this.cover,
     hasVideo: Boolean(this.video) || this.blocks.some((b) => b.type === "video" && b.src),
     likes: this.likes,
@@ -80,8 +83,15 @@ tutorialSchema.methods.toCardDTO = function () {
 tutorialSchema.methods.toDTO = function () {
   return {
     ...this.toCardDTO(),
+    // BUG FIX: دیتای قدیمی که قبل از پاک‌سازِ نویسه‌های نامرئی ذخیره شده،
+    // هنگام «خواندن» هم پاک می‌شود تا متن به‌هم‌ریخته نمایش داده نشود.
     video: this.video,
-    blocks: this.blocks.map((b) => ({ type: b.type, text: b.text, src: b.src })),
+    blocks: this.blocks.map((b) => ({
+      type: b.type,
+      text: stripInvisible(b.text || ""),
+      heading: stripInvisible(b.heading || ""),
+      src: b.src,
+    })),
   };
 };
 

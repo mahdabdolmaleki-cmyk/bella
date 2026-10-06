@@ -138,6 +138,7 @@ export default function TutorialList() {
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      unoptimized
                     />
                   ) : (
                     <span className="flex h-full items-center justify-center bg-gradient-to-br from-moss/60 to-night">
@@ -183,3 +184,4 @@ export default function TutorialList() {
     </section>
   );
 }
+

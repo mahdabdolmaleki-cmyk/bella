@@ -74,6 +74,9 @@ export const ICON_NAMES = [
   "settings",
   "pen",
   "qr",
+  "bow",
+  "ribbon",
+  "party-popper",
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -142,6 +145,9 @@ export const ICON_LABELS: Record<IconName, string> = {
   settings: "تنظیمات",
   pen: "ویرایش",
   qr: "کد اصالت",
+  bow: "پاپیون",
+  ribbon: "روبان هدیه",
+  "party-popper": "جشن و کاغذ رنگی",
 };
 
 /**
@@ -212,6 +218,9 @@ export const ICON_TONES: Record<IconName, string> = {
   settings: "#cbd5e1",
   pen: "#fbbf24",
   qr: "#a3e635",
+  bow: "#f472b6",
+  ribbon: "#f9a8d4",
+  "party-popper": "#fbbf24",
 };
 
 /** Colour for a stored icon name, falling back exactly like `iconUrl` does. */
@@ -238,10 +247,11 @@ export function iconUrl(name: string | undefined, fallback: IconName = "sparkles
 // Which icon each section of the site uses. Admins override these from
 // «تنظیمات سایت → آیکن بخش‌های سایت»; anything missing falls back here.
 // ---------------------------------------------------------------------------
-export type SectionIconKey = "festival" | "quiz" | "brands" | "best" | "features" | "related";
+export type SectionIconKey = "festival" | "quiz" | "brands" | "best" | "features" | "related" | "discounts";
 
 export const SECTION_ICON_KEYS: SectionIconKey[] = [
   "festival",
+  "discounts",
   "quiz",
   "brands",
   "best",
@@ -251,6 +261,7 @@ export const SECTION_ICON_KEYS: SectionIconKey[] = [
 
 export const SECTION_ICON_LABELS: Record<SectionIconKey, string> = {
   festival: "بنر جشنواره",
+  discounts: "کارت تخفیف‌ها",
   quiz: "آزمون عطرشناسی",
   brands: "برندهای صفحه اصلی",
   best: "پرفروش‌ترین‌ها",
@@ -259,7 +270,8 @@ export const SECTION_ICON_LABELS: Record<SectionIconKey, string> = {
 };
 
 export const DEFAULT_SECTION_ICONS: Record<SectionIconKey, IconName> = {
-  festival: "gift",
+  festival: "bow",
+  discounts: "percent",
   quiz: "brain",
   brands: "crown",
   best: "medal",

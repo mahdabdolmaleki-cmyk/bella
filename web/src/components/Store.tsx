@@ -23,6 +23,7 @@ import {
   Coins,
   X,
 } from "lucide-react";
+import ClampLine from "./ClampLine";
 import { ProductVisual } from "./art";
 import { Reveal, SectionHeading } from "./ui";
 import { useCart } from "./Cart";
@@ -53,25 +54,25 @@ function PackArt({ i }: { i: number }) {
   if (i === 0)
     return (
       <svg viewBox="0 0 200 180" className="h-44" fill="none">
-        <path d="M68 58 C68 18 132 18 132 58" stroke="#d4af37" strokeWidth="7" strokeLinecap="round" />
-        <path d="M46 58 L154 58 L143 162 L57 162 Z" fill="#0d2b1b" stroke="#d4af37" strokeWidth="2.5" />
-        <path d="M54 66 L146 66 L137 154 L63 154 Z" stroke="#e8cd85" strokeWidth="1" strokeDasharray="4 5" />
+        <path d="M68 58 C68 18 132 18 132 58" stroke="#d4af7c" strokeWidth="7" strokeLinecap="round" />
+        <path d="M46 58 L154 58 L143 162 L57 162 Z" fill="#0d2b1b" stroke="#d4af7c" strokeWidth="2.5" />
+        <path d="M54 66 L146 66 L137 154 L63 154 Z" stroke="#d4af7c" strokeWidth="1" strokeDasharray="4 5" />
       </svg>
     );
   if (i === 1)
     return (
       <svg viewBox="0 0 200 180" className="h-44" fill="none">
-        <rect x="35" y="55" width="130" height="95" rx="8" fill="#0d2b1b" stroke="#d4af37" strokeWidth="2.5" />
-        <rect x="35" y="55" width="130" height="26" rx="8" fill="#123a25" stroke="#d4af37" strokeWidth="2" />
-        <circle cx="100" cy="108" r="20" stroke="#d4af37" strokeWidth="1.5" />
-        <text x="100" y="115" textAnchor="middle" fontFamily="Cormorant Garamond, serif" fontSize="20" fill="#e8cd85">B</text>
+        <rect x="35" y="55" width="130" height="95" rx="8" fill="#0d2b1b" stroke="#d4af7c" strokeWidth="2.5" />
+        <rect x="35" y="55" width="130" height="26" rx="8" fill="#123a25" stroke="#d4af7c" strokeWidth="2" />
+        <circle cx="100" cy="108" r="20" stroke="#d4af7c" strokeWidth="1.5" />
+        <text x="100" y="115" textAnchor="middle" fontFamily="Cormorant Garamond, serif" fontSize="20" fill="#d4af7c">B</text>
       </svg>
     );
   return (
     <svg viewBox="0 0 200 180" className="h-44" fill="none">
-      <path d="M100 78 C70 48 30 60 38 88 C44 110 80 104 100 86 C120 104 156 110 162 88 C170 60 130 48 100 78 Z" fill="#8a6d22" stroke="#e8cd85" strokeWidth="2" />
-      <circle cx="100" cy="84" r="12" fill="#d4af37" stroke="#6e5718" strokeWidth="2" />
-      <path d="M92 94 L78 140 M108 94 L122 140" stroke="#d4af37" strokeWidth="6" strokeLinecap="round" />
+      <path d="M100 78 C70 48 30 60 38 88 C44 110 80 104 100 86 C120 104 156 110 162 88 C170 60 130 48 100 78 Z" fill="#8a6d22" stroke="#d4af7c" strokeWidth="2" />
+      <circle cx="100" cy="84" r="12" fill="#d4af7c" stroke="#6e5718" strokeWidth="2" />
+      <path d="M92 94 L78 140 M108 94 L122 140" stroke="#d4af7c" strokeWidth="6" strokeLinecap="round" />
       <circle cx="100" cy="84" r="5" fill="#0b2417" />
     </svg>
   );
@@ -273,7 +274,7 @@ const SORTS: Array<{ key: string; label: string }> = [
   { key: "newest", label: "جدیدترین" },
   { key: "price-asc", label: "ارزان‌ترین" },
   { key: "price-desc", label: "گران‌ترین" },
-  { key: "bestseller", label: "پرف��وش‌ترین" },
+  { key: "bestseller", label: "پرفروش‌ترین" },
 ];
 
 /** دسته‌های پیش‌فرض — اگر ادمین در تنظیمات چیزی نساخته باشد. */
@@ -303,6 +304,15 @@ export function ProductsSection({
   const [inStock, setInStock] = useState(false);
   const [sort, setSort] = useState("newest");
   const [panelOpen, setPanelOpen] = useState(false);
+  // «فقط تخفیف‌دارها» — از لینک کارت تخفیف صفحهٔ اصلی (?discount=1) روشن می‌شود.
+  const [discountOnly, setDiscountOnly] = useState(false);
+
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("discount") === "1") setDiscountOnly(true);
+    } catch {}
+  }, []);
 
   const cats = useMemo(
     () => ["همه", ...(categories?.length ? categories : FALLBACK_CATEGORIES)],
@@ -368,6 +378,7 @@ export function ProductsSection({
       if (priceMin) params.set("priceMin", priceMin);
       if (priceMax) params.set("priceMax", priceMax);
       if (inStock) params.set("inStock", "1");
+      if (discountOnly) params.set("discount", "1");
       if (sort !== "newest") params.set("sort", sort);
       const qs = params.toString();
       fetch(`/api/products${qs ? `?${qs}` : ""}`, { signal })
@@ -388,6 +399,7 @@ export function ProductsSection({
       priceMin,
       priceMax,
       inStock,
+      discountOnly,
       sort,
     ],
   );
@@ -478,6 +490,15 @@ export function ProductsSection({
               ))}
             </div>
 
+            {discountOnly && (
+              <button
+                onClick={() => setDiscountOnly(false)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/50 bg-emerald-300/10 px-4 py-2 text-[11px] font-bold text-emerald-200 transition-colors hover:bg-emerald-300/20"
+              >
+                <X size={12} /> فقط تخفیف‌دارها
+              </button>
+            )}
+
             {activeCount > 0 && (
               <button
                 onClick={resetFilters}
@@ -535,33 +556,45 @@ export function ProductsSection({
                     render={(v) => toFa(Number(v))}
                   />
 
-                  <div className="flex flex-wrap items-center gap-3 border-t border-gold/10 pt-4">
-                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-gold-soft">
-                      <Coins size={13} className="text-amber-300" /> محدودهٔ قیمت (تومان)
-                    </span>
-                    <input
-                      type="number"
-                      value={priceMin}
-                      onChange={(e) => setPriceMin(e.target.value)}
-                      placeholder="از"
-                      className="w-28 rounded-xl glass-input px-3 py-2 text-xs text-cream placeholder:text-sage/40 focus:outline-none"
-                    />
-                    <input
-                      type="number"
-                      value={priceMax}
-                      onChange={(e) => setPriceMax(e.target.value)}
-                      placeholder="تا"
-                      className="w-28 rounded-xl glass-input px-3 py-2 text-xs text-cream placeholder:text-sage/40 focus:outline-none"
-                    />
-                    <label className="flex items-center gap-2 text-xs text-sage">
+                  {/* BUG FIX موبایل: قبلاً عنوان + دو اینپوت w-28 + چک‌باکس در یک
+                      ردیف flex-wrap بودند و در گوشی به‌هم می‌ریختند. حالا عنوان و
+                      چک‌باکس در یک ردیف و دو اینپوت قیمت شبکهٔ دوستونهٔ تمام‌عرض
+                      هستند و در هر صفحه‌ای درست دیده می‌شوند. */}
+                  <div className="border-t border-gold/10 pt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-[11px] font-bold text-gold-soft">
+                        <Coins size={13} className="text-amber-300" /> محدودهٔ قیمت (تومان)
+                      </span>
+                      <label className="flex items-center gap-2 text-xs text-sage">
+                        <input
+                          type="checkbox"
+                          className="glass-check"
+                          checked={inStock}
+                          onChange={(e) => setInStock(e.target.checked)}
+                        />
+                        فقط کالاهای موجود
+                      </label>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:max-w-sm">
                       <input
-                        type="checkbox"
-                        className="glass-check"
-                        checked={inStock}
-                        onChange={(e) => setInStock(e.target.checked)}
+                        type="number"
+                        inputMode="numeric"
+                        dir="ltr"
+                        value={priceMin}
+                        onChange={(e) => setPriceMin(e.target.value)}
+                        placeholder="از قیمت"
+                        className="w-full rounded-xl glass-input px-3 py-2 text-left text-xs text-cream placeholder:text-sage/40 focus:outline-none"
                       />
-                      فقط کالاهای موجود
-                    </label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        dir="ltr"
+                        value={priceMax}
+                        onChange={(e) => setPriceMax(e.target.value)}
+                        placeholder="تا قیمت"
+                        className="w-full rounded-xl glass-input px-3 py-2 text-left text-xs text-cream placeholder:text-sage/40 focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -596,10 +629,10 @@ export function ProductsSection({
                   viewport={{ once: true, margin: "-40px" }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.6, delay: (i % 3) * 0.1 }}
-                  className="group relative flex flex-col overflow-hidden rounded-3xl border border-gold/15 bg-gradient-to-b from-forest/80 to-night p-6 transition-all duration-500 hover:-translate-y-2 hover:border-gold/50 hover:shadow-[0_20px_60px_rgba(212,175,55,0.15)]"
+                  className="prod-card group relative flex flex-col overflow-hidden rounded-3xl border border-gold/15 p-6 transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(212,175,55,0.25)]"
                 >
                   {pr.badge && (
-                    <span className="absolute top-4 right-4 z-10 rounded-full bg-gold px-3 py-1 text-[10px] font-black text-[#241a05]">
+                    <span className="absolute top-4 right-4 z-10 tag-red rounded-full px-3 py-1 text-[10px] font-black">
                       {pr.badge}
                     </span>
                   )}
@@ -622,14 +655,29 @@ export function ProductsSection({
                     <Link href={`/shop/${pr.id}`} className="text-lg font-black text-cream transition-colors hover:text-gold">
                       {pr.name}
                     </Link>
-                    <span className="font-script text-lg text-gold">{pr.nameEn}</span>
+                    {/* فونت انگلیسی: از خط شکستهٔ قبلی (Great Vibes) به سریف خوانا تغییر کرد */}
+                    {pr.nameEn?.trim() && (
+                      <span dir="ltr" className="font-display text-[15px] font-semibold leading-6 text-gold">
+                        {pr.nameEn}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-sage">{pr.tagline}</p>
 
                   <div className="mt-4 space-y-1.5 border-t border-gold/10 pt-4 text-[11px] text-sage">
-                    <p className="flex items-center gap-2"><Droplets size={12} className="text-gold" /> آغاز: {pr.topNotes}</p>
-                    <p className="flex items-center gap-2"><Heart size={12} className="text-gold" /> قلب: {pr.heartNotes}</p>
-                    <p className="flex items-center gap-2"><Flame size={12} className="text-gold" /> پایه: {pr.baseNotes}</p>
+                    {[
+                      { Icon: Droplets, label: "آغاز", value: pr.topNotes },
+                      { Icon: Heart, label: "قلب", value: pr.heartNotes },
+                      { Icon: Flame, label: "پایه", value: pr.baseNotes },
+                    ].map(({ Icon, label, value }) => (
+                      <p key={label} className="flex items-start gap-2">
+                        <Icon size={12} className="mt-0.5 shrink-0 text-gold" />
+                        <span className="flex min-w-0 flex-1 items-baseline gap-1">
+                          <span className="shrink-0 font-bold">{label}: </span>
+                          {value ? <ClampLine text={value} /> : "—"}
+                        </span>
+                      </p>
+                    ))}
                   </div>
 
                   <div className="mt-3 flex items-center gap-4 text-[11px] text-sage">
@@ -650,7 +698,7 @@ export function ProductsSection({
                       onClick={() =>
                         add({ id: pr.id, name: pr.name, price: pr.price, glass: pr.glass, liquid: pr.liquid, sizeMl: pr.sizeMl, image: pr.image })
                       }
-                      className="flex items-center gap-1.5 rounded-full bg-gold px-4 py-2.5 text-xs font-black text-[#241a05] transition-all hover:scale-105 hover:shadow-[0_6px_20px_rgba(212,175,55,0.45)] active:scale-90 disabled:cursor-not-allowed disabled:bg-sage/30 disabled:text-sage disabled:hover:scale-100 disabled:hover:shadow-none"
+                      className="btn-add flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-black transition-all hover:scale-105 active:scale-90 disabled:cursor-not-allowed disabled:bg-sage/30 disabled:text-sage disabled:hover:scale-100"
                     >
                       <Plus size={14} />
                       {pr.inStock === false ? "ناموجود" : "افزودن"}

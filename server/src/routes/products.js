@@ -51,12 +51,21 @@ router.get(
     const priceMin = int(req.query.priceMin, { min: 0, max: 1e12, fallback: null, clamp: false });
     const priceMax = int(req.query.priceMax, { min: 0, max: 1e12, fallback: null, clamp: false });
     const inStockOnly = req.query.inStock === "1" || req.query.inStock === "true";
+    // فقط ادکلن‌های مشمول تخفیف (قیمت قبلی ثبت‌شده و بالاتر از قیمت فعلی).
+    const discountOnly = req.query.discount === "1" || req.query.discount === "true";
 
     const filter = { active: true };
     if (category && category !== "همه") filter.category = category;
     if (brands.length) filter.brand = { $in: brands };
     if (concentrations.length) filter.concentration = { $in: concentrations };
     if (sizes.length) filter.sizeMl = { $in: sizes };
+    if (discountOnly) {
+      filter.$and = [
+        ...(filter.$and || []),
+        { oldPrice: { $gt: 0 } },
+        { $expr: { $gt: ["$oldPrice", "$price"] } },
+      ];
+    }
 
     // فصل و رایحه متن آزادند («بهار، پاییز»)، پس باید درونشان جست‌وجو کرد
     // نه برابری دقیق.

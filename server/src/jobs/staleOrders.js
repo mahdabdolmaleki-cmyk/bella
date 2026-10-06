@@ -18,6 +18,8 @@
 
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import { verifyPayment, isZarinpalConfigured } from "../utils/zarinpal.js";
+import { notifyOrderPlaced } from "../utils/orderNotify.js";
 
 const TTL_MINUTES = Math.max(
   5,
@@ -70,9 +72,58 @@ export async function sweepStaleOrders() {
     .limit(BATCH);
 
   let released = 0;
+  // v38: اگر پرداختی callback نگرفته باشد (مشتری بعد از بانک برنگردد)،
+  // سفارش pending با authority باید قبل از «failed» شدن یک‌بار verify شود؛
+  // وگرنه پول مشتری برداشت/بلوکه می‌ماند و سفارش‌اش سوخت. سه خطای انتقالی
+  // پشت‌سرهم یعنی درگاه قطع است — بقیه مثل قبل فقط منقضی می‌شوند تا
+  // هر ده دقیقهٔ sweeper تایم‌اوت‌ها را پشت سر هم نخورد.
+  let transportFails = 0;
+  const gatewayReachable = () =>
+    isZarinpalConfigured() && transportFails < 3;
 
   for (const order of stale) {
     try {
+      // ---------------------------------------------------------------
+      // تلاشِ نجات: pending + authority → verify قبل از انقضا
+      // ---------------------------------------------------------------
+      if (
+        gatewayReachable() &&
+        order.paymentStatus === "pending" &&
+        order.authority
+      ) {
+        const verified = await verifyPayment({
+          amount: order.onlinePayable(),
+          authority: order.authority,
+        });
+
+        if (verified.ok) {
+          const revived = await Order.findOneAndUpdate(
+            {
+              _id: order._id,
+              paymentStatus: { $in: ["unpaid", "pending"] },
+              stockCommitted: true,
+            },
+            {
+              $set: {
+                paymentStatus: "paid",
+                refId: verified.refId,
+                cardPan: verified.cardPan || null,
+                paidAt: new Date(),
+              },
+            },
+            { new: true }
+          );
+          if (revived) {
+            console.log(
+              `staleOrders: verified & revived paid order ${revived.code}`
+            );
+            notifyOrderPlaced(revived);
+          }
+          continue;
+        }
+        if (verified.transport) transportFails += 1;
+      }
+
       // ---------------------------------------------------------------------
       // Atomically claim the stale order.
       //

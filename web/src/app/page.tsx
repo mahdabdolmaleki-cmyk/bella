@@ -4,7 +4,7 @@ import {
   BestsellersSection,
   FeaturesSection,
 } from "@/components/HomeSections";
-import ScentQuiz from "@/components/ScentQuiz";
+import BellaConsultation from "@/components/BellaConsultation";
 import { getSiteSettings } from "@/lib/settings";
 import { parseSectionIcons } from "@/lib/icons";
 
@@ -21,7 +21,11 @@ export default async function HomePage() {
         festivalActive={settings.festivalActive === "true"}
         festivalTitle={settings.festivalTitle}
         festivalSubtitle={settings.festivalSubtitle}
+        discountsActive={settings.discountsBoxActive === "1"}
+        discountsTitle={settings.discountsBoxTitle}
+        discountsSubtitle={settings.discountsBoxSubtitle}
         festivalIcon={icons.festival}
+        discountsIcon={icons.discounts}
         journeyStages={settings.journeyStages}
         bottleGlass={settings.journeyBottleGlass}
         bottleLiquid={settings.journeyBottleLiquid}
@@ -30,7 +34,7 @@ export default async function HomePage() {
       <div id="after-journey" />
       <FeaturesSection features={settings.homeFeatures} icon={icons.features} />
       <BrandsSection brands={settings.homeBrands} icon={icons.brands} />
-      <ScentQuiz icon={icons.quiz} />
+      <BellaConsultation icon={icons.quiz} />
       <BestsellersSection icon={icons.best} />
     </>
   );

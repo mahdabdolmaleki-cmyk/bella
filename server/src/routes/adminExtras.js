@@ -160,7 +160,9 @@ router.delete(
 // ===========================================================================
 
 const RANGES = {
-  daily: { days: 14, label: "روزانه" },
+  // درخواست مدیر: «روزانه» = ۷ روز اخیر (قبلاً ۱۴ روز بود و نمودار را
+  // اسکرولی می‌کرد)؛ «ماهانه» = ۱۲ ماه اخیر.
+  daily: { days: 7, label: "روزانه" },
   weekly: { days: 7 * 12, label: "هفتگی" },
   monthly: { days: 365, label: "ماهانه" },
 };
@@ -190,10 +192,11 @@ router.get(
     const range = RANGES[rangeName] ? rangeName : "daily";
     const since = new Date(Date.now() - RANGES[range].days * 86400000);
 
-    // "Real" sales only: every placed order counts as a sale unless it was cancelled.
+    // "Real" sales only: every placed order counts as a sale unless it was cancelled or explicitly excluded (v36)
     const paidMatch = {
       createdAt: { $gte: since },
       status: { $ne: "لغو شد" },
+      excludeFromSales: { $ne: true },
     };
 
     const [salesRows, visitRows, totals] = await Promise.all([
@@ -220,6 +223,7 @@ router.get(
           {
             $match: {
               status: { $ne: "لغو شد" },
+              excludeFromSales: { $ne: true },
             },
           },
           { $group: { _id: null, revenue: { $sum: "$total" } } },
@@ -249,7 +253,7 @@ router.get(
     // otherwise the chart silently hides the quiet days and looks wrong.
     const buckets = new Map();
     const step = range === "daily" ? 1 : range === "weekly" ? 7 : 30;
-    const points = range === "daily" ? 14 : range === "weekly" ? 12 : 12;
+    const points = range === "daily" ? 7 : range === "weekly" ? 12 : 12;
     for (let i = points - 1; i >= 0; i -= 1) {
       const d = new Date(Date.now() - i * step * 86400000);
       const day = new Intl.DateTimeFormat("en-CA", {
@@ -331,9 +335,10 @@ router.get(
     const last7 = new Date(now - 7 * 86400000);
     const last30 = new Date(now - 30 * 86400000);
 
-    // Paid (“real”) sales only — every placed order counts as a sale unless it was cancelled.
+    // Paid (“real”) sales only — every placed order counts as a sale unless it was cancelled or excluded (v36)
     const paidOnly = {
       status: { $ne: "\u0644\u063a\u0648 \u0634\u062f" },
+      excludeFromSales: { $ne: true },
     };
     const revenueSince = (since) =>
       Order.aggregate([

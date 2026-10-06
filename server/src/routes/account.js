@@ -1,11 +1,14 @@
 import { Router } from "express";
 import Order from "../models/Order.js";
+import Message from "../models/Message.js";
 import Product from "../models/Product.js";
 import Settings from "../models/Settings.js";
 import { requireUser } from "../middleware/authMiddleware.js";
+import { notifySms } from "../utils/sms.js";
+import { notifyEmail } from "../utils/emailNotify.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
-import { int } from "../utils/validate.js";
+import { int, str } from "../utils/validate.js";
 
 /**
  * Customer-account extras: the loyalty club (points + membership tier) and the
@@ -26,6 +29,7 @@ const FAVOURITE_LIMIT = 100;
 /** Only settled money counts towards the club. */
 const SETTLED_MATCH = {
   status: { $ne: "لغو شد" },
+  excludeFromSales: { $ne: true },
   $or: [{ paymentStatus: "paid" }, { status: "تحویل داده شد" }],
 };
 
@@ -124,6 +128,103 @@ router.post(
     // $addToSet is atomic — double-clicking the heart cannot create duplicates.
     await req.user.updateOne({ $addToSet: { favorites: productId } });
     res.json({ ok: true, favorite: true });
+  })
+);
+
+// ---------------------------------------------------------------------------
+// درخواست لغو سفارش (v36 → v37: اطلاع‌رسانی کامل برای ادمین با کد پیگیری، اسم، تلفن، مبلغ)
+// مشتری از پنل خودش درخواست می‌دهد: پرچم روی سفارش می‌نشیند، یک پیام در تب
+// «پیام‌ها»ی پنل ادمین ثبت می‌شود و شمارهٔ تماس مدیر برای پیگیری برمی‌گردد.
+// ---------------------------------------------------------------------------
+const CANCELLED_STATUS = "لغو شد";
+const SHIPPED_STATUSES = ["ارسال شد", "تحویل داده شد", "لغو شد"];
+function isCancelRequestable(status) {
+  return !SHIPPED_STATUSES.includes(status);
+}
+
+router.post(
+  "/orders/:code/cancel-request",
+  rateLimit({ name: "cancel-request", windowMs: 60 * 1000, max: 10 }),
+  ah(async (req, res) => {
+    const code = str(req.params.code, { max: 32 });
+    if (!code) return res.status(400).json({ error: "شناسه سفارش نامعتبر است." });
+
+    const order = await Order.findOne({ code, user: req.user._id });
+    if (!order) return res.status(404).json({ error: "سفارش پیدا نشد." });
+
+    const settings = await Settings.getSingleton();
+    const adminPhone = settings.contactPhone || "";
+    const adminEmail = settings.contactEmail || "";
+
+    if (order.cancelRequested) {
+      return res.json({ ok: true, already: true, adminPhone, adminEmail });
+    }
+    if (!isCancelRequestable(order.status)) {
+      return res.status(409).json({
+        error: "در این مرحله از سفارش، لغو فقط از طریق پشتیبانی ممکن است.",
+        adminPhone,
+        adminEmail,
+      });
+    }
+    if (order.status === CANCELLED_STATUS) {
+      return res.status(409).json({
+        error: "این سفارش قبلاً لغو شده است.",
+        adminPhone,
+        adminEmail,
+      });
+    }
+
+    order.cancelRequested = true;
+    order.cancelRequestedAt = new Date();
+    await order.save();
+
+    // v37: اطلاع‌رسانی کامل برای ادمین — کد پیگیری، اسم، تلفن، مبلغ سفارش
+    const totalFa = Number(order.total || 0).toLocaleString("fa-IR");
+    const totalEn = Number(order.total || 0).toLocaleString("en-US");
+    const nowFa = new Date().toLocaleString("fa-IR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const detailBody = [
+      "🚨 درخواست لغو سفارش",
+      `کد پیگیری: ${order.code}`,
+      `نام مشتری: ${order.customerName || "—"}`,
+      `شماره تماس: ${order.phone || "—"}`,
+      `مبلغ سفارش: ${totalFa} تومان`,
+      `وضعیت فعلی: ${order.status}`,
+      `زمان درخواست: ${nowFa}`,
+    ].join("\n");
+
+    // درخواست در تب «پیام‌ها»ی پنل ادمین ظاهر می‌شود — با جزئیات کامل
+    await Message.create({
+      name: order.customerName || "مشتری بلا",
+      phone: order.phone,
+      body: detailBody,
+    }).catch(() => {});
+
+    // اطلاع‌رسانی لغو به مدیر — SMS با قالب + ایمیل همزمان (fire-and-forget)
+    // کد پیگیری، نام، تلفن، مبلغ — از تنظیمات smsCancelAdminEnabled / emailCancelAdminEnabled
+    notifySms("cancelAdmin", null, {
+      orderId: order.code,
+      name: order.customerName || "مشتری",
+      total: totalEn,
+      phone: order.phone || "",
+    }).catch(() => {});
+
+    notifyEmail("cancelAdmin", null, {
+      orderId: order.code,
+      name: order.customerName || "مشتری",
+      total: totalFa,
+      phone: order.phone || "",
+      status: order.status,
+      time: nowFa,
+    }).catch(() => {});
+
+    res.json({ ok: true, adminPhone, adminEmail });
   })
 );
 

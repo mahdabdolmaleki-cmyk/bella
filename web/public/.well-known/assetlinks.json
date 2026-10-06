@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "ir.bellaperfume.twa",
+        "sha256_cert_fingerprints": ["CC:5C:0D:7A:E9:8E:76:3D:6F:C9:31:05:E2:3E:87:0A:7D:6B:74:4B:09:C6:BF:A9:A7:D8:66:22:BC:0F:48:6E"]
+      }
+    }]

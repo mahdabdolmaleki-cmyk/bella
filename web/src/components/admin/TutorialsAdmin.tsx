@@ -23,6 +23,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { toFa } from "@/lib/data";
+import { prepareImageForUpload, uploadForm } from "@/lib/prepareUpload";
 import {
   BLOCK_LABELS,
   faDate,
@@ -221,7 +222,8 @@ function PostsTab() {
             >
               <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-xl bg-moss/50">
                 {t.cover ? (
-                  <Image src={t.cover} alt="" fill sizes="80px" className="object-cover" />
+                  <Image src={t.cover} alt="" fill sizes="80px" className="object-cover"
+                      unoptimized />
                 ) : (
                   <span className="flex h-full items-center justify-center">
                     <GraduationCap size={18} className="text-gold/40" />
@@ -305,11 +307,15 @@ function Editor({
   const set = (patch: Partial<TutorialAdminDTO>) => setDraft({ ...draft, ...patch });
 
   async function upload(file: File): Promise<string> {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: form });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "آپلود انجام نشد.");
+    // BUG FIX: عکس‌های سنگین/HEIC قبل از ارسال به JPEG بهینه تبدیل می‌شوند
+    // تا آپلود کاور و عکس‌های آموزش هرگز به‌خاطر حجم یا فرمت شکست نخورد.
+    const prepared = await prepareImageForUpload(file);
+    const res = await fetch("/api/admin/upload", {
+      method: "POST",
+      body: uploadForm(prepared),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) throw new Error(data.error || "آپلود انجام نشد.");
     return data.url as string;
   }
 
@@ -364,7 +370,7 @@ function Editor({
   };
 
   const addBlock = (type: TutorialBlockType) =>
-    set({ blocks: [...draft.blocks, { type, text: "", src: "" }] });
+    set({ blocks: [...draft.blocks, { type, text: "", heading: "", src: "" }] });
 
   const removeBlock = (index: number) =>
     set({ blocks: draft.blocks.filter((_, i) => i !== index) });
@@ -429,38 +435,41 @@ function Editor({
             />
           </label>
 
-          <label className="sm:col-span-2">
+          <div className="sm:col-span-2">
             <span className="mb-1.5 block text-[11px] text-sage">
-              ویدئوی اصلی — فایل آپلودی یا لینک آپارات/یوتیوب (اختیاری)
+              ویدئوی اصلی (اختیاری)
             </span>
-            <input
-              className={inputCls}
-              value={draft.video}
-              onChange={(e) => set({ video: e.target.value })}
-              dir="ltr"
-              placeholder="aparat.com/v/XXXXX یا /uploads/videos/…"
-            />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => videoRef.current?.click()}
-                disabled={videoPct !== null}
-                className="btn-emerald inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold disabled:opacity-50"
-              >
-                {videoPct !== null ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <Film size={13} />
-                )}
-                آپلود ویدئو
-              </button>
-              {draft.video && (
+            {/* درخواست مدیر: تکست‌باکس مسیر/لینک حذف شد — ویدئوی اصلی فقط
+                با دکمهٔ آپلود انتخاب می‌شود و نام فایل به‌صورت چیپ نمایش
+                می‌یابد (مثل بلوک‌های ویدئویی پایین فرم). */}
+            <div className="flex flex-wrap items-center gap-2">
+              {draft.video ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl glass-soft px-3 py-2">
+                  <Film size={14} className="shrink-0 text-emerald-300" />
+                  <span dir="ltr" className="max-w-[240px] truncate text-[11px] text-cream/90">
+                    {draft.video.split("/").pop()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => set({ video: "" })}
+                    className="btn-ghost mr-auto rounded-full px-3 py-1 text-[10.5px] font-bold"
+                  >
+                    حذف ویدئو
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => set({ video: "" })}
-                  className="btn-ghost rounded-full px-4 py-2 text-[11px] font-bold"
+                  onClick={() => videoRef.current?.click()}
+                  disabled={videoPct !== null}
+                  className="btn-emerald inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold disabled:opacity-50"
                 >
-                  حذف ویدئو
+                  {videoPct !== null ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Film size={13} />
+                  )}
+                  آپلود ویدئو
                 </button>
               )}
               <span className="text-[10.5px] text-sage">
@@ -479,7 +488,7 @@ function Editor({
               </div>
             )}
             {videoErr && <p className="mt-1.5 text-[11px] text-rose-300">{videoErr}</p>}
-          </label>
+          </div>
         </div>
 
         <input
@@ -499,7 +508,8 @@ function Editor({
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="relative h-16 w-24 overflow-hidden rounded-xl bg-moss/50">
             {draft.cover ? (
-              <Image src={draft.cover} alt="" fill sizes="96px" className="object-cover" />
+              <Image src={draft.cover} alt="" fill sizes="96px" className="object-cover"
+                      unoptimized />
             ) : (
               <span className="flex h-full items-center justify-center">
                 <ImagePlus size={18} className="text-gold/40" />
@@ -612,7 +622,8 @@ function Editor({
                     <div className="mb-2 flex items-center gap-3">
                       <div className="relative h-14 w-20 overflow-hidden rounded-lg bg-moss/50">
                         {block.src ? (
-                          <Image src={block.src} alt="" fill sizes="80px" className="object-cover" />
+                          <Image src={block.src} alt="" fill sizes="80px" className="object-cover"
+                      unoptimized />
                         ) : (
                           <span className="flex h-full items-center justify-center">
                             <ImagePlus size={16} className="text-gold/40" />
@@ -676,6 +687,15 @@ function Editor({
                     </div>
                   )}
 
+                  {(block.type === "text" || block.type === "note") && (
+                    <input
+                      value={block.heading ?? ""}
+                      maxLength={120}
+                      onChange={(e) => setBlock(i, { heading: e.target.value })}
+                      placeholder="سرتیتر این بخش (اختیاری) — با طلاییِ برجسته نشان داده می‌شود"
+                      className={`${inputCls} mb-2 border-gold/25 font-bold`}
+                    />
+                  )}
                   <textarea
                     className={inputCls}
                     rows={block.type === "text" ? 5 : 2}
@@ -683,7 +703,7 @@ function Editor({
                     onChange={(e) => setBlock(i, { text: e.target.value })}
                     placeholder={
                       block.type === "text"
-                        ? "متن این بخش…"
+                        ? "متن این بخش… (پاراگراف‌ها را با خط خالی جدا کنید؛ همه در یک باکس زیر سرتیتر نمایش داده می‌شوند)"
                         : block.type === "note"
                           ? "متن نکته…"
                           : "زیرنویس (اختیاری)"
@@ -757,7 +777,8 @@ function Editor({
 /* ---------------------------------------------------------------- */
 
 function CommentsTab({ onPending }: { onPending: (value: number) => void }) {
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  // Comments are published immediately now; show the newest of every status.
+  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("all");
   const [rows, setRows] = useState<TutorialCommentAdmin[] | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [replyFor, setReplyFor] = useState<number | null>(null);

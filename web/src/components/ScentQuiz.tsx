@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { RotateCcw, ArrowLeft, Loader2, ShoppingBag, Sparkles } from "lucide-react";
+import { RotateCcw, ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { BasketIcon } from "./BasketIcon";
 import { ProductVisual } from "./art";
 import { SectionHeading } from "./ui";
 import SiteIcon from "./SiteIcon";
@@ -438,7 +439,7 @@ export default function ScentQuiz({ icon }: { icon?: string }) {
                           onClick={() => add(p)}
                           className="mt-3 flex items-center justify-center gap-1.5 rounded-full border border-gold/35 py-2 text-[11px] font-bold text-gold transition-colors hover:bg-gold/10"
                         >
-                          <ShoppingBag size={12} /> افزودن به سبد
+                          <BasketIcon size={12} /> افزودن به سبد
                         </button>
                       </motion.div>
                     ))}

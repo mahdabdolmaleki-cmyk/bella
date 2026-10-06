@@ -1,0 +1,61 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { Vazirmatn, Cormorant_Garamond, Alex_Brush } from "next/font/google";
+import Shell from "@/components/Shell";
+import { getSiteSettings } from "@/lib/settings";
+import "./globals.css";
+
+// PERF: was `force-dynamic`, which disabled static rendering for the whole
+// app. The settings fetch already revalidates every 60 seconds.
+export const revalidate = 60;
+
+const vazir = Vazirmatn({
+  subsets: ["arabic", "latin"],
+  // PERF: 300 and 900 were downloaded on every visit but never used.
+  weight: ["400", "500", "700"],
+  variable: "--font-vazir",
+  display: "swap",
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-cormorant",
+  display: "swap",
+});
+
+/* brand wordmark font — matches the "Bella Perfume" gold script supplied by the client */
+const alexBrush = Alex_Brush({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-alexbrush",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title:"2217815",
+  description:
+    "بلا پرفیوم — افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده. کلکسیون عطرهای اورینتال با بسته‌بندی مخملی و دوخت طلایی.",
+};
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const settings = await getSiteSettings();
+  return (
+    <html
+      lang="fa"
+      dir="rtl"
+      className={`${vazir.variable} ${cormorant.variable} ${alexBrush.variable}`}
+    >
+      <body className="bg-night text-cream antialiased">
+        <Shell
+          footerAbout={settings.footerAbout}
+          footerBadges={settings.footerBadges}
+          footerGuaranteeTitle={settings.footerGuaranteeTitle}
+          footerGuarantees={settings.footerGuarantees}
+        >
+          {children}
+        </Shell>
+      </body>
+    </html>
+  );
+}

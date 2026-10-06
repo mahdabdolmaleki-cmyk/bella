@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { ChevronDown, Package, MessageCircle, Phone, MapPin, Mail, Truck, Save } from "lucide-react";
-import { formatToman } from "@/lib/data";
+import { ChevronDown, Package, MessageCircle, Phone, MapPin, Mail, Truck, Save, BellRing, BarChart3 } from "lucide-react";
+import { formatToman, toFa } from "@/lib/data";
+import { InvoiceLines } from "@/components/InvoiceLines";
 import type { Order } from "@/lib/types";
 
 type Message = {
@@ -48,6 +49,63 @@ export default function OrdersAdmin({
   const [savingId, setSavingId] = useState<number | null>(null);
 
   const [error, setError] = useState("");
+  // v35: پاک‌کردن پرچم «درخواست لغوی مشتری» بدون تغییر وضعیت سفارش.
+  const [clearingId, setClearingId] = useState<number | null>(null);
+  // v36: حذف از گزارش فروش
+  const [salesToggling, setSalesToggling] = useState<number | null>(null);
+
+  const clearCancelRequest = async (id: number) => {
+    const previous = orders.find((o) => o.id === id);
+    setClearingId(id);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ clearCancelRequest: true }),
+      });
+      if (!res.ok) throw new Error();
+      setOrders((list) =>
+        list.map((o) => (o.id === id ? { ...o, cancelRequested: false } : o))
+      );
+    } catch {
+      setError("بررسی درخواست لغو ثبت نشد.");
+      if (previous) {
+        setOrders((list) =>
+          list.map((o) => (o.id === id ? { ...o, cancelRequested: previous.cancelRequested } : o))
+        );
+      }
+    }
+    setClearingId(null);
+  };
+
+  const toggleExcludeFromSales = async (id: number) => {
+    const target = orders.find((o) => o.id === id);
+    if (!target) return;
+    const nextVal = !target.excludeFromSales;
+    setSalesToggling(id);
+    setError("");
+    const prev = target.excludeFromSales;
+    setOrders((list) => list.map((o) => (o.id === id ? { ...o, excludeFromSales: nextVal } : o)));
+    try {
+      const res = await fetch(`/api/admin/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ excludeFromSales: nextVal }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json().catch(() => null);
+      if (data?.order) {
+        setOrders((list) => list.map((o) => (o.id === id ? { ...o, ...data.order } : o)));
+      }
+    } catch {
+      setError("تغییر وضعیت گزارش فروش انجام نشد.");
+      setOrders((list) => list.map((o) => (o.id === id ? { ...o, excludeFromSales: prev } : o)));
+    }
+    setSalesToggling(null);
+  };
 
   const updateStatus = async (id: number, status: string) => {
     const previous = orders.find((o) => o.id === id)?.status;
@@ -152,6 +210,35 @@ export default function OrdersAdmin({
                       >
                         {o.status}
                       </span>
+                      {o.cancelRequested && (
+                        <span className="animate-pulse rounded-full border border-amber-400/50 bg-amber-400/15 px-2 py-0.5 text-[10px] font-black text-amber-300">
+                          درخواست لغو مشتری
+                        </span>
+                      )}
+                      {o.vipBox && (
+                        <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-gold-soft">
+                          باکس VIP
+                        </span>
+                      )}
+                      {!!o.discountAmount && (
+                        <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                          {o.couponCode
+                            ? o.couponFixed
+                              ? `کد تخفیف ${o.couponCode} (${toFa(o.couponFixed)} تومان)`
+                              : `کد تخفیف ${o.couponCode} (${toFa(o.discountPercent ?? 0)}٪)`
+                            : `تخفیف خرید اول (${toFa(o.discountPercent ?? 0)}٪)`}
+                        </span>
+                      )}
+                      {o.shippingCod && (
+                        <span className="rounded-full border border-amber-300/40 bg-amber-300/10 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                          پس‌کرایه
+                        </span>
+                      )}
+                      {o.excludeFromSales && (
+                        <span className="rounded-full border border-zinc-400/40 bg-zinc-400/10 px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                          حذف از فروش
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 truncate text-sm font-bold text-cream">
                       {o.customerName} — {formatToman(o.total)}
@@ -163,6 +250,24 @@ export default function OrdersAdmin({
 
                 {open && (
                   <div className="border-t border-gold/10 px-4 py-4">
+                    {o.cancelRequested && (
+                      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3.5 py-3">
+                        <BellRing size={15} className="shrink-0 text-amber-300" />
+                        <p className="min-w-0 flex-1 text-[11.5px] font-bold leading-5 text-amber-200">
+                          مشتری درخواست لغو این سفارش را داده
+                          {o.cancelRequestedAt &&
+                            ` — ${fmtDate(o.cancelRequestedAt)}`}
+                          . (این درخواست در تب «پیام‌ها» هم ثبت شده است.)
+                        </p>
+                        <button
+                          onClick={() => clearCancelRequest(o.id)}
+                          disabled={clearingId === o.id}
+                          className="shrink-0 rounded-full border border-amber-300/50 px-3.5 py-1.5 text-[11px] font-bold text-amber-200 transition hover:bg-amber-300/10 disabled:opacity-50"
+                        >
+                          {clearingId === o.id ? "…" : "بررسی شد"}
+                        </button>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-sage">
                       <span className="flex items-center gap-1.5">
                         <Phone size={13} className="text-gold/70" /> {o.phone}
@@ -205,22 +310,9 @@ export default function OrdersAdmin({
                       ))}
                     </div>
 
-                    {/* Goods vs. shipping, so the admin can reconcile the gateway amount. */}
-                    <div className="mt-3 space-y-1 border-t border-gold/10 pt-3 text-xs">
-                      <div className="flex justify-between text-sage">
-                        <span>جمع کالاها</span>
-                        <span className="text-cream">
-                          {formatToman(o.subtotal ?? o.total - (o.shippingCost ?? 0))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sage">
-                        <span>هزینه ارسال</span>
-                        <span className="text-cream">{formatToman(o.shippingCost ?? 0)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-gold-soft">
-                        <span>مبلغ کل</span>
-                        <span>{formatToman(o.total)}</span>
-                      </div>
+                    {/* فاکتور کامل — نسخهٔ مشترک v41: تخفیف کد/خرید اول، باکس ویژه، و برای پس‌کرایه بجای «مبلغ کل» ردیف «پس کرایه» */}
+                    <div className="mt-3 border-t border-gold/10 pt-3">
+                      <InvoiceLines order={o as any} tone="dark" />
                     </div>
 
                     {/* Courier barcode given to the customer for tracking. */}
@@ -243,19 +335,29 @@ export default function OrdersAdmin({
                       </button>
                     </div>
 
-                    <div className="mt-4 flex items-center gap-2">
-                      <label className="text-[11px] font-bold text-sage">تغییر وضعیت:</label>
-                      <select
-                        value={o.status}
-                        onChange={(e) => updateStatus(o.id, e.target.value)}
-                        className="rounded-lg glass-input px-3 py-1.5 text-xs text-cream focus:border-gold focus:outline-none"
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] font-bold text-sage">تغییر وضعیت:</label>
+                        <select
+                          value={o.status}
+                          onChange={(e) => updateStatus(o.id, e.target.value)}
+                          className="rounded-lg glass-input px-3 py-1.5 text-xs text-cream focus:border-gold focus:outline-none"
+                        >
+                          {STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => toggleExcludeFromSales(o.id)}
+                        disabled={salesToggling === o.id}
+                        className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition ${o.excludeFromSales ? "border-zinc-400/40 bg-zinc-400/15 text-zinc-300" : "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"}`}
                       >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        <BarChart3 size={13} />
+                        {salesToggling === o.id ? "…" : o.excludeFromSales ? "بازگردانی به گزارش فروش" : "حذف از گزارش فروش"}
+                      </button>
                     </div>
                   </div>
                 )}

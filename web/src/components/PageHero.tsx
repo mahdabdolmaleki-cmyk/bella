@@ -30,7 +30,7 @@ export default function PageHero({
         <div className="mx-auto mt-5 flex items-center justify-center gap-3">
           <span className="hairline h-px w-14" />
           <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true">
-            <path d="M7 0l1.8 5.2L14 7l-5.2 1.8L7 14 5.2 8.8 0 7l5.2-1.8z" fill="#d4af37" />
+            <path d="M7 0l1.8 5.2L14 7l-5.2 1.8L7 14 5.2 8.8 0 7l5.2-1.8z" fill="#d4af7c" />
           </svg>
           <span className="hairline h-px w-14" />
         </div>

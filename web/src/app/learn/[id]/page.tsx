@@ -120,6 +120,8 @@ export default function TutorialPage() {
       } else {
         setSent(true);
         setBody("");
+        // نظر بلافاصله منتشر می‌شود؛ فهرست نظرات تازه شود.
+        loadComments();
       }
     } catch {
       setError("ارتباط با سرور برقرار نشد.");
@@ -134,7 +136,7 @@ export default function TutorialPage() {
         <BookOpen size={40} className="mx-auto text-gold/40" />
         <p className="mt-4 text-sm text-sage">این آموزش پیدا نشد.</p>
         <Link href="/learn" className="btn-ghost mt-6 inline-flex rounded-full px-5 py-2.5 text-xs font-bold">
-          بازگشت به آکادمی
+          بازگشت به آموزش
         </Link>
       </div>
     );
@@ -160,7 +162,7 @@ export default function TutorialPage() {
           href="/learn"
           className="inline-flex items-center gap-2 text-xs font-bold text-gold-soft transition-colors hover:text-gold"
         >
-          <ArrowRight size={14} /> آکادمی بلا
+          <ArrowRight size={14} /> آموزش بلا
         </Link>
       </div>
 
@@ -193,6 +195,9 @@ export default function TutorialPage() {
             fill
             sizes="(max-width: 768px) 100vw, 768px"
             className="object-cover"
+            // مستقیم از /uploads لود می‌شود؛ لایهٔ بهینه‌ساز تصویر یک میان‌جی
+            // اضافه بود که روی استقرارهای با پروکسی ناقص، عکس‌ها را می‌شکست.
+            unoptimized
           />
         </div>
       )}
@@ -220,10 +225,38 @@ export default function TutorialPage() {
       <div className="mt-8 space-y-6">
         {tutorial.blocks.map((block, i) => {
           if (block.type === "text") {
+            // مثل تب توضیحات محصول: هر بلوک متن = یک باکس واحد با سرتیتر
+            // طلایی اختیاری و پاراگراف‌ها (جدا با خط خالی) داخل همان باکس.
+            const paragraphs = block.text
+              .split(/\n\s*\n/)
+              .map((p2) => p2.trim())
+              .filter(Boolean);
             return (
-              <p key={i} className="whitespace-pre-line text-sm leading-9 text-cream/90">
-                {block.text}
-              </p>
+              <section
+                key={i}
+                className="relative overflow-hidden rounded-2xl border border-gold/15 bg-gold/[0.035] px-5 py-5 sm:px-7"
+              >
+                <span className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold via-gold/50 to-transparent" />
+                {block.heading?.trim() && (
+                  <h3
+                    dir="auto"
+                    className="mb-3 text-[15px] font-black text-gold-soft sm:text-base"
+                  >
+                    {block.heading.trim()}
+                  </h3>
+                )}
+                <div className="space-y-4">
+                  {paragraphs.map((paragraph, pIndex) => (
+                    <p
+                      key={pIndex}
+                      dir="auto"
+                      className="whitespace-pre-line break-words text-sm leading-9 text-cream/90"
+                    >
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              </section>
             );
           }
           if (block.type === "note") {
@@ -235,7 +268,14 @@ export default function TutorialPage() {
                 className="flex gap-3 rounded-2xl border border-teal-300/30 bg-teal-300/[0.09] p-4 shadow-[0_0_28px_-16px_rgba(45,212,191,0.65)]"
               >
                 <Lightbulb size={18} className="mt-0.5 shrink-0 text-teal-300" />
-                <p className="whitespace-pre-line text-sm leading-8 text-cream/90">{block.text}</p>
+                <div className="min-w-0">
+                  {block.heading?.trim() && (
+                    <p dir="auto" className="mb-1.5 text-[13px] font-black text-teal-200">
+                      {block.heading.trim()}
+                    </p>
+                  )}
+                  <p className="whitespace-pre-line text-sm leading-8 text-cream/90">{block.text}</p>
+                </div>
               </div>
             );
           }
@@ -249,6 +289,7 @@ export default function TutorialPage() {
                     fill
                     sizes="(max-width: 768px) 100vw, 768px"
                     className="object-cover"
+                    unoptimized
                   />
                 </div>
                 {block.text && (
@@ -325,7 +366,7 @@ export default function TutorialPage() {
           {sent ? (
             <div className="flex items-center gap-2 text-sm text-emerald-300">
               <CheckCircle2 size={18} />
-              نظر شما ثبت شد و پس از تأیید مدیر نمایش داده می‌شود.
+              نظر شما ثبت و منتشر شد. ممنون از همراهی شما!
             </div>
           ) : (
             <>

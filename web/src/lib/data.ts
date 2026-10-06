@@ -1,6 +1,8 @@
 export type ProductDescriptionBlock = {
   type: "text" | "image" | "video";
   text: string;
+  /** سرتیتر اختیاری بلوک متن — بالای باکس پاراگراف اول نمایش داده می‌شود. */
+  heading?: string;
   src: string;
 };
 
@@ -41,8 +43,15 @@ export type ProductDTO = {
   // Ordered rich content for the "توضیحات" tab. Legacy fields remain optional
   // so products saved before the block editor continue to render unchanged.
   descriptionBlocks?: ProductDescriptionBlock[];
+  // نمادها و متن‌های ویژهٔ صفحهٔ محصول — آیکن از پکیج /icons + متن کوتاه.
+  highlights?: ProductHighlight[];
   longDescription?: string;
   gallery?: string[];
+};
+
+export type ProductHighlight = {
+  icon: string;
+  text: string;
 };
 
 // NOTE: the old SEED_PRODUCTS constant lived here. It duplicated the real

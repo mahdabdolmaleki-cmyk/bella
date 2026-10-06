@@ -11,15 +11,18 @@ import {
   Clock,
   Wind,
   Loader2,
-  ShoppingBag,
   ChevronLeft,
+  ChevronRight,
   Star,
 } from "lucide-react";
+import { BasketIcon } from "@/components/BasketIcon";
 import { ProductVisual } from "@/components/art";
+import SiteIcon from "@/components/SiteIcon";
 import { useCart } from "@/components/Cart";
 import { useAuth } from "@/components/AuthContext";
 import Reviews, { Stars } from "@/components/Reviews";
 import RelatedProducts from "@/components/RelatedProducts";
+import ClampLine from "@/components/ClampLine";
 import { formatToman, toFa } from "@/lib/data";
 import type { Product } from "@/lib/types";
 
@@ -136,7 +139,7 @@ export default function ProductPage() {
         <span className="text-gold-soft">{product.name}</span>
       </nav>
 
-      <div className="mt-6 grid gap-8 md:grid-cols-2 md:gap-10">
+      <div className="mt-5 grid grid-cols-1 gap-5 md:mt-6 md:grid-cols-2 md:gap-10">
         <Gallery product={product} />
         <Summary
           product={product}
@@ -192,73 +195,152 @@ export default function ProductPage() {
 
 /* Gallery */
 
+/**
+ * گالری تصویر محصول: عکس اصلی + عکس‌های اضافهٔ گالری (تا ۱۰ عکس).
+ *
+ * تعامل‌ها:
+ *  - دسکتاپ: ستون بندانگشتی عمودی کنار عکس + فلش‌های چپ/راست + کلیدهای جهت
+ *  - موبایل: نوار بندانگشتی افقی زیر عکس + کشیدن انگشت (swipe) روی عکس
+ * بندانگشتی فعال با اسکرول نوار، خودش هم به دید می‌آید.
+ */
 function Gallery({ product }: { product: Product }) {
   const images = [product.image, ...(product.gallery || [])].filter(
     (src): src is string => typeof src === "string" && src.length > 0,
   );
   const [active, setActive] = useState(0);
   const current = images[active];
+  const count = images.length;
+
+  const goTo = (index: number) => {
+    if (count === 0) return;
+    setActive(((index % count) + count) % count);
+  };
+  const prev = () => goTo(active - 1);
+  const next = () => goTo(active + 1);
+
+  // بندانگشتی فعال هنگام تعویض عکس (مثلا با فلش) به دید اسکرول می‌شود.
+  useEffect(() => {
+    const el = document.querySelector(`[data-thumb="${active}"]`);
+    el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [active]);
+
+  const thumb = (src: string, index: number) => (
+    <button
+      key={src}
+      data-thumb={index}
+      onClick={() => setActive(index)}
+      aria-label={`تصویر ${toFa(index + 1)} از ${toFa(count)}`}
+      aria-current={index === active}
+      className={`relative h-16 w-14 shrink-0 overflow-hidden rounded-xl border transition-all duration-200 md:h-20 md:w-16 ${
+        index === active
+          ? "border-gold shadow-[0_0_0_2px_rgba(212,175,55,0.35)]"
+          : "border-gold/20 opacity-70 hover:border-gold/50 hover:opacity-100"
+      }`}
+    >
+      <Image
+        src={src}
+        alt={`${product.name} ${index + 1}`}
+        fill
+        sizes="64px"
+        className="object-cover"
+        unoptimized
+      />
+    </button>
+  );
 
   return (
-    <div>
-      <div className="gold-ring relative flex aspect-4/5 items-center justify-center overflow-hidden rounded-3xl border border-gold/20 bg-gradient-to-b from-pine/25 to-night">
-        {current ? (
-          <motion.div
-            key={current}
-            initial={{ opacity: 0, scale: 1.03 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="relative h-full w-full"
-          >
-            <Image
-              src={current}
+    <div className="min-w-0 md:flex md:flex-row md:items-start md:gap-3">
+      <div className="min-w-0 flex-1">
+        <div
+          tabIndex={count > 1 ? 0 : -1}
+          onKeyDown={(e) => {
+            // در چیدمان RTL، حرکت به چپ یعنی عکس بعدی.
+            if (e.key === "ArrowLeft") { e.preventDefault(); next(); }
+            if (e.key === "ArrowRight") { e.preventDefault(); prev(); }
+          }}
+          className="product-gallery gold-ring relative flex aspect-square max-h-[58svh] items-center justify-center overflow-hidden rounded-3xl border border-gold/20 bg-gradient-to-b from-pine/25 to-night outline-none focus-visible:ring-2 focus-visible:ring-gold/50 md:aspect-4/5 md:max-h-none"
+        >
+          {current ? (
+            <motion.div
+              key={current}
+              initial={{ opacity: 0, scale: 1.03 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35 }}
+              // کشیدن به چپ/راست روی موبایل عکس را عوض می‌کند؛ محور عمودی
+              // آزاد است تا اسکرول عادی صفحه هم کار کند.
+              drag={count > 1 ? "x" : false}
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_e, info) => {
+                if (info.offset.x < -60) next();
+                else if (info.offset.x > 60) prev();
+              }}
+              className="relative h-full w-full cursor-grab active:cursor-grabbing"
+            >
+              <Image
+                src={current}
+                alt={product.name}
+                fill
+                sizes="(max-width: 768px) 100vw, 480px"
+                className="object-contain p-4 md:p-6"
+                priority
+                unoptimized
+              />
+            </motion.div>
+          ) : (
+            <ProductVisual
+              image={null}
+              glass={product.glass}
+              liquid={product.liquid}
               alt={product.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 480px"
-              className="object-contain p-6"
-              priority
-              unoptimized
+              className="h-4/5 w-4/5 md:h-[82%] md:w-[82%]"
             />
-          </motion.div>
-        ) : (
-          <ProductVisual
-            image={null}
-            glass={product.glass}
-            liquid={product.liquid}
-            alt={product.name}
-            className="h-4/5 w-4/5"
-          />
-        )}
+          )}
 
-        {product.badge && (
-          <span className="absolute top-4 right-4 rounded-full bg-gold px-3 py-1 text-[10.5px] font-black text-[#241a05]">
-            {product.badge}
-          </span>
+          {product.badge && (
+            <span className="absolute top-4 right-4 tag-red rounded-full px-3 py-1 text-[10.5px] font-black">
+              {product.badge}
+            </span>
+          )}
+
+          {count > 1 && (
+            <>
+              {/* شمارندهٔ عکس */}
+              <span className="absolute bottom-3 left-3 rounded-full bg-night/75 px-2.5 py-1 text-[10px] font-bold text-cream/90 backdrop-blur">
+                {toFa(active + 1)} / {toFa(count)}
+              </span>
+
+              {/* فلش‌های تعویض عکس */}
+              <button
+                onClick={prev}
+                aria-label="عکس قبلی"
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-cream/70 transition-colors hover:text-gold"
+              >
+                <ChevronRight size={22} />
+              </button>
+              <button
+                onClick={next}
+                aria-label="عکس بعدی"
+                className="absolute inset-y-0 left-0 flex w-10 items-center justify-center text-cream/70 transition-colors hover:text-gold"
+              >
+                <ChevronLeft size={22} />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* موبایل: نوار بندانگشتی افقی زیر عکس */}
+        {count > 1 && (
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 md:hidden">
+            {images.map((src, index) => thumb(src, index))}
+          </div>
         )}
       </div>
 
-      {images.length > 1 && (
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {images.map((src, index) => (
-            <button
-              key={src}
-              onClick={() => setActive(index)}
-              className={`relative h-20 w-16 shrink-0 overflow-hidden rounded-xl border transition-colors ${
-                index === active
-                  ? "border-gold"
-                  : "border-gold/20 hover:border-gold/50"
-              }`}
-            >
-              <Image
-                src={src}
-                alt={`${product.name} ${index + 1}`}
-                fill
-                sizes="64px"
-                className="object-cover"
-                unoptimized
-              />
-            </button>
-          ))}
+      {/* دسکتاپ: ستون بندانگشتی عمودی کنار عکس */}
+      {count > 1 && (
+        <div className="mt-3 hidden max-h-[540px] flex-col gap-2 overflow-y-auto pl-1 md:mt-0 md:flex">
+          {images.map((src, index) => thumb(src, index))}
         </div>
       )}
     </div>
@@ -280,7 +362,12 @@ function Summary({
 
   return (
     <div>
-      <p className="font-script text-lg text-gold-soft">{product.nameEn}</p>
+      {/* فونت انگلیسی خوانا — قبلاً خط شکستهٔ Great Vibes بود */}
+      {product.nameEn?.trim() && (
+        <p dir="ltr" className="font-display text-right text-xl font-semibold text-gold-soft">
+          {product.nameEn}
+        </p>
+      )}
       <h1 className="mt-1 font-display text-3xl font-black text-cream sm:text-4xl">
         {product.name}
       </h1>
@@ -337,13 +424,31 @@ function Summary({
         <button
           onClick={onAdd}
           disabled={soldOut}
-          className="shimmer-btn flex flex-1 items-center justify-center gap-2 rounded-full py-3.5 text-sm font-black text-[#241a05] disabled:cursor-not-allowed disabled:opacity-50"
+          className="shimmer-btn btn-add flex flex-1 items-center justify-center gap-2 rounded-full py-3.5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <ShoppingBag size={17} />
+          <BasketIcon size={17} />
           {soldOut ? "فعلاً ناموجود" : "افزودن به سبد خرید"}
         </button>
         <FavoriteButton productId={product.id} />
       </div>
+
+      {/* نمادها و متن‌های ویژه‌ای که ادمین برای این محصول تعیین کرده —
+          مثل «ارسال فوری»، «ضمانت اصالت» یا «هدیهٔ اتومایزر». */}
+      {product.highlights && product.highlights.length > 0 && (
+        <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {product.highlights.map((h, i) => (
+            <li
+              key={`${h.icon}-${i}`}
+              className="cream-box flex items-center gap-2 rounded-xl border border-gold/15 px-3 py-2.5 transition-colors hover:border-gold/35"
+            >
+              <SiteIcon name={h.icon} size={18} className="shrink-0" />
+              <span className="text-[11px] font-bold leading-5 text-cream/85">
+                {h.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -364,12 +469,13 @@ function NoteRow({
     <div className="flex items-start gap-2.5">
       <Icon size={15} className="mt-0.5 shrink-0 text-gold" />
       <p
-        className={
+        className={`flex min-w-0 flex-1 ${
           compact ? "text-[11.5px] text-sage" : "text-[12.5px] text-sage"
-        }
+        }`}
       >
-        <span className="font-bold text-cream/90">{label}: </span>
-        {value}
+        <span className="shrink-0 font-bold text-cream/90">{label}: </span>
+        {/* نت‌های بلند: یک خط + دکمهٔ «بیشتر» که به دو خط باز می‌شود */}
+        <ClampLine text={value} />
       </p>
     </div>
   );
@@ -452,6 +558,7 @@ function DescriptionTab({ product }: { product: Product }) {
           {
             type: "text" as const,
             text: product.longDescription.trim(),
+            heading: "",
             src: "",
           },
         ]
@@ -459,6 +566,7 @@ function DescriptionTab({ product }: { product: Product }) {
     ...(product.gallery || []).map((src) => ({
       type: "image" as const,
       text: "",
+      heading: "",
       src,
     })),
   ];
@@ -478,7 +586,7 @@ function DescriptionTab({ product }: { product: Product }) {
   return (
     <article className="mx-auto max-w-4xl space-y-7">
       {intro && (
-        <div className="relative overflow-hidden rounded-2xl border border-gold/15 bg-gold/[0.035] px-5 py-5 sm:px-7">
+        <div className="cream-box relative overflow-hidden rounded-2xl border border-gold/15 px-5 py-5 sm:px-7">
           <span className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold via-gold/50 to-transparent" />
           <p
             dir="auto"
@@ -496,20 +604,34 @@ function DescriptionTab({ product }: { product: Product }) {
             .map((paragraph) => paragraph.trim())
             .filter(Boolean);
           if (paragraphs.length === 0) return null;
+          // توضیح مدیر (v2): هر «بخش متن» = یک باکس واحد؛ سرتیتر درشتِ طلایی
+          // بالای همان باکس و همهٔ پاراگراف‌هایش با فاصله داخل همان باکس —
+          // دقیقاً مثل نمونهٔ ارسالی: تیتر + متن در یک قاب.
           return (
             <section
               key={`text-${index}`}
-              className="space-y-4 px-1 text-[14px] leading-8 text-cream/85 sm:px-3 sm:text-[15px] sm:leading-9"
+              className="cream-box relative overflow-hidden rounded-2xl border border-gold/15 px-5 py-5 sm:px-7"
             >
-              {paragraphs.map((paragraph, paragraphIndex) => (
-                <p
-                  key={paragraphIndex}
+              <span className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-gold via-gold/50 to-transparent" />
+              {block.heading?.trim() && (
+                <h3
                   dir="auto"
-                  className="whitespace-pre-line break-words"
+                  className="mb-3 text-[15px] font-black text-gold-soft sm:text-base"
                 >
-                  {paragraph}
-                </p>
-              ))}
+                  {block.heading.trim()}
+                </h3>
+              )}
+              <div className="space-y-4">
+                {paragraphs.map((paragraph, paragraphIndex) => (
+                  <p
+                    key={paragraphIndex}
+                    dir="auto"
+                    className="whitespace-pre-line break-words text-[14px] leading-8 text-cream/90 sm:text-[15px] sm:leading-9"
+                  >
+                    {paragraph}
+                  </p>
+                ))}
+              </div>
             </section>
           );
         }
@@ -518,7 +640,7 @@ function DescriptionTab({ product }: { product: Product }) {
           return (
             <figure
               key={`image-${index}-${block.src}`}
-              className="overflow-hidden rounded-3xl border border-gold/15 bg-night/35 shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
+              className="cream-box overflow-hidden rounded-3xl border border-gold/15 shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
             >
               <Image
                 src={block.src}
@@ -527,6 +649,9 @@ function DescriptionTab({ product }: { product: Product }) {
                 height={900}
                 sizes="(max-width: 900px) 100vw, 900px"
                 className="h-auto max-h-[720px] w-full object-contain"
+                // مستقیم لود می‌شود تا مثل عکس اصلی گالری، بدون لایهٔ
+                // بهینه‌ساز کار کند (رفع عکس‌های شکسته توضیحات محصول).
+                unoptimized
               />
               {block.text && (
                 <figcaption
@@ -607,7 +732,7 @@ function SpecsTab({ product }: { product: Product }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gold/15">
+    <div className="cream-box overflow-hidden rounded-2xl border border-gold/15">
       <table className="w-full text-right text-[12.5px]">
         <tbody>
           {filled.map(([label, value], index) => (

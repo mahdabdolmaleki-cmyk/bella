@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
+import { jalaliToIso, toJalali } from "@/lib/jalali";
 import Image from "next/image";
 import {
   Sparkles,
@@ -20,13 +21,19 @@ import {
   Shapes,
   ExternalLink,
   AlertCircle,
+  BadgePercent,
   LayoutGrid,
   Share2,
   Link2,
   LogIn,
   Mail,
+  MessageSquare,
   Smartphone,
   Truck,
+  Clock,
+  ShoppingBasket,
+  ShieldCheck,
+  Ticket,
 } from "lucide-react";
 import {
   parseSocials,
@@ -40,6 +47,7 @@ import SocialGlyph from "@/components/SocialGlyph";
 import {
   parseBrands,
   parseJourneyStages,
+  parseEnamadSeal,
   parseFooterBadges,
   parseShopCategories,
   type BrandCard,
@@ -83,6 +91,9 @@ const TABS = [
   { id: "shipping", label: "ارسال", icon: Truck, tint: "text-sky-300" },
   { id: "categories", label: "دسته‌بندی فروشگاه", icon: LayoutGrid, tint: "text-lime-300" },
   { id: "contact", label: "تماس با ما", icon: Share2, tint: "text-rose-300" },
+  { id: "terms", label: "قوانین و مقررات", icon: ScrollText, tint: "text-teal-300" },
+  { id: "cart", label: "سبد رها شده", icon: ShoppingBasket, tint: "text-amber-300" },
+  { id: "sms", label: "پیامک‌ها و ایمیل‌ها", icon: MessageSquare, tint: "text-lime-300" },
   { id: "maintenance", label: "پرداخت و نگهداری", icon: AlertCircle, tint: "text-orange-300" },
 ] as const;
 
@@ -98,6 +109,76 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
 
   const set = (key: keyof SiteSettingsMap, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  /* ---------------- پیامک‌ها: ارسال تست و بررسی اعتبار ---------------- */
+  const [couponDateDraft, setCouponDateDraft] = useState<Record<number, string>>({});
+  const [smsTestPhone, setSmsTestPhone] = useState("");
+  const [smsTestBusy, setSmsTestBusy] = useState(false);
+  const [smsTestResult, setSmsTestResult] = useState<{
+    ok: boolean;
+    preview: string;
+    error: string;
+  } | null>(null);
+  const [smsCreditBusy, setSmsCreditBusy] = useState(false);
+  const [smsCreditText, setSmsCreditText] = useState("");
+
+
+  const sendSmsTest = async (
+    activity: "otp" | "orderPlaced" | "orderPlacedAdmin" | "orderStatus" | "abandonedFirst" | "abandonedSecond" | "cancelAdmin"
+  ) => {
+    const phone = smsTestPhone.trim();
+    if (!/^09\d{9}$/.test(phone)) {
+      setSmsTestResult({
+        ok: false,
+        preview: "",
+        error: "شماره موبایل را به شکل 09xxxxxxxxx وارد کنید.",
+      });
+      return;
+    }
+    setSmsTestBusy(true);
+    setSmsTestResult(null);
+    try {
+      // توجه: تست با متن‌های «ذخیره‌شده» ارسال می‌شود؛ اول تغییرات را ذخیره کنید.
+      const res = await fetch("/api/admin/sms/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, activity }),
+      });
+      const data = await res.json();
+      setSmsTestResult({
+        ok: Boolean(data.ok),
+        preview: data.preview || "",
+        error: data.error || (res.ok ? "" : "ارسال پیامک تست ناموفق بود."),
+      });
+    } catch {
+      setSmsTestResult({
+        ok: false,
+        preview: "",
+        error: "ارتباط با سرور برقرار نشد.",
+      });
+    } finally {
+      setSmsTestBusy(false);
+    }
+  };
+
+  const checkSmsCredit = async () => {
+    setSmsCreditBusy(true);
+    setSmsCreditText("");
+    try {
+      const res = await fetch("/api/admin/sms/credit");
+      const data = await res.json();
+      if (data.ok) {
+        const value = Number(data.credit) || 0;
+        setSmsCreditText(`اعتبار باقیمانده sms.ir: ${value.toLocaleString("fa-IR")}`);
+      } else {
+        setSmsCreditText(data.error || "دریافت اعتبار ناموفق بود.");
+      }
+    } catch {
+      setSmsCreditText("ارتباط با سرور برقرار نشد.");
+    } finally {
+      setSmsCreditBusy(false);
+    }
+  };
 
   const toggleLoginMethod = (
     key: "loginPhoneEnabled" | "loginEmailEnabled",
@@ -161,7 +242,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
     writeBadges(badges.map((b, i) => (i === index ? { ...b, ...patch } : b)));
 
   /* ---------------- دسته‌بندی‌های فروشگاه ---------------- */
-  // دقیقاً مثل نمادها، فهرست قابل ویرایش در حالت خام نگه داشته می‌ش��د؛
+  // دقیقاً مثل نمادها، فهرست قابل ویرایش در حالت خام نگه داشته می‌شود؛
   // اگر از پارسر می‌ساختیم، دستهٔ تازهٔ خالی همان لحظه ناپدید می‌شد.
   const [shopCats, setShopCats] = useState<string[]>(() =>
     parseShopCategories(initialSettings.shopCategories),
@@ -420,7 +501,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                 type="checkbox"
                 checked={form.festivalActive === "true"}
                 onChange={(e) => set("festivalActive", e.target.checked ? "true" : "false")}
-                className="h-4 w-4 accent-[#d4af37]"
+                className="h-4 w-4 accent-[#d4af7c]"
               />
               نمایش بنر جشنواره در صفحه اصلی
             </label>
@@ -445,6 +526,279 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                 />
               </div>
             </div>
+          </section>
+
+          {/* ---------- کارت تخفیف‌ها (باکس دوم، جدا از جشنواره) ---------- */}
+          <section className="gold-ring rounded-2xl glass-panel p-5">
+            <div className="flex items-center gap-2 text-emerald-300">
+              <BadgePercent size={16} />
+              <h2 className="text-sm font-black">کارت تخفیف‌ها (باکس دوم صفحهٔ اصلی)</h2>
+            </div>
+            <p className="mt-1 text-[11px] leading-6 text-sage">
+              کارتی جدا از بنر جشنواره؛ با کلیک روی آن، فروشگاه فقط ادکلن‌های مشمول تخفیف را
+              نشان می‌دهد (محصولاتی که «قیمت قبلی» دارند).
+            </p>
+
+            <label className="mt-4 flex items-center gap-2 text-xs font-bold text-sage">
+              <input
+                type="checkbox"
+                checked={form.discountsBoxActive === "1"}
+                onChange={(e) => set("discountsBoxActive", e.target.checked ? "1" : "")}
+                className="h-4 w-4 accent-[#d4af7c]"
+              />
+              نمایش کارت تخفیف‌ها در صفحهٔ اصلی
+            </label>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-sage">عنوان</label>
+                <input
+                  value={form.discountsBoxTitle}
+                  onChange={(e) => set("discountsBoxTitle", e.target.value)}
+                  className={inputCls}
+                  placeholder="تخفیف‌های بلا"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-sage">توضیح کوتاه</label>
+                <input
+                  value={form.discountsBoxSubtitle}
+                  onChange={(e) => set("discountsBoxSubtitle", e.target.value)}
+                  className={inputCls}
+                  placeholder="ادکلن‌های مشمول تخفیف را ببینید"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ---------- تخفیف خرید اول + باکس VIP ---------- */}
+          <section className="gold-ring rounded-2xl glass-panel p-5">
+            <div className="flex items-center gap-2 text-gold">
+              <Sparkles size={16} />
+              <h2 className="text-sm font-black">تخفیف خرید اول و باکس VIP</h2>
+            </div>
+
+            <label className="mt-4 flex items-center gap-2 text-xs font-bold text-sage">
+              <input
+                type="checkbox"
+                checked={form.firstPurchaseDiscountEnabled === "1"}
+                onChange={(e) => set("firstPurchaseDiscountEnabled", e.target.checked ? "1" : "")}
+                className="h-4 w-4 accent-[#d4af7c]"
+              />
+              فعال‌بودن تخفیف خرید اول مشتری
+            </label>
+            <p className="mt-1 text-[10.5px] leading-5 text-sage/70">
+              فقط برای مشتری‌هایی که تا امروز هیچ سفارشی نداشته‌اند؛ روی جمع سبد (بدون کرایه)
+              اعمال می‌شود.
+            </p>
+            <div className="mt-3 max-w-xs">
+              <label className="mb-1 block text-[11px] font-bold text-sage">درصد تخفیف (۰ تا ۹۰)</label>
+              <input
+                type="number"
+                min={0}
+                max={90}
+                value={form.firstPurchasePercent}
+                onChange={(e) => set("firstPurchasePercent", e.target.value)}
+                className={inputCls}
+                placeholder="25"
+              />
+            </div>
+
+            <div className="mt-6 border-t border-gold/10 pt-5">
+              <label className="flex items-center gap-2 text-xs font-bold text-sage">
+                <input
+                  type="checkbox"
+                  checked={form.vipBoxEnabled === "1"}
+                  onChange={(e) => set("vipBoxEnabled", e.target.checked ? "1" : "")}
+                  className="h-4 w-4 accent-[#d4af7c]"
+                />
+                فعال‌بودن باکس ویژه (VIP) هنگام خرید
+              </label>
+              <p className="mt-1 text-[10.5px] leading-5 text-sage/70">
+                با فعال‌بودن، مشتری هنگام خرید می‌تواند انتخاب کند که ادکلن داخل باکس لوکس ارسال شود.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold text-sage">هزینهٔ باکس (تومان)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.vipBoxFee}
+                    onChange={(e) => set("vipBoxFee", e.target.value)}
+                    className={inputCls}
+                    placeholder="150000"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold text-sage">عنوان باکس</label>
+                  <input
+                    value={form.vipBoxTitle}
+                    onChange={(e) => set("vipBoxTitle", e.target.value)}
+                    className={inputCls}
+                    placeholder="باکس ویژه VIP"
+                  />
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="mb-1 block text-[11px] font-bold text-sage">توضیح باکس (به مشتری)</label>
+                <input
+                  value={form.vipBoxDesc}
+                  onChange={(e) => set("vipBoxDesc", e.target.value)}
+                  className={inputCls}
+                  placeholder="ادکلن شما داخل باکس لوکس و مخملی، با روبان طلایی ارسال می‌شود."
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ---------- کدهای تخفیف (v40) ---------- */}
+          <section className="gold-ring mt-4 rounded-2xl glass-panel p-5">
+            <div className="flex items-center gap-2 text-gold">
+              <Ticket size={16} />
+              <h2 className="text-sm font-black">کدهای تخفیف</h2>
+            </div>
+
+            <label className="mt-4 flex items-center gap-2 text-xs font-bold text-sage">
+              <input
+                type="checkbox"
+                checked={form.couponEnabled === "1"}
+                onChange={(e) => set("couponEnabled", e.target.checked ? "1" : "")}
+                className="h-4 w-4 accent-[#d4af7c]"
+              />
+              فعال‌بودن کدهای تخفیف
+            </label>
+            <p className="mt-1 text-[10.5px] leading-5 text-sage/70">
+              هر کد می‌تواند درصدی (۱ تا ۹۰٪) یا مبلغی (تومان) باشد و تا پایان «تاریخ
+              انقضای شمسی» معتبر است؛ خالی‌گذاشتن تاریخ یعنی بدون انقضا. کد تخفیف و
+              تخفیف خرید اول روی هم جمع نمی‌شوند — هرکدام که مبلغش بیشتر باشد اعمال
+              می‌شود. مبلغ تخفیف در فاکتور مشتری، «مدیریت سفارش‌ها» و «فاکتورها» نمایش
+              داده می‌شود. <b>هر کد به‌ازای هر اکانت فقط یک بار</b> قابل استفاده است و
+              <b> فقط با پرداخت شدنِ سفارش می‌سوزد</b>؛ سفارشِ پرداخت‌نشده پس از انقضا یا لغو،
+              کد را آزاد می‌کند (تا انقضا، کد روی همان سفارش قفل است و سفارشِ دوم با آن گرفته نمی‌شود).
+            </p>
+
+            {(() => {
+              type CRow = { code?: string; percent?: number; amount?: number; until?: string };
+              let list: CRow[] = [];
+              try {
+                const parsed = JSON.parse(form.couponCodesJson || "[]");
+                if (Array.isArray(parsed)) list = parsed;
+              } catch {
+                /* داده قدیمی/خراب — با اولین ویرایش سالم بازنویسی می‌شود */
+              }
+              const write = (next: CRow[]) => set("couponCodesJson", JSON.stringify(next));
+              const edit = (i: number, p: Partial<CRow>) =>
+                write(list.map((x, j) => (j === i ? { ...x, ...p } : x)));
+              const toLatin = (v: string) =>
+                v
+                  .replace(/[\u06F0-\u06F9]/g, (d) => String("۰۱۳۴۵۷۸۹".indexOf(d)))
+                  .replace(/[\u0660-\u0669]/g, (d) => String("٠١٣٤٥٧٨٩".indexOf(d)));
+              const jalStr = (iso: string) => {
+                const pp = toJalali(`${iso.slice(0, 10)}T12:00:00`);
+                if (!pp) return "";
+                const pad = (n: number) => String(n).padStart(2, "0");
+                return `${pp.jy}-${pad(pp.jm)}-${pad(pp.jd)}`;
+              };
+              return (
+                <>
+                  {list.map((c, i) => {
+                    const isAmount = !c.percent && (c.amount ?? 0) > 0;
+                    const draft = couponDateDraft[i] ?? (c.until ? jalStr(c.until) : "");
+                    const onDate = (raw: string) => {
+                      setCouponDateDraft((m) => ({ ...m, [i]: raw }));
+                      if (!raw.trim()) {
+                        edit(i, { until: "" });
+                        return;
+                      }
+                      const m2 = toLatin(raw.trim()).match(/^(\d{4})[-/]?(\d{1,2})[-/]?(\d{1,2})$/);
+                      if (m2) {
+                        const iso = jalaliToIso(+m2[1], +m2[2], +m2[3]);
+                        edit(i, { until: iso ?? c.until ?? "" });
+                      }
+                    };
+                    return (
+                      <div
+                        key={i}
+                        className="mt-3 grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_96px_104px_150px_42px]"
+                      >
+                        <label className="block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">کد تخفیف</span>
+                          <input
+                            value={String(c.code ?? "")}
+                            onChange={(e) => edit(i, { code: e.target.value.toUpperCase().replace(/\s+/g, "") })}
+                            className={inputCls}
+                            dir="ltr"
+                            placeholder="BELLA15"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">نوع</span>
+                          <select
+                            value={isAmount ? "amount" : "percent"}
+                            onChange={(e) => {
+                              if (e.target.value === "amount")
+                                edit(i, { percent: 0, amount: c.amount ?? Math.max(1000, (c.percent ?? 10) * 5000) });
+                              else edit(i, { amount: 0, percent: c.percent ?? 10 });
+                            }}
+                            className={`${inputCls} appearance-none`}
+                          >
+                            <option value="percent">درصد</option>
+                            <option value="amount">تومان</option>
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">
+                            {isAmount ? "مبلغ (تومان)" : "درصد (۱–۹۰)"}
+                          </span>
+                          <input
+                            type="number"
+                            min={isAmount ? 1000 : 1}
+                            max={isAmount ? 10000000 : undefined}
+                            step={isAmount ? 1000 : 1}
+                            value={isAmount ? (c.amount ?? "") : (c.percent ?? "")}
+                            onChange={(e) => {
+                              const n = Number(e.target.value) || 0;
+                              edit(i, isAmount ? { amount: n } : { percent: Math.min(90, n) });
+                            }}
+                            className={inputCls}
+                            dir="ltr"
+                            placeholder={isAmount ? "50000" : "15"}
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">
+                            تاریخ انقضا (شمسی)
+                          </span>
+                          <input
+                            value={draft}
+                            onChange={(e) => onDate(e.target.value)}
+                            className={inputCls}
+                            dir="ltr"
+                            placeholder="1405-07-13"
+                            title="قالب: 1405-07-13 — خالی یعنی بدون انقضا"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => write(list.filter((_, j) => j !== i))}
+                          className="rounded-lg border border-red-400/30 p-2.5 text-[#8c2f3f] transition hover:bg-red-400/10"
+                          aria-label="حذف کد"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => write([...list, { code: "", percent: 10, until: "" }])}
+                    className="btn-add mt-3 rounded-full px-4 py-2 text-[11px] font-bold"
+                  >
+                    + افزودن کد جدید
+                  </button>
+                </>
+              );
+            })()}
           </section>
 
           {/* ---------- متن مراحل صفحه اصلی ---------- */}
@@ -496,7 +850,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                   type="color"
                   value={form.journeyBottleGlass}
                   onChange={(e) => set("journeyBottleGlass", e.target.value)}
-                  className="h-10 w-full rounded-lg border border-gold/25 bg-transparent"
+                  className="h-10 w-full rounded-lg border border-gold/25 bg-transparent text-[#241a22]"
                 />
               </div>
               <div>
@@ -507,7 +861,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                   type="color"
                   value={form.journeyBottleLiquid}
                   onChange={(e) => set("journeyBottleLiquid", e.target.value)}
-                  className="h-10 w-full rounded-lg border border-gold/25 bg-transparent"
+                  className="h-10 w-full rounded-lg border border-gold/25 bg-transparent text-[#241a22]"
                 />
               </div>
             </div>
@@ -520,7 +874,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
               <h2 className="text-sm font-black">تصویر عطر صفحه اصلی</h2>
             </div>
             <p className="mt-1 text-[11px] leading-6 text-sage">
-              اگر تصویری آپلود ک��ید، جای بطری طراحی‌شده در انیمیشن اسکرول صفحه اصلی
+              اگر تصویری آپلود کردید، جای بطری طراحی‌شده در انیمیشن اسکرول صفحه اصلی
               نمایش داده می‌شود. تصویر PNG با پس‌زمینه شفاف بهترین نتیجه را می‌دهد.
             </p>
 
@@ -862,7 +1216,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
               )}
             </div>
             <p className="mt-1 text-[11px] leading-6 text-sage">
-              نماد اعتماد الکت��ونیکی، ساماندهی، اتحادیه کسب‌وکارهای مجازی یا هر نشان دیگری
+              نماد اعتماد الکترونیکی، ساماندهی، اتحادیه کسب‌وکارهای مجازی یا هر نشان دیگری
               که دارید. تصویر را آپلود کنید و لینک استعلام را بگذارید؛ همین ترتیب در فوتر
               نمایش داده می‌شود. اگر هیچ نمادی ثبت نکنید، این بخش از فوتر حذف می‌شود.
             </p>
@@ -936,6 +1290,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                           sizes="80px"
                           className="object-contain p-1.5"
                           unoptimized
+                          referrerPolicy="origin"
                         />
                       ) : (
                         <span className="absolute inset-0 flex items-center justify-center px-1 text-center text-[9px] text-night/60">
@@ -953,11 +1308,24 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                       />
                       <input
                         value={badge.link}
-                        onChange={(e) => setBadge(index, { link: e.target.value })}
+                        onChange={(e) => {
+                          // کد کامل اینماد (یا لینکش) چسبانده شد: لینک و لوگوی
+                          // زنده خودکار پر می‌شود و آپلود تصویر لازم نیست.
+                          const seal = parseEnamadSeal(e.target.value);
+                          if (seal) {
+                            setBadge(index, {
+                              link: seal.link,
+                              image: seal.image,
+                              title: badge.title || "نماد اعتماد الکترونیکی",
+                            });
+                          } else {
+                            setBadge(index, { link: e.target.value });
+                          }
+                        }}
                         onBlur={(e) =>
                           setBadge(index, { link: normaliseLink(e.target.value) })
                         }
-                        placeholder="لینک استعلام (مثلاً trustseal.enamad.ir/...)"
+                        placeholder="لینک استعلام یا کد کامل اینماد را این‌جا بچسبانید"
                         dir="ltr"
                         aria-invalid={!linkIsUsable(badge.link)}
                         className={inputCls}
@@ -993,7 +1361,8 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                           <a
                             href={badge.link}
                             target="_blank"
-                            rel="noopener noreferrer"
+                            rel="noopener"
+                            referrerPolicy="origin"
                             className="flex items-center gap-1 text-[11px] font-bold text-sky-300 hover:underline"
                           >
                             <ExternalLink size={12} /> باز کردن لینک
@@ -1057,7 +1426,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-sage">
-                آستانه ��ضویت الماسی (تومان)
+                آستانه عضویت الماسی (تومان)
               </label>
               <input
                 type="number"
@@ -1104,6 +1473,199 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
               </label>
             </div>
           </section>
+
+          {/* ================= روش‌های ارسال فعال ================= */}
+          {(() => {
+            const shipMethods: {
+              key: keyof SiteSettingsMap;
+              label: string;
+              desc: string;
+            }[] = [
+              { key: "shippingTipaxEnabled", label: "تیپاکس", desc: "تحویل درب منزل با بارکد رهگیری، سراسری" },
+              { key: "shippingPishtazEnabled", label: "پست پیشتاز", desc: "پست جمهوری اسلامی ایران، سراسری" },
+              { key: "shippingChaparEnabled", label: "چاپار اکسپرس", desc: "ارسال سریع بین‌شهری، سراسری" },
+              { key: "shippingPeykEnabled", label: "پیک محلی", desc: "فقط برای مقصدهای استان البرز" },
+            ];
+            const enabledCount = shipMethods.filter((m) => form[m.key] !== "").length;
+            const onlyPeyk = enabledCount === 1 && form.shippingPeykEnabled !== "";
+            return (
+              <section className="gold-ring rounded-2xl glass-panel p-5">
+                <div className="flex items-center gap-2 text-gold">
+                  <Truck size={16} />
+                  <h2 className="text-sm font-black">روش‌های ارسال قابل انتخاب برای مشتری</h2>
+                </div>
+                <p className="mt-1 text-[11px] leading-6 text-sage">
+                  هر روشی که تیک داشته باشد در مرحلهٔ پرداخت به مشتری نشان داده می‌شود؛ مثلاً فقط
+                  «تیپاکس»، یا «تیپاکس» و «پست پیشتاز» با هم. حداقل یک روش باید فعال بماند.
+                </p>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {shipMethods.map((m) => {
+                    const on = form[m.key] !== "";
+                    const isLastOn = on && enabledCount === 1;
+                    return (
+                      <label
+                        key={m.key}
+                        className={`flex items-start gap-3 rounded-2xl border p-4 transition select-none ${
+                          on ? "border-gold/50 bg-gold/10" : "border-gold/15 bg-gold/[0.02] opacity-70"
+                        } ${isLastOn ? "cursor-not-allowed" : "cursor-pointer"}`}
+                        title={isLastOn ? "حداقل یک روش ارسال باید فعال باشد" : undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          disabled={isLastOn}
+                          onChange={(e) => set(m.key, e.target.checked ? "1" : "")}
+                          className="mt-0.5 h-4 w-4 accent-[#d4af7c]"
+                        />
+                        <span className="flex-1">
+                          <span className="block text-xs font-bold text-cream">{m.label}</span>
+                          <span className="mt-0.5 block text-[10.5px] leading-5 text-sage/80">{m.desc}</span>
+                          <span className={`mt-1 block text-[10px] font-bold ${on ? "text-emerald-300" : "text-sage/60"}`}>
+                            {on ? "✓ به مشتری نمایش داده می‌شود" : "✕ مخفی"}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {onlyPeyk && (
+                  <p className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-[11px] leading-5 text-amber-200">
+                    ⚠ فقط «پیک محلی» فعال است و پیک فقط به استان البرز ارسال می‌کند؛ مشتریان سایر استان‌ها
+                    هیچ روش ارسالی نخواهند دید و نمی‌توانند سفارش ثبت کنند.
+                  </p>
+                )}
+              </section>
+            );
+          })()}
+
+          {/* ================= زمان تحویل محصول به مشتری ================= */}
+          <section className="gold-ring rounded-2xl glass-panel p-5">
+            <div className="flex items-center gap-2 text-gold">
+              <Clock size={16} />
+              <h2 className="text-sm font-black">تنظیمات تاریخ و زمان تحویل محصول به مشتری</h2>
+            </div>
+            <p className="mt-1 text-[11px] leading-6 text-sage">
+              مدیریت نمایش مدت زمان تحویل به خریدار در مرحلهٔ پرداخت و امکان تعیین تعداد روز تحویل برای هر روش پستی (پست معمولی، تیپاکس و...).
+            </p>
+
+            {/* کلید روشن / خاموش نمایش زمان تحویل */}
+            <div className="mt-4 rounded-2xl border border-gold/15 bg-gold/[0.03] p-4">
+              <label className="flex items-center gap-3 text-xs font-bold text-cream cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.deliveryEstimateEnabled !== ""}
+                  onChange={(e) => set("deliveryEstimateEnabled", e.target.checked ? "1" : "")}
+                  className="h-4 w-4 accent-[#d4af7c]"
+                />
+                <span>نمایش زمان تحویل به مشتری در مرحله خرید</span>
+              </label>
+              <p className="mt-1.5 text-[10.5px] leading-5 text-sage/80">
+                {form.deliveryEstimateEnabled !== ""
+                  ? "✓ فعال — زمان تحویل هر روش پستی در سبد خرید، فاکتور و حساب کاربری به خریدار نمایش داده می‌شود."
+                  : "✕ غیرفعال — زمان تحویل به مشتری نشان داده نمی‌شود و کاملاً مخفی خواهد بود."}
+              </p>
+            </div>
+
+            {/* فیلدهای روز تحویل هر روش ارسال */}
+            <div className="mt-5 space-y-3">
+              <h3 className="text-xs font-bold text-gold-soft">
+                تعداد روز تحویل به تفکیک روش‌های پستی (روز کاری):
+              </h3>
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <label className="block rounded-2xl border border-gold/15 bg-gold/[0.02] p-4">
+                  <span className="mb-1 block text-[11.5px] font-bold text-cream">
+                    پست معمولی / پیشتاز
+                  </span>
+                  <input
+                    type="text"
+                    value={form.deliveryDaysPishtaz}
+                    onChange={(e) => set("deliveryDaysPishtaz", e.target.value)}
+                    className={inputCls}
+                    placeholder="7 یا 5 تا 7"
+                  />
+                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                    پیش‌فرض: ۷ روز کاری (مثلاً: 7 یا 5 تا 7)
+                  </span>
+                </label>
+
+                <label className="block rounded-2xl border border-gold/15 bg-gold/[0.02] p-4">
+                  <span className="mb-1 block text-[11.5px] font-bold text-cream">
+                    تیپاکس
+                  </span>
+                  <input
+                    type="text"
+                    value={form.deliveryDaysTipax}
+                    onChange={(e) => set("deliveryDaysTipax", e.target.value)}
+                    className={inputCls}
+                    placeholder="2 یا 1 تا 2"
+                  />
+                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                    پیش‌فرض: ۲ روز کاری (مثلاً: 2 یا 1 تا 2)
+                  </span>
+                </label>
+
+                <label className="block rounded-2xl border border-gold/15 bg-gold/[0.02] p-4">
+                  <span className="mb-1 block text-[11.5px] font-bold text-cream">
+                    چاپار اکسپرس
+                  </span>
+                  <input
+                    type="text"
+                    value={form.deliveryDaysChapar}
+                    onChange={(e) => set("deliveryDaysChapar", e.target.value)}
+                    className={inputCls}
+                    placeholder="2 یا 1 تا 2"
+                  />
+                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                    پیش‌فرض: ۲ روز کاری
+                  </span>
+                </label>
+
+                <label className="block rounded-2xl border border-gold/15 bg-gold/[0.02] p-4">
+                  <span className="mb-1 block text-[11.5px] font-bold text-cream">
+                    پیک محلی
+                  </span>
+                  <input
+                    type="text"
+                    value={form.deliveryDaysPeyk}
+                    onChange={(e) => set("deliveryDaysPeyk", e.target.value)}
+                    className={inputCls}
+                    placeholder="1"
+                  />
+                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                    پیش‌فرض: ۱ روز کاری
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* پیش‌نمایش نحوه مشاهده توسط مشتری */}
+            <div className="mt-4 rounded-xl border border-gold/30 bg-black/80 p-3.5">
+              <span className="text-[10.5px] font-bold text-gold">پیش‌نمایش در مرحلهٔ انتخاب روش ارسال:</span>
+              {form.deliveryEstimateEnabled === "" ? (
+                <p className="mt-1 text-[11px] text-sage">
+                  نمایش زمان تحویل غیرفعال است؛ فقط عنوان روش ارسال و توضیحات مختصر آن به مشتری نمایش داده می‌شود.
+                </p>
+              ) : (
+                <div className="mt-2 space-y-1.5 text-[11px] text-cream">
+                  {form.shippingTipaxEnabled !== "" && (
+                    <p>• <span className="font-bold text-gold-soft">تیپاکس:</span> تحویل {form.deliveryDaysTipax || "۲"} روز کاری</p>
+                  )}
+                  {form.shippingPishtazEnabled !== "" && (
+                    <p>• <span className="font-bold text-gold-soft">پست پیشتاز:</span> تحویل {form.deliveryDaysPishtaz || "۷"} روز کاری</p>
+                  )}
+                  {form.shippingChaparEnabled !== "" && (
+                    <p>• <span className="font-bold text-gold-soft">چاپار اکسپرس:</span> تحویل {form.deliveryDaysChapar || "۲"} روز کاری</p>
+                  )}
+                  {form.shippingPeykEnabled !== "" && (
+                    <p>• <span className="font-bold text-gold-soft">پیک محلی:</span> تحویل {form.deliveryDaysPeyk || "۱"} روز کاری</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+
           {saveBar}
         </div>
       )}
@@ -1113,7 +1675,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
         <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
           <div className="flex items-center gap-2 text-gold">
             <LayoutGrid size={16} />
-            <h2 className="text-sm font-black">��سته‌بندی‌های صفحهٔ فروشگاه</h2>
+            <h2 className="text-sm font-black">دسته‌بندی‌های صفحهٔ فروشگاه</h2>
           </div>
           <p className="mt-1.5 text-[11px] leading-6 text-sage">
             این نام‌ها همان دکمه‌های بالای صفحهٔ فروشگاه‌اند و باید دقیقاً با
@@ -1267,7 +1829,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                       onBlur={(e) =>
                         setSocial(i, { href: normaliseLink(e.target.value) })
                       }
-                      placeholder="instagram.com/bella.perfume"
+                      placeholder="instagram.com/bella_perfume1985"
                       className={inputCls}
                     />
                     <Link2
@@ -1315,12 +1877,22 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
           </button>
 
           <h3 className="mt-6 text-xs font-black text-cream">کارت‌های تماس</h3>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="block">
               <span className="form-label">تلفن مشاوره</span>
               <input
                 value={form.contactPhone}
                 onChange={(e) => set("contactPhone", e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="form-label">ایمیل سایت</span>
+              <input
+                value={form.contactEmail}
+                onChange={(e) => set("contactEmail", e.target.value)}
+                placeholder="info@bellaperfume.ir"
+                dir="ltr"
                 className={inputCls}
               />
             </label>
@@ -1342,7 +1914,8 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
             </label>
           </div>
           <p className="mt-1.5 text-[11px] text-sage">
-            هر کدام را خالی بگذارید، همان کارت حذف می‌شود.
+            هر کدام را خالی بگذارید، همان کارت حذف می‌شود. ایمیل را که وارد
+            کنید، کارت آن در صفحهٔ تماس کلیک‌پذیر می‌شود (نامه‌نویسی مستقیم).
           </p>
 
           {saveBar}
@@ -1436,8 +2009,480 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
       )}
 
       {/* ================= v33: پرداخت و نگهداری ================= */}
+      {tab === "terms" && (
+        <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
+          <div className="flex items-center gap-2 text-gold">
+            <ScrollText size={16} />
+            <h2 className="text-sm font-black">صفحهٔ قوانین و مقررات</h2>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-6 text-sage">
+            عنوان و متن صفحهٔ «قوانین و مقررات» (آدرس /terms در فوتر سایت) از
+            همین‌جا قابل تغییر است. هر خط یک پاراگراف است؛ خطی که با ## شروع
+            شود به‌عنوان تیتر بخش نمایش داده می‌شود.
+          </p>
+
+          <label className="mt-4 block">
+            <span className="form-label">عنوان صفحه</span>
+            <input
+              value={form.termsTitle}
+              onChange={(e) => set("termsTitle", e.target.value)}
+              placeholder="قوانین و مقررات بلا پرفیوم"
+              className={inputCls}
+            />
+            <span className="form-hint">خالی بگذارید تا عنوان پیش‌فرض نمایش داده شود.</span>
+          </label>
+
+          <label className="mt-4 block">
+            <span className="form-label">متن قوانین</span>
+            <textarea
+              rows={12}
+              value={form.termsText}
+              onChange={(e) => set("termsText", e.target.value)}
+              placeholder={"متن قوانین...\n## عنوان بخش\n۱. متن بند اول"}
+              className={inputCls}
+            />
+            <span className="form-hint">
+              هر خط یک پاراگراف — برای تیتر بخش، خط را با ## شروع کنید. (حداکثر ۲۰٬۰۰۰ کاراکتر)
+            </span>
+          </label>
+
+          {saveBar}
+        </section>
+      )}
+
+      
+      {tab === "sms" && (
+        <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
+          <div className="flex items-center gap-2 text-gold">
+            <MessageSquare size={16} />
+            <h2 className="text-sm font-black">پیامک‌ها و ایمیل‌های سایت</h2>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-6 text-sage">
+            سرویس ارسال پیامک: <b>sms.ir</b>. متن هر پیامک را در پنل sms.ir (بخش
+            «ارسال سریع» / قالب‌ها) تعریف و تأیید کنید، سپس شناسهٔ قالبش را
+            این‌جا وارد کنید. کلید API در فایل .env سرور با نام
+            <span className="mx-1 font-mono text-gold-soft">SMSIR_API_KEY</span>
+            تنظیم می‌شود. سرویس ایمیل: SMTP Gmail (MAIL_PROVIDER=smtp در .env).
+            برای هر رویداد می‌توانید پیامک و ایمیل را جداگانه روشن/خاموش کنید — وقتی هر دو فعال باشند، هر دو همزمان ارسال می‌شوند.
+          </p>
+
+          <p className="mt-4 text-[11px] font-black text-gold-soft">تنظیمات کلی — خط و ایمیل مدیر</p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="block">
+              <span className="form-label">شماره خط sms.ir</span>
+              <input
+                value={form.smsirLine}
+                onChange={(e) => set("smsirLine", e.target.value)}
+                placeholder="مثلاً 30004505000017"
+                inputMode="numeric"
+                className={inputCls}
+              />
+              <span className="form-hint">خط اختصاصی پنل sms.ir برای ارسال bulk.</span>
+            </label>
+            <label className="block">
+              <span className="form-label">شناسهٔ قالب کد ورود sms.ir</span>
+              <input
+                value={form.smsirTemplateId}
+                onChange={(e) => set("smsirTemplateId", e.target.value)}
+                placeholder="مثلاً 123456"
+                inputMode="numeric"
+                className={inputCls}
+              />
+              <span className="form-hint">خالی = متن پیش‌فرض از خط اختصاصی.</span>
+            </label>
+            <label className="block">
+              <span className="form-label">نام پارامتر کد در قالب</span>
+              <input
+                value={form.smsirOtpParam}
+                onChange={(e) => set("smsirOtpParam", e.target.value)}
+                placeholder="Code"
+                className={inputCls}
+              />
+              <span className="form-hint">معمولاً Code یا CODE.</span>
+            </label>
+            <label className="block">
+              <span className="form-label">ایمیل مدیر (برای اطلاع‌رسانی‌ها)</span>
+              <input
+                value={form.emailAdmin}
+                onChange={(e) => set("emailAdmin", e.target.value)}
+                placeholder="admin@bellaperfume.ir"
+                dir="ltr"
+                className={inputCls}
+              />
+              <span className="form-hint">مقصد ایمیل‌های سفارش جدید و لغو.</span>
+            </label>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="form-label">شماره موبایل مدیر (پیامک)</span>
+              <input
+                value={form.smsAdminPhone}
+                onChange={(e) => set("smsAdminPhone", e.target.value)}
+                placeholder="مثلاً 09121234567"
+                inputMode="tel"
+                className={inputCls}
+              />
+              <span className="form-hint">مقصد پیامک‌های مدیر.</span>
+            </label>
+            <label className="block">
+              <span className="form-label">ایمیل سایت (تماس)</span>
+              <input
+                value={form.contactEmail}
+                onChange={(e) => set("contactEmail", e.target.value)}
+                placeholder="info@bellaperfume.ir"
+                dir="ltr"
+                className={inputCls}
+              />
+              <span className="form-hint">در صورت خالی بودن emailAdmin، از این ایمیل برای مدیر استفاده می‌شود.</span>
+            </label>
+          </div>
+
+          {/* ---------- کد تأیید ---------- */}
+          <div className="mt-6 rounded-xl border border-gold/15 glass-soft p-3.5">
+            <p className="text-xs font-black text-cream">کد تأیید ورود / تغییر مشخصات</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => set("smsOtpEnabled", form.smsOtpEnabled === "1" ? "" : "1")}
+                className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsOtpEnabled === "1" ? "border-emerald-300/40 bg-emerald-300/10" : "border-gold/20"}`}
+              >
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsOtpEnabled === "1" ? "border-emerald-300 bg-emerald-300 text-[#241a05]" : "border-gold/40"}`}>
+                  {form.smsOtpEnabled === "1" && <Check size={12} />}
+                </span>
+                <span className="text-xs font-bold text-cream">📱 پیامک کد تأیید فعال</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => set("emailOtpEnabled", form.emailOtpEnabled === "1" ? "" : "1")}
+                className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.emailOtpEnabled === "1" ? "border-sky-300/40 bg-sky-300/10" : "border-gold/20"}`}
+              >
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.emailOtpEnabled === "1" ? "border-sky-300 bg-sky-300 text-[#241a05]" : "border-gold/40"}`}>
+                  {form.emailOtpEnabled === "1" && <Check size={12} />}
+                </span>
+                <span className="text-xs font-bold text-cream">✉️ ایمیل کد تأیید فعال</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ---------- ثبت سفارش - مشتری ---------- */}
+          <div className="mt-4 rounded-xl border border-gold/15 glass-soft p-3.5">
+            <p className="text-xs font-black text-cream">بعد از ثبت سفارش — مشتری</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => set("smsOrderPlacedEnabled", form.smsOrderPlacedEnabled === "1" ? "" : "1")}
+                className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsOrderPlacedEnabled === "1" ? "border-emerald-300/40 bg-emerald-300/10" : "border-gold/20"}`}
+              >
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsOrderPlacedEnabled === "1" ? "border-emerald-300 bg-emerald-300 text-[#241a05]" : "border-gold/40"}`}>
+                  {form.smsOrderPlacedEnabled === "1" && <Check size={12} />}
+                </span>
+                <span className="text-xs font-bold text-cream">📱 پیامک ثبت سفارش</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => set("emailOrderPlacedEnabled", form.emailOrderPlacedEnabled === "1" ? "" : "1")}
+                className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.emailOrderPlacedEnabled === "1" ? "border-sky-300/40 bg-sky-300/10" : "border-gold/20"}`}
+              >
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.emailOrderPlacedEnabled === "1" ? "border-sky-300 bg-sky-300 text-[#241a05]" : "border-gold/40"}`}>
+                  {form.emailOrderPlacedEnabled === "1" && <Check size={12} />}
+                </span>
+                <span className="text-xs font-bold text-cream">✉️ ایمیل ثبت سفارش</span>
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="form-label">شناسهٔ قالب sms.ir</span>
+                <input value={form.smsirOrderPlacedTemplate} onChange={(e) => set("smsirOrderPlacedTemplate", e.target.value)} placeholder="شناسه قالب" inputMode="numeric" className={inputCls} />
+              </label>
+              <label className="block">
+                <span className="form-label">نام پارامترها (ORDERID, NAME, TOTAL)</span>
+                <input value={form.smsirOrderPlacedParams} onChange={(e) => set("smsirOrderPlacedParams", e.target.value)} placeholder="ORDERID, NAME, TOTAL" className={inputCls} />
+              </label>
+            </div>
+          </div>
+
+          {/* ---------- سفارش جدید - مدیر ---------- */}
+          <div className="mt-4 rounded-xl border border-gold/15 glass-soft p-3.5">
+            <p className="text-xs font-black text-cream">سفارش جدید — اطلاع به مدیر</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={() => set("smsAdminNotifyEnabled", form.smsAdminNotifyEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsAdminNotifyEnabled === "1" ? "border-emerald-300/40 bg-emerald-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsAdminNotifyEnabled === "1" ? "border-emerald-300 bg-emerald-300 text-[#241a05]" : "border-gold/40"}`}>{form.smsAdminNotifyEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">📱 پیامک به مدیر</span>
+              </button>
+              <button type="button" onClick={() => set("emailAdminNotifyEnabled", form.emailAdminNotifyEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.emailAdminNotifyEnabled === "1" ? "border-sky-300/40 bg-sky-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.emailAdminNotifyEnabled === "1" ? "border-sky-300 bg-sky-300 text-[#241a05]" : "border-gold/40"}`}>{form.emailAdminNotifyEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">✉️ ایمیل به مدیر</span>
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="form-label">شناسهٔ قالب مدیر</span>
+                <input value={form.smsirAdminOrderTemplate} onChange={(e) => set("smsirAdminOrderTemplate", e.target.value)} placeholder="شناسه قالب" inputMode="numeric" className={inputCls} />
+              </label>
+              <label className="block">
+                <span className="form-label">نام پارامترها (ORDERID, NAME, TOTAL, PHONE)</span>
+                <input value={form.smsirAdminOrderParams} onChange={(e) => set("smsirAdminOrderParams", e.target.value)} placeholder="ORDERID, NAME, TOTAL, PHONE" className={inputCls} />
+              </label>
+            </div>
+          </div>
+
+          {/* ---------- تغییر وضعیت ---------- */}
+          <div className="mt-4 rounded-xl border border-gold/15 glass-soft p-3.5">
+            <p className="text-xs font-black text-cream">تغییر وضعیت سفارش — مشتری</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={() => set("smsOrderStatusEnabled", form.smsOrderStatusEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsOrderStatusEnabled === "1" ? "border-emerald-300/40 bg-emerald-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsOrderStatusEnabled === "1" ? "border-emerald-300 bg-emerald-300 text-[#241a05]" : "border-gold/40"}`}>{form.smsOrderStatusEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">📱 پیامک تغییر وضعیت</span>
+              </button>
+              <button type="button" onClick={() => set("emailOrderStatusEnabled", form.emailOrderStatusEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.emailOrderStatusEnabled === "1" ? "border-sky-300/40 bg-sky-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.emailOrderStatusEnabled === "1" ? "border-sky-300 bg-sky-300 text-[#241a05]" : "border-gold/40"}`}>{form.emailOrderStatusEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">✉️ ایمیل تغییر وضعیت</span>
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="form-label">شناسهٔ قالب تغییر وضعیت</span>
+                <input value={form.smsirOrderStatusTemplate} onChange={(e) => set("smsirOrderStatusTemplate", e.target.value)} placeholder="شناسه قالب" inputMode="numeric" className={inputCls} />
+              </label>
+              <label className="block">
+                <span className="form-label">نام پارامترها (ORDERID, STATUS)</span>
+                <input value={form.smsirOrderStatusParams} onChange={(e) => set("smsirOrderStatusParams", e.target.value)} placeholder="ORDERID, STATUS" className={inputCls} />
+              </label>
+            </div>
+          </div>
+
+          {/* ---------- سبد رها شده 2 ساعته ---------- */}
+          <div className="mt-4 rounded-xl border border-amber-300/20 glass-soft p-3.5">
+            <p className="text-xs font-black text-cream">سبد رها شده — مرحله اول (2 ساعته)</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={() => set("smsAbandonedFirstEnabled", form.smsAbandonedFirstEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsAbandonedFirstEnabled === "1" ? "border-amber-300/40 bg-amber-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsAbandonedFirstEnabled === "1" ? "border-amber-300 bg-amber-300 text-[#241a05]" : "border-gold/40"}`}>{form.smsAbandonedFirstEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">📱 پیامک 2 ساعته</span>
+              </button>
+              <button type="button" onClick={() => set("emailAbandonedFirstEnabled", form.emailAbandonedFirstEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.emailAbandonedFirstEnabled === "1" ? "border-sky-300/40 bg-sky-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.emailAbandonedFirstEnabled === "1" ? "border-sky-300 bg-sky-300 text-[#241a05]" : "border-gold/40"}`}>{form.emailAbandonedFirstEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">✉️ ایمیل 2 ساعته</span>
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block"><span className="form-label">شناسه قالب 2 ساعته</span><input value={form.smsirAbandonedFirstTemplate} onChange={(e) => set("smsirAbandonedFirstTemplate", e.target.value)} placeholder="شناسه قالب" inputMode="numeric" className={inputCls} /></label>
+              <label className="block"><span className="form-label">نام پارامترها (NAME, TOTAL)</span><input value={form.smsirAbandonedFirstParams} onChange={(e) => set("smsirAbandonedFirstParams", e.target.value)} placeholder="NAME, TOTAL" className={inputCls} /></label>
+            </div>
+          </div>
+
+          {/* ---------- سبد رها شده 12 ساعته ---------- */}
+          <div className="mt-4 rounded-xl border border-amber-300/20 glass-soft p-3.5">
+            <p className="text-xs font-black text-cream">سبد رها شده — مرحله دوم (12 ساعته)</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={() => set("smsAbandonedSecondEnabled", form.smsAbandonedSecondEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsAbandonedSecondEnabled === "1" ? "border-amber-300/40 bg-amber-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsAbandonedSecondEnabled === "1" ? "border-amber-300 bg-amber-300 text-[#241a05]" : "border-gold/40"}`}>{form.smsAbandonedSecondEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">📱 پیامک 12 ساعته</span>
+              </button>
+              <button type="button" onClick={() => set("emailAbandonedSecondEnabled", form.emailAbandonedSecondEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.emailAbandonedSecondEnabled === "1" ? "border-sky-300/40 bg-sky-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.emailAbandonedSecondEnabled === "1" ? "border-sky-300 bg-sky-300 text-[#241a05]" : "border-gold/40"}`}>{form.emailAbandonedSecondEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">✉️ ایمیل 12 ساعته</span>
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block"><span className="form-label">شناسه قالب 12 ساعته</span><input value={form.smsirAbandonedSecondTemplate} onChange={(e) => set("smsirAbandonedSecondTemplate", e.target.value)} placeholder="شناسه قالب" inputMode="numeric" className={inputCls} /></label>
+              <label className="block"><span className="form-label">نام پارامترها (NAME, TOTAL)</span><input value={form.smsirAbandonedSecondParams} onChange={(e) => set("smsirAbandonedSecondParams", e.target.value)} placeholder="NAME, TOTAL" className={inputCls} /></label>
+            </div>
+          </div>
+
+          {/* ---------- گزارش لغو سفارش به ادمین ---------- */}
+          <div className="mt-4 rounded-xl border border-red-300/25 bg-red-500/[0.06] p-3.5">
+            <p className="text-xs font-black text-red-200">🚨 گزارش لغو سفارش — اطلاع به مدیر (کد، نام، تلفن، مبلغ)</p>
+            <p className="mt-1 text-[10.5px] leading-5 text-red-200/70">وقتی مشتری از حساب کاربری درخواست لغو می‌دهد، این اطلاع‌رسانی با جزئیات کامل برای مدیر ارسال می‌شود.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={() => set("smsCancelAdminEnabled", form.smsCancelAdminEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsCancelAdminEnabled === "1" ? "border-red-300/40 bg-red-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsCancelAdminEnabled === "1" ? "border-red-300 bg-red-300 text-[#241a05]" : "border-gold/40"}`}>{form.smsCancelAdminEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">📱 پیامک لغو به مدیر</span>
+              </button>
+              <button type="button" onClick={() => set("emailCancelAdminEnabled", form.emailCancelAdminEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.emailCancelAdminEnabled === "1" ? "border-sky-300/40 bg-sky-300/10" : "border-gold/20"}`}>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.emailCancelAdminEnabled === "1" ? "border-sky-300 bg-sky-300 text-[#241a05]" : "border-gold/40"}`}>{form.emailCancelAdminEnabled === "1" && <Check size={12} />}</span>
+                <span className="text-xs font-bold text-cream">✉️ ایمیل لغو به مدیر</span>
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block"><span className="form-label">شناسه قالب لغو (sms.ir)</span><input value={form.smsirCancelAdminTemplate} onChange={(e) => set("smsirCancelAdminTemplate", e.target.value)} placeholder="شناسه قالب" inputMode="numeric" className={inputCls} /></label>
+              <label className="block"><span className="form-label">نام پارامترها (ORDERID, NAME, TOTAL, PHONE)</span><input value={form.smsirCancelAdminParams} onChange={(e) => set("smsirCancelAdminParams", e.target.value)} placeholder="ORDERID, NAME, TOTAL, PHONE" className={inputCls} /><span className="form-hint">به ترتیب: کد پیگیری، نام، مبلغ، تلفن — هر 4 تا برای گزارش لغو.</span></label>
+            </div>
+          </div>
+
+          {/* ---- ارسال تست ---- */}
+          <div className="mt-5 rounded-xl border border-gold/20 glass-soft p-3.5">
+            <span className="form-label">ارسال پیامک تست (با متن‌های ذخیره‌شده)</span>
+            <p className="mt-0.5 text-[11px] leading-5 text-sage">تست با متن‌های <b>ذخیره‌شده</b> ارسال می‌شود؛ اول تغییرات بالا را ذخیره کنید.</p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <input value={smsTestPhone} onChange={(e) => setSmsTestPhone(e.target.value)} placeholder="09xxxxxxxxx" inputMode="tel" className={`${inputCls} max-w-[180px]`} />
+              {(
+                [
+                  ["otp", "تست کد تأیید"],
+                  ["orderPlaced", "تست ثبت سفارش"],
+                  ["orderPlacedAdmin", "تست سفارش مدیر"],
+                  ["orderStatus", "تست تغییر وضعیت"],
+                  ["abandonedFirst", "تست سبد 2ساعته"],
+                  ["abandonedSecond", "تست سبد 12ساعته"],
+                  ["cancelAdmin", "تست لغو سفارش 🚨"],
+                ] as const
+              ).map(([activity, label]) => (
+                <button key={activity} type="button" disabled={smsTestBusy} onClick={() => sendSmsTest(activity)} className="rounded-full border border-gold/40 px-3.5 py-2 text-[11px] font-bold text-gold transition hover:bg-gold/10 disabled:opacity-50">{label}</button>
+              ))}
+              <button type="button" disabled={smsCreditBusy} onClick={checkSmsCredit} className="rounded-full border border-cyan-300/40 px-3.5 py-2 text-[11px] font-bold text-cyan-200 transition hover:bg-cyan-300/10 disabled:opacity-50">{smsCreditBusy ? "در حال بررسی…" : "بررسی اعتبار"}</button>
+            </div>
+            {smsCreditText && <p className="mt-2.5 text-[11.5px] font-bold text-cyan-200">{smsCreditText}</p>}
+            {smsTestResult && (
+              <div className={`mt-2.5 rounded-lg border p-2.5 text-[11.5px] leading-6 ${smsTestResult.ok ? "border-emerald-300/40 bg-emerald-300/10 text-emerald-100" : "border-red-300/40 bg-red-300/10 text-red-100"}`}>
+                {smsTestResult.error ? <b>{smsTestResult.error}</b> : <b>پیامک تست ارسال شد ✓</b>}
+                {smsTestResult.preview && <pre className="mt-1.5 whitespace-pre-wrap font-sans text-sage">{smsTestResult.preview}</pre>}
+              </div>
+            )}
+          </div>
+
+          {saveBar}
+        </section>
+      )}
+
+{tab === "cart" && (
+        <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
+          <div className="flex items-center gap-2 text-amber-300">
+            <ShoppingBasket size={16} />
+            <h2 className="text-sm font-black">سبد خرید رها شده - پیگیری خودکار</h2>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-6 text-sage">
+            وقتی مشتری لاگین کرده و چیزی داخل سبد دارد اما خرید را کامل نمی‌کند، بعد از زمان‌های زیر پیامک یادآوری ارسال می‌شود.
+            سبد به‌صورت خودکار روی سرور ذخیره می‌شود و بعد از ثبت سفارش، پاک می‌شود.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => set("abandonedCartEnabled", form.abandonedCartEnabled === "1" ? "" : "1")}
+            className={`mt-4 flex w-full items-center gap-3 rounded-xl border p-3.5 text-right transition ${form.abandonedCartEnabled === "1" ? "border-emerald-300/40 bg-emerald-300/10" : "border-gold/20 glass-soft"}`}
+          >
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${form.abandonedCartEnabled === "1" ? "border-emerald-300 bg-emerald-300 text-[#241a05]" : "border-gold/40"}`}
+            >
+              {form.abandonedCartEnabled === "1" && <Check size={14} />}
+            </span>
+            <span>
+              <span className="block text-sm font-black text-cream">پیگیری سبد رها شده فعال باشد</span>
+              <span className="mt-0.5 block text-[11px] text-sage">
+                {form.abandonedCartEnabled === "1" ? "سیستم هر 5 دقیقه سبدها را چک می‌کند و پیامک می‌فرستد." : "پیگیری سبد غیرفعال است."}
+              </span>
+            </span>
+          </button>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="form-label">ساعت یادآوری اول (پیش‌فرض 2 ساعت)</span>
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={form.abandonedCartFirstHours}
+                onChange={(e) => set("abandonedCartFirstHours", e.target.value)}
+                className={inputCls}
+                placeholder="2"
+              />
+            </label>
+            <label className="block">
+              <span className="form-label">ساعت یادآوری دوم (پیش‌فرض 12 ساعت)</span>
+              <input
+                type="number"
+                min={1}
+                max={720}
+                value={form.abandonedCartSecondHours}
+                onChange={(e) => set("abandonedCartSecondHours", e.target.value)}
+                className={inputCls}
+                placeholder="12"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/[0.06] p-3 text-[10.5px] leading-6 text-amber-100/80">
+            <p>💡 نکته: متن پیامک‌ها را در تب «پیامک‌ها» تنظیم کنید (قالب‌های سبد 2 ساعته و 12 ساعته). پارامترهای پیشنهادی: NAME (نام مشتری) و TOTAL (مبلغ سبد).</p>
+          </div>
+
+          {saveBar}
+        </section>
+      )}
+
       {tab === "maintenance" && (
         <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
+          <div className="flex items-center gap-2 text-gold">
+            <ShieldCheck size={16} />
+            <h2 className="text-sm font-black">تنظیمات تراکنش</h2>
+          </div>
+          <p className="mt-1 text-[11px] leading-6 text-sage">
+            تنظیمات اعتبارسنجی خودکار و غیرخودکار تراکنش‌های پرداخت الکترونیکی
+          </p>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                {
+                  on: true,
+                  title: "خودکار",
+                  desc: "پس از انجام پرداخت، زرین‌پال تراکنش را به‌صورت خودکار تأیید می‌کند.",
+                },
+                {
+                  on: false,
+                  title: "غیرخودکار",
+                  desc: "پس از انجام پرداخت، پذیرنده تراکنش را از طریق API اعتبارسنجی تراکنش، تأیید نهایی می‌کند.",
+                },
+              ] as const
+            ).map((opt) => {
+              const active = (form.zarinpalAutoVerify === "1") === opt.on;
+              return (
+                <button
+                  key={opt.title}
+                  type="button"
+                  onClick={() => set("zarinpalAutoVerify", opt.on ? "1" : "")}
+                  className={`rounded-xl border p-3.5 text-right transition ${
+                    active ? "border-gold/70 bg-gold/10 ring-1 ring-gold/40" : "border-gold/20 glass-soft"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border ${
+                        active ? "border-gold" : "border-sage/60"
+                      }`}
+                    >
+                      {active && <span className="h-2 w-2 rounded-full bg-[#6b2c4e]" />}
+                    </span>
+                    <span className="text-sm font-black text-[#241a22]">{opt.title}</span>
+                  </span>
+                  <span className="mt-1.5 block text-[11px] leading-5 text-sage">{opt.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {form.zarinpalAutoVerify === "1" ? (
+            <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-orange-300/50 bg-orange-300/10 p-3 text-[10.5px] leading-5 text-[#7a4a12]">
+              <AlertCircle size={13} className="mt-0.5 shrink-0" />
+              در حالت خودکار، اگر مشتری پس از پرداخت به سایت بازنگردد مبلغ تا پایان روز برداشت می‌شود؛
+              عودت چنین تراکنش‌هایی (مثلاً سفارش منقضی‌شده) دستی و از پنل زرین‌پال انجام می‌شود.
+              در حالت غیرخودکار، پرداخت تأییدنشده خودش به حساب مشتری برمی‌گردد.
+            </p>
+          ) : null}
+
+          <p className="mt-2 text-[11px] leading-6 text-sage">
+            برای اطلاعات بیشتر، نحوه استفاده از API و مشاهده راهنمای اتصال و نمونه کدها{" "}
+            <a
+              href="https://www.zarinpal.com/docs/apiDocs/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-bold text-gold hover:underline"
+            >
+              کلیک کنید <ExternalLink size={11} />
+            </a>
+            .
+          </p>
+
+          <div className="my-5 h-px bg-gold/15" />
+
           <div className="flex items-center gap-2 text-gold">
             <AlertCircle size={16} />
             <h2 className="text-sm font-black">حالت به‌روزرسانی سایت</h2>
