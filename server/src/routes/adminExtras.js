@@ -55,7 +55,7 @@ router.get(
   "/reviews",
   ah(async (req, res) => {
     const status = str(req.query.status, { max: 20 });
-    const product = int(req.query.product, { min: 1, max: 1e9, fallback: null });
+    const product = int(req.query.product, { min: 1, max: 1e9, fallback: null, clamp: false });
     const search = str(req.query.search, { max: 60 });
     const limit = int(req.query.limit, { min: 1, max: 200, fallback: 100 }) || 100;
     const page = int(req.query.page, { min: 1, max: 1000, fallback: 1 }) || 1;
@@ -102,7 +102,7 @@ router.patch(
   "/reviews/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر." });
 
     const review = await Review.findOne({ id });
@@ -146,7 +146,7 @@ router.delete(
   "/reviews/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر." });
     const review = await Review.findOneAndDelete({ id });
     if (!review) return res.status(404).json({ error: "نقد یافت نشد." });

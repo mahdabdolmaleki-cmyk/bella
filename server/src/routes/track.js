@@ -33,7 +33,7 @@ router.post(
     const raw = str(req.body?.bucket, { max: 20 });
     const bucket = BUCKETS.has(raw) ? raw : "other";
     const product =
-      bucket === "product" ? int(req.body?.product, { min: 1, max: 1e9, fallback: null }) : null;
+      bucket === "product" ? int(req.body?.product, { min: 1, max: 1e9, fallback: null, clamp: false }) : null;
 
     const day = dayKey();
     // Midday UTC of that day: safe anchor for the TTL index regardless of zone.

@@ -172,7 +172,7 @@ router.put(
   "/tutorials/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const tutorial = await Tutorial.findOne({ id });
@@ -195,7 +195,7 @@ router.delete(
   "/tutorials/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const removed = await Tutorial.findOneAndDelete({ id });
@@ -237,7 +237,7 @@ router.patch(
   "/tutorial-comments/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const comment = await TutorialComment.findOne({ id });
@@ -264,7 +264,7 @@ router.delete(
   "/tutorial-comments/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const removed = await TutorialComment.findOneAndDelete({ id });

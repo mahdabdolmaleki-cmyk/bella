@@ -12,7 +12,9 @@ const campaignSchema = new mongoose.Schema(
     subject: { type: String, required: true, trim: true, maxlength: 160 },
     body: { type: String, required: true, maxlength: 8000 },
     // "all" = every active customer, "selected" = the chosen recipients only.
-    audience: { type: String, enum: ["all", "selected"], default: "selected" },
+    audience: { type: String, enum: ["all", "vip", "selected"], default: "selected" },
+    // کانال ارسال: ایمیل / پیامک / هر دو (v43).
+    channel: { type: String, enum: ["email", "sms", "both"], default: "email" },
     // How many addresses were attempted / delivered / rejected.
     total: { type: Number, default: 0, min: 0 },
     sent: { type: Number, default: 0, min: 0 },
@@ -34,6 +36,7 @@ campaignSchema.methods.toDTO = function () {
     subject: this.subject,
     body: this.body,
     audience: this.audience,
+    channel: this.channel,
     total: this.total,
     sent: this.sent,
     failed: this.failed,

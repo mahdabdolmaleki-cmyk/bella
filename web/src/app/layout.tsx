@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Vazirmatn, Cormorant_Garamond, Alex_Brush } from "next/font/google";
 import Shell from "@/components/Shell";
 import { getSiteSettings } from "@/lib/settings";
+import { SITE_URL, abs } from "@/lib/seo";
 import "./globals.css";
 
 // PERF: was `force-dynamic`, which disabled static rendering for the whole
@@ -33,11 +34,23 @@ const alexBrush = Alex_Brush({
 });
 
 export const metadata: Metadata = {
-  title:"2217815",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "بلا پرفیوم | مزون عطرهای لوکس",
+    template: "%s | بلا پرفیوم",
+  },
   description:
     "بلا پرفیوم — افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده. کلکسیون عطرهای اورینتال با بسته‌بندی مخملی و دوخت طلایی.",
   other: { enamad: "2217815" },
-
+  robots: { index: true, follow: true },
+  themeColor: "#0e3b26",
+  alternates: { canonical: abs("/") },
+  openGraph: {
+    locale: "fa_IR",
+    siteName: "بلا پرفیوم",
+    type: "website",
+    url: abs("/"),
+  },
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {

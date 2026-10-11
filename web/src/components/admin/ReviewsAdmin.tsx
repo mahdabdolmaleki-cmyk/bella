@@ -3,8 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Star,
-  Check,
-  X,
   Trash2,
   Reply,
   Loader2,
@@ -278,26 +276,8 @@ export default function ReviewsAdmin() {
                   </motion.div>
                 )}
 
-                {/* ---------- actions ---------- */}
+                {/* ---------- actions: فقط پاسخ و حذف (نقدها بی‌درنگ منتشر می‌شوند) ---------- */}
                 <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-gold/10 pt-3">
-                  {row.status !== "approved" && (
-                    <button
-                      onClick={() => patch(row.id, { status: "approved" })}
-                      disabled={busyId === row.id}
-                      className="flex items-center gap-1 rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
-                    >
-                      <Check size={13} /> تأیید و انتشار
-                    </button>
-                  )}
-                  {row.status !== "rejected" && (
-                    <button
-                      onClick={() => patch(row.id, { status: "rejected" })}
-                      disabled={busyId === row.id}
-                      className="flex items-center gap-1 rounded-lg border border-gold/25 px-3 py-2 text-xs font-bold text-sage hover:bg-gold/10 disabled:opacity-50"
-                    >
-                      <X size={13} /> رد کردن
-                    </button>
-                  )}
                   <button
                     onClick={() => {
                       setReplyFor(replyFor === row.id ? null : row.id);

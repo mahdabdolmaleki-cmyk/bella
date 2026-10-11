@@ -1,9 +1,11 @@
 import { Router } from "express";
 import Product from "../models/Product.js";
 import Settings from "../models/Settings.js";
+import User from "../models/User.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { optionalUser } from "../middleware/authMiddleware.js";
 import Order, { ORDER_STATUSES } from "../models/Order.js";
+import { parseStarsConfig, starLevelFor, starPerks, starPerkSources } from "../utils/stars.js";
 import { ah } from "../utils/asyncHandler.js";
 import { int, bool, isPhone } from "../utils/validate.js";
 import { parseCouponList, findCoupon, couponAmount } from "../utils/coupon.js";
@@ -113,7 +115,7 @@ router.post(
 
     const wanted = new Map();
     for (const item of rawItems) {
-      const id = int(item?.id, { min: 1, max: 1e9 });
+      const id = int(item?.id, { min: 1, max: 1e9, clamp: false });
       const qty = int(item?.qty, { min: 1, max: MAX_QTY, fallback: 1 }) || 1;
       if (id === null) continue;
       wanted.set(id, Math.min(MAX_QTY, (wanted.get(id) || 0) + qty));
@@ -224,12 +226,38 @@ router.post(
       }
     }
 
+    // تخفیف ستاره (وفاداری) — برای لاگین‌شده‌ها، تا پیش‌نمایشِ سبد دقیقاً همان
+    // قانونِ سرور («بزرگ‌تر برنده») را نشان دهد.
+    let starDiscount = null;
+    if (req.user) {
+      const cfg = parseStarsConfig(settings.starsConfigJson);
+      const me = await User.findById(req.user._id).select("points");
+      const level = starLevelFor(me?.points ?? 0, cfg);
+      const ben = starPerks(level, cfg);
+      const byPercent = ben.discountPercent > 0 ? Math.min(subtotal, Math.round((subtotal * ben.discountPercent) / 100)) : 0;
+      const byAmount = ben.discountAmount > 0 ? Math.min(subtotal, ben.discountAmount) : 0;
+      const amount = Math.max(byPercent, byAmount);
+      if (amount > 0) {
+        const src = starPerkSources(level, cfg);
+        const byAmountWins = byAmount >= byPercent;
+        starDiscount = {
+          percent: byAmountWins ? 0 : ben.discountPercent,
+          amount,
+          fixed: byAmountWins ? byAmount : 0,
+          star: src.discount?.star ?? level,
+          title: src.discount?.title || "",
+        };
+      }
+    }
+
     // تخفیف‌ها روی هم جمع نمی‌شوند؛ بزرگ‌تر اعمال می‌شود.
     const candidates = [];
     if (firstPurchaseDiscount)
       candidates.push({ source: "first", percent: firstPurchaseDiscount.percent, amount: firstPurchaseDiscount.amount, fixed: 0, code: "" });
     if (coupon?.applied)
       candidates.push({ source: "coupon", percent: coupon.applied.percent, amount: coupon.applied.amount, fixed: coupon.applied.fixed, code: coupon.applied.code });
+    if (starDiscount)
+      candidates.push({ source: "star", percent: starDiscount.percent, amount: starDiscount.amount, fixed: starDiscount.fixed, code: "", star: starDiscount.star, title: starDiscount.title });
     const discount = candidates.length ? candidates.sort((a, b) => b.amount - a.amount)[0] : null;
 
     res.json({

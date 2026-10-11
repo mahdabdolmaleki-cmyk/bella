@@ -16,7 +16,7 @@
 // the same order into `paid` after its stock has already been released.
 // ---------------------------------------------------------------------------
 
-import Order from "../models/Order.js";
+import Order, { awardOrderPoints } from "../models/Order.js";
 import Product from "../models/Product.js";
 import { verifyPayment, isZarinpalConfigured } from "../utils/zarinpal.js";
 import { notifyOrderPlaced } from "../utils/orderNotify.js";
@@ -117,6 +117,9 @@ export async function sweepStaleOrders() {
             console.log(
               `staleOrders: verified & revived paid order ${revived.code}`
             );
+            // اهدای امتیاز وفاداری — این مسیر هم findOneAndUpdate است، پس
+            // قلاب post("save") اجرا نمی‌شود و صریحاً صدا زده می‌شود.
+            await awardOrderPoints(revived);
             notifyOrderPlaced(revived);
           }
           continue;

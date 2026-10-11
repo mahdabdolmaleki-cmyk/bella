@@ -8,6 +8,8 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { connectDB } from "./config/db.js";
+import mongoose from "mongoose";
+import { bootstrapCategories } from "./utils/categories.js";
 import { startStaleOrderSweeper } from "./jobs/staleOrders.js";
 import { startAbandonedCartSweeper } from "./jobs/abandonedCarts.js";
 import { startLogRetention } from "./utils/fileLog.js";
@@ -32,6 +34,8 @@ import tutorialsRouter from "./routes/tutorials.js";
 import adminTutorialsRouter from "./routes/adminTutorials.js";
 import cartRouter from "./routes/cart.js";
 import consultationsRouter from "./routes/consultations.js";
+import categoriesRouter from "./routes/categories.js";
+import adminCategoriesRouter from "./routes/adminCategories.js";
 import {
   currentExclusiveOperation,
   isMaintenanceInProgress,
@@ -135,6 +139,9 @@ app.use(
   })
 );
 
+// دسته‌بندی درختی — پیش از /api/admin تا مسیر ادمینش زودتر ثبت شود.
+app.use("/api/categories", categoriesRouter);
+app.use("/api/admin/categories", adminCategoriesRouter);
 app.use("/api/products", productsRouter);
 app.use("/api/auth", authRouter);
 // adminExtras is mounted FIRST so /api/admin/reviews and /api/admin/stats are
@@ -207,6 +214,31 @@ async function start() {
     console.error("MongoDB connection failed:", error.message);
     // In production a database-less API only returns 500s — fail fast instead.
     if (isProd) process.exit(1);
+  }
+
+  // ساخت دسته‌بندی پایهٔ درختی (ادکلن/دکانت) + مهاجرت محصولات قدیمی — یک‌بار.
+  if (mongoose.connection.readyState === 1) {
+    await bootstrapCategories().catch((e) =>
+      console.error("bootstrap categories failed:", e.message),
+    );
+  }
+
+  // ساخت صریح ایندکس‌ها هنگام راه‌اندازی. autoIndex به‌تنهایی قابل اتکا نیست و
+  // ایندکس یکتای couponUseKey (جلوگیری از استفادهٔ هم‌زمان یک کوپن) و referralCode
+  // بدون این قدم در سطح پایگاه‌داده ساخته نمی‌شدند.
+  if (mongoose.connection.readyState === 1) {
+    const results = await Promise.all(
+      Object.values(mongoose.models).map((m) =>
+        m
+          .createIndexes()
+          .then(() => `${m.modelName}:ok`)
+          .catch((e) => {
+            console.error(`index build failed for ${m.modelName}:`, e.message);
+            return `${m.modelName}:ERR`;
+          }),
+      ),
+    );
+    console.log("🧱 indexes:", results.join(" "));
   }
 
   // Releases stock reserved by orders that never reached the gateway.

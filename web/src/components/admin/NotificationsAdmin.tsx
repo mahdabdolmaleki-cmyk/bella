@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Mail,
   History,
+  Crown,
 } from "lucide-react";
 import { toFa } from "@/lib/data";
 
@@ -26,7 +27,8 @@ type Campaign = {
   id: string;
   subject: string;
   body: string;
-  audience: "all" | "selected";
+  audience: "all" | "vip" | "selected";
+  channel?: "email" | "sms" | "both";
   total: number;
   sent: number;
   failed: number;
@@ -40,7 +42,8 @@ const inputCls =
   "glass-input w-full rounded-xl px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/40 focus:outline-none";
 
 export default function NotificationsAdmin() {
-  const [audience, setAudience] = useState<"all" | "selected">("all");
+  const [audience, setAudience] = useState<"all" | "vip" | "selected">("all");
+  const [channel, setChannel] = useState<"email" | "sms" | "both">("email");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [search, setSearch] = useState("");
@@ -141,6 +144,7 @@ export default function NotificationsAdmin() {
           subject: subject.trim(),
           body: body.trim(),
           audience,
+          channel,
           userIds: audience === "selected" ? picked : [],
         }),
       });
@@ -206,6 +210,7 @@ export default function NotificationsAdmin() {
           {(
             [
               ["all", "همه‌ی مشتریان", Users],
+              ["vip", "مشتریان VIP", Crown],
               ["selected", "انتخاب دستی", UserCheck],
             ] as const
           ).map(([key, label, Icon]) => (
@@ -226,8 +231,40 @@ export default function NotificationsAdmin() {
         <p className="mt-2.5 text-[11px] text-sage">
           {audience === "all"
             ? `پیام به ${toFa(totalCustomers)} مشتری دارای ایمیل فرستاده می‌شود (حداکثر ۵۰۰ نفر در هر ارسال).`
-            : `${toFa(picked.length)} مشتری انتخاب شده است.`}
+            : audience === "vip"
+              ? "پیام فقط برای مشتریان VIP ارسال می‌شود (پیشنهادهای اختصاصی)."
+              : `${toFa(picked.length)} مشتری انتخاب شده است.`}
         </p>
+
+        {/* ---------- کانال ارسال ---------- */}
+        <div className="mt-4">
+          <h3 className="text-xs font-black text-gold-soft">کانال ارسال</h3>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                ["email", "ایمیل"],
+                ["sms", "پیامک (sms.ir)"],
+                ["both", "ایمیل + پیامک"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setChannel(key)}
+                className={`rounded-xl py-2 text-xs font-bold transition-colors ${
+                  channel === key
+                    ? "border border-gold/60 bg-gold/15 text-gold"
+                    : "border border-gold/20 text-sage hover:text-cream"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-sage">
+            پیامک به‌صورت متن آزاد از خط اختصاصی sms.ir ارسال می‌شود (گیرندگانِ دارای شماره).
+          </p>
+        </div>
 
         {audience === "selected" && (
           <div className="mt-4">
@@ -354,7 +391,9 @@ export default function NotificationsAdmin() {
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-sage">
                   <span className="flex items-center gap-1">
                     <Mail size={11} />
-                    {c.audience === "all" ? "همگانی" : "انتخابی"}
+                    {c.audience === "all" ? "همگانی" : c.audience === "vip" ? "VIP" : "انتخابی"}
+                    {" · "}
+                    {c.channel === "sms" ? "پیامک" : c.channel === "both" ? "ایمیل+پیامک" : "ایمیل"}
                   </span>
                   <span>ارسال‌شده: {toFa(c.sent)}</span>
                   {c.failed > 0 && (

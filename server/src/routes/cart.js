@@ -1,7 +1,7 @@
 import { Router } from "express";
 import Product from "../models/Product.js";
 import AbandonedCart from "../models/AbandonedCart.js";
-import { optionalUser } from "../middleware/authMiddleware.js";
+import { optionalUser, requireAdmin } from "../middleware/authMiddleware.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
 import { int } from "../utils/validate.js";
@@ -35,7 +35,7 @@ router.post(
     // فقط id و qty از کلاینت می‌آید — قیمت و نام از دیتابیس
     const wanted = new Map();
     for (const it of rawItems) {
-      const id = int(it?.id, { min: 1, max: 1e9 });
+      const id = int(it?.id, { min: 1, max: 1e9, clamp: false });
       const qty = int(it?.qty, { min: 1, max: 99, fallback: 1 }) || 1;
       if (id === null) continue;
       wanted.set(id, Math.min(99, (wanted.get(id) || 0) + qty));
@@ -85,7 +85,6 @@ router.post(
 );
 
 // برای تست ادمین: لیست سبدهای رها شده
-import { requireAdmin } from "../middleware/authMiddleware.js";
 router.get(
   "/abandoned",
   requireAdmin,

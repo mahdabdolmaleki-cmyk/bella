@@ -37,6 +37,13 @@ const userSchema = new mongoose.Schema(
     // Favourite products (فهرست علاقه‌مندی‌ها). Stores the public numeric Product.id,
     // not ObjectIds, so the storefront can match them without an extra lookup.
     favorites: { type: [Number], default: [] },
+    // وفاداری ستاره‌ای (v42): امتیاز تجمیعی از خریدها؛ ستاره از آستانه‌ها مشتق می‌شود.
+    points: { type: Number, default: 0, min: 0 },
+    // وضعیت VIP — فقط ادمین می‌تواند آن را فعال/غیرفعال کند.
+    vip: { type: Boolean, default: false },
+    // زیرمجموعه‌گیری (v43): کد معرف یکتا و معرفِ این کاربر.
+    referralCode: { type: String, default: "", uppercase: true, trim: true, maxlength: 24 },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true },
 );
@@ -47,6 +54,17 @@ userSchema.index(
     unique: true,
     name: "user_phone_unique",
     partialFilterExpression: { phone: { $type: "string", $gt: "" } },
+  }
+);
+
+// کد رفرال یکتا — اما فقط برای کاربرانی که کد غیرخالی دارند. sparse رشتهٔ خالی
+// («») را رد نمی‌کند، پس بدون partialFilter دومین کاربرِ بدون کد، E11000 می‌گرفت.
+userSchema.index(
+  { referralCode: 1 },
+  {
+    unique: true,
+    name: "user_referralCode_unique",
+    partialFilterExpression: { referralCode: { $type: "string", $gt: "" } },
   }
 );
 
@@ -72,7 +90,14 @@ userSchema.methods.toDTO = function () {
     city: this.city,
     postalCode: this.postalCode,
     favorites: Array.isArray(this.favorites) ? this.favorites : [],
+    points: this.points ?? 0,
+    vip: this.vip === true,
   };
+};
+
+// نسخهٔ ادمین — همان DTO عمومی (points/vip را هم شامل می‌شود).
+userSchema.methods.toAdminDTO = function () {
+  return this.toDTO();
 };
 
 // Extra safety net: even a raw res.json(user) can never expose the hash.

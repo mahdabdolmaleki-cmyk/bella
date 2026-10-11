@@ -33,6 +33,8 @@ import {
   Smartphone,
   UserRound,
   Hash,
+  Crown,
+  UserPlus,
 } from "lucide-react";
 import { Field, SelectField, TextField } from "@/components/Field";
 import {
@@ -43,8 +45,9 @@ import {
 import PageHero from "@/components/PageHero";
 import { ProductVisual } from "@/components/art";
 import { InvoiceLines } from "@/components/InvoiceLines";
+import { ItemCampaignTags } from "@/components/InvoiceItemTags";
 import { formatToman, toFa, type ProductDTO } from "@/lib/data";
-import type { LoyaltyInfo, Order, TierInfo } from "@/lib/types";
+import type { LoyaltyInfo, Order } from "@/lib/types";
 
 export default function AccountPage() {
   const { user, loading } = useAuth();
@@ -109,11 +112,20 @@ function AuthForms() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  // کد معرف (زیرمجموعه‌گیری) — اختیاری؛ از ?ref= هم پیش‌پر می‌شود.
+  const [referral, setReferral] = useState("");
   const [devCode, setDevCode] = useState("");
   const [cooldown, setCooldown] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  // پیش‌پر کردن کد معرف از لینک دعوت (?ref=CODE).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) setReferral(ref.toUpperCase().slice(0, 24));
+  }, []);
 
   const loadLoginMethods = useCallback(async () => {
     setMethodsLoading(true);
@@ -218,7 +230,7 @@ function AuthForms() {
         ? { email: email.trim() }
         : { phone: normalizePhone(phone) };
       const ticket = await verifyOtp({ ...identity, code: code.trim() });
-      const result = await login({ ...identity, ticket });
+      const result = await login({ ...identity, ticket, referralCode: referral.trim() || undefined });
       if (result.admin) {
         // مدیر اصلی: مستقیم به پنل مدیریت.
         router.replace("/admin");
@@ -337,6 +349,15 @@ function AuthForms() {
                 ? "کد ۶ رقمی به این ایمیل فرستاده می‌شود. اگر عضو نباشید، نام اولیه از بخش اول ایمیل ساخته می‌شود."
                 : "کد ۶ رقمی پیامکی به این شماره فرستاده می‌شود و در صورت نیاز حساب تازه می‌سازد."}
             </p>
+
+            <Field
+              label="کد معرف (اختیاری)"
+              dir="ltr"
+              placeholder="BLXXXXXX"
+              value={referral}
+              onChange={(e) => setReferral(e.target.value.toUpperCase().slice(0, 24))}
+              icon={<UserPlus size={15} />}
+            />
 
             <button
               type="button"
@@ -566,52 +587,117 @@ function Overview({
   orders: Order[] | null;
   favorites: ProductDTO[] | null;
 }) {
-  const current: TierInfo | undefined = loyalty?.tiers.find((t) => t.key === loyalty.tier);
+  const starCfg = loyalty?.stars?.[Math.max(0, loyalty.star - 1)];
+  const perkLabel = (k: string) => {
+    if (k === "vipbox") return "باکس VIP رایگان";
+    if (k === "freeship") return "ارسال رایگان";
+    if (k === "gift") return "هدیه دکانت ۱۰ میلی";
+    if (k === "discount") {
+      const amt = loyalty?.discountAmount ?? 0;
+      const pct = loyalty?.discountPercent ?? 0;
+      if (amt > 0) return `تخفیف ${toFa(amt)} تومان`;
+      if (pct > 0) return `تخفیف ${toFa(pct)}٪`;
+      return "تخفیف";
+    }
+    return k;
+  };
+  const PerkIcon = ({ k }: { k: string }) => {
+    const I = k === "vipbox" ? Crown : k === "freeship" ? Truck : k === "gift" ? Sparkles : CreditCard;
+    return <I size={12} />;
+  };
 
   return (
     <div className="space-y-4">
-      {/* loyalty card */}
+      {/* پروفایل/طراحی اختصاصی مشتری VIP */}
+      {loyalty?.vip && (
+        <div
+          className="relative overflow-hidden rounded-3xl border border-gold/45 p-4 sm:p-6"
+          style={{
+            background: "linear-gradient(135deg, rgba(212,175,124,.24), rgba(14,59,38,.6))",
+            boxShadow: "inset 0 0 90px -30px #d4af7c",
+          }}
+        >
+          <p className="flex items-center gap-2 text-[11px] font-black tracking-[0.2em] text-gold-soft">
+            <Crown size={14} /> عضو ویژهٔ بلا · VIP
+          </p>
+          <p className="font-display mt-2 text-2xl leading-none text-cream sm:text-3xl">
+            پروفایل اختصاصی شما
+          </p>
+          <p className="mt-1.5 text-[11px] leading-6 text-sage">
+            به‌عنوان مشتری VIP از مزایا، پیشنهادها و اطلاعیه‌های اختصاصی بهره‌مند می‌شوید.
+          </p>
+        </div>
+      )}
+
+      {/* کارت ستاره‌های وفاداری */}
       <div
         className="gold-ring relative overflow-hidden rounded-3xl border border-gold/25 glass-soft p-4 sm:p-6"
-        style={{ boxShadow: `inset 0 0 90px -40px ${current?.color ?? "#d4af7c"}` }}
+        style={{ boxShadow: "inset 0 0 90px -40px #d4af7c" }}
       >
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div>
             <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.2em] text-sage">
-              <Gem size={13} /> باشگاه مشتریان بلا
+              <Gem size={13} /> باشگاه ستارهٔ بلا
             </p>
             <p className="font-display mt-2 text-3xl leading-none text-cream sm:text-4xl">
               {loyalty ? toFa(loyalty.points) : "—"}
               <span className="mr-2 text-sm font-bold text-sage">امتیاز</span>
             </p>
-            {loyalty && (
-              <p className="mt-1.5 text-[11px] text-sage">
-                هر {formatToman(loyalty.tomanPerPoint)} خرید = ۱ امتیاز
+            {/* ردیف ستاره‌های بصری */}
+            {loyalty && loyalty.stars.length > 0 && (
+              <p className="mt-2 flex items-center gap-1 text-lg leading-none" dir="ltr">
+                {loyalty.stars.map((_, i) => (
+                  <span key={i} className={i < loyalty.star ? "text-gold" : "text-sage/25"}>
+                    ★
+                  </span>
+                ))}
               </p>
             )}
           </div>
 
-          <span
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-black sm:px-3.5 sm:text-xs"
-            style={{
-              borderColor: `${current?.color ?? "#d4af7c"}66`,
-              color: current?.color ?? "#d4af7c",
-            }}
-          >
-            <span className="text-base leading-none">{current?.icon ?? "✦"}</span>
-            عضویت {current?.label ?? "عادی"}
+          <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-gold/40 px-3 py-1.5 text-[11px] font-black text-gold-soft sm:px-3.5 sm:text-xs">
+            <span className="text-base leading-none">★</span>
+            {starCfg?.title ?? (loyalty && loyalty.star > 0 ? `ستارهٔ ${loyalty.star}` : "بدون ستاره")}
           </span>
         </div>
 
-        {/* progress towards the next tier */}
+        {/* تراشه‌های مزایا */}
+        {loyalty && loyalty.perks.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {loyalty.perks.map((k) => (
+              <span
+                key={k}
+                className="flex items-center gap-1.5 rounded-full border border-gold/25 bg-gold/5 px-3 py-1.5 text-[11px] font-bold text-gold-soft"
+              >
+                <PerkIcon k={k} />
+                {perkLabel(k)}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* آمار داخل بنر */}
+        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-gold/10 pt-4 text-center">
+          <div>
+            <p className="text-[10px] font-bold text-sage">جمع خرید</p>
+            <p className="mt-0.5 text-xs font-black text-gold-soft">{loyalty ? formatToman(loyalty.totalSpent) : "…"}</p>
+          </div>
+          <div className="border-x border-gold/10">
+            <p className="text-[10px] font-bold text-sage">سفارش‌ها</p>
+            <p className="mt-0.5 text-xs font-black text-gold-soft">{loyalty ? toFa(loyalty.orders) : "…"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-sage">زیرمجموعه‌ها</p>
+            <p className="mt-0.5 text-xs font-black text-gold-soft">{loyalty ? toFa(loyalty.referralCount) : "…"}</p>
+          </div>
+        </div>
+
+        {/* پیشرفت تا ستارهٔ بعد */}
         {loyalty?.next ? (
           <div className="mt-5">
             <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] text-sage">
-              <span>
-                تا عضویت{" "}
-                {loyalty.tiers.find((t) => t.key === loyalty.next?.tier)?.label}
-              </span>
-              <span>{formatToman(loyalty.next.remaining)} خرید دیگر</span>
+              <span>تا {loyalty.next.title}</span>
+              <span>{toFa(loyalty.next.remaining)} امتیاز دیگر</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-night/70">
               <motion.div
@@ -624,10 +710,46 @@ function Overview({
           </div>
         ) : loyalty ? (
           <p className="mt-5 flex items-center gap-1.5 text-[11px] text-gold-soft">
-            <Sparkles size={13} /> شما در بالاترین سطح عضویت قرار دارید.
+            <Sparkles size={13} /> شما به بالاترین ستاره رسیده‌اید.
           </p>
         ) : null}
       </div>
+
+      {/* زیرمجموعه‌گیری — کد معرف + تعداد زیرمجموعه‌ها */}
+      {loyalty && (
+        <div className="rounded-3xl border border-gold/20 glass-panel p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.2em] text-sage">
+              <UserPlus size={13} /> زیرمجموعه‌گیری
+            </p>
+            <span className="flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-black text-gold-soft">
+              <UserRound size={12} />
+              {toFa(loyalty.referralCount)} زیرمجموعه
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-6 text-sage">
+            کد معرف خود را به دوستانتان بدهید؛ هنگام ثبت‌نام وارد کنند تا هم شما و هم
+            آن‌ها کد تخفیف بگیرید و امتیازِ معرف به حساب شما اضافه شود.
+          </p>
+          {loyalty.referralCode && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <code className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-black tracking-widest text-gold-soft" dir="ltr">
+                {loyalty.referralCode}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  const link = `${typeof window !== "undefined" ? window.location.origin : ""}/?ref=${loyalty.referralCode}`;
+                  navigator.clipboard?.writeText(link).catch(() => {});
+                }}
+                className="rounded-full border border-gold/30 px-4 py-2 text-[11px] font-bold text-gold-soft hover:bg-gold/10"
+              >
+                کپی لینک دعوت
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* quick numbers */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
@@ -1078,6 +1200,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
                     <p className="text-[10px] text-sage">
                       {toFa(it.qty)} × {formatToman(it.price)}
                     </p>
+                    <ItemCampaignTags item={it} tone="dark" />
                   </div>
                   <span className="text-xs text-gold-soft">{formatToman(it.price * it.qty)}</span>
                 </div>

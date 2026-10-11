@@ -11,6 +11,8 @@ import { formatToman } from "@/lib/data";
 //  • کد تخفیف مبلغی: «کد تخفیف CODE (N تومان)»؛ درصدی: «(N٪)».
 // ──────────────────────────────────────────────────────────────────────────
 
+export type StarPerkApplied = { key: string; star?: number; title?: string };
+
 export type InvoiceOrderLite = {
   subtotal?: number;
   total: number;
@@ -22,8 +24,14 @@ export type InvoiceOrderLite = {
   couponCode?: string;
   couponPercent?: number;
   couponFixed?: number;
+  vipBox?: boolean;
   vipBoxFee?: number;
   onlinePaid?: number;
+  // وفاداری ستاره‌ای — برای نمایشِ «کدام مزیت از کدام ستاره» در فاکتور.
+  starLevel?: number;
+  starGift?: boolean;
+  starPerksApplied?: StarPerkApplied[];
+  discountSource?: "none" | "first" | "coupon" | "star" | string;
 };
 
 const fa = (n: number) => n.toLocaleString("fa-IR");
@@ -31,9 +39,11 @@ const fa = (n: number) => n.toLocaleString("fa-IR");
 export function InvoiceLines({
   order,
   tone = "light",
+  totalLabel,
 }: {
   order: InvoiceOrderLite;
   tone?: "light" | "dark";
+  totalLabel?: string;
 }) {
   const shippingCost = order.shippingCost ?? 0;
   const subtotal = order.subtotal ?? Math.max(0, order.total - shippingCost);
@@ -43,6 +53,17 @@ export function InvoiceLines({
   const cod = Boolean(order.shippingCod);
   const online = order.onlinePaid ?? Math.max(0, order.total - (cod ? shippingCost : 0));
   const fixedValue = order.couponCode ? order.couponFixed ?? 0 : 0;
+
+  // مزایای ستارهٔ اعمال‌شده و منبع هرکدام (عنوان ستاره) — برای فاکتور.
+  const perks = order.starPerksApplied ?? [];
+  const perkTitle = (key: string) => perks.find((p) => p.key === key)?.title || "";
+  const freeshipStar = perkTitle("freeship");
+  const vipboxStar = perkTitle("vipbox");
+  const discountStar = perkTitle("discount");
+  const giftStar = perkTitle("gift");
+  const vipFromStar = Boolean(vipboxStar) && order.vipBox === true && vipBoxFee === 0;
+  const shipFromStar = Boolean(freeshipStar) && (order.freeShipping || shippingCost === 0);
+  const discountFromStar = order.discountSource === "star" && discountAmount > 0;
 
   const light = tone === "light";
   const k = light
@@ -92,28 +113,51 @@ export function InvoiceLines({
           cls={k.disc}
           valueCls={light ? "font-bold" : undefined}
           label={
-            order.couponCode
-              ? `کد تخفیف ${order.couponCode}${
-                  fixedValue > 0 && !discountPercent
-                    ? ` (${fa(fixedValue)} تومان)`
-                    : discountPercent
-                      ? ` (${fa(discountPercent)}٪)`
-                      : ""
-                }`
-              : `تخفیف خرید اول${discountPercent ? ` (${fa(discountPercent)}٪)` : ""}`
+            discountFromStar
+              ? `تخفیف وفاداری — از مزایای ${discountStar}${discountPercent ? ` (${fa(discountPercent)}٪)` : ""}`
+              : order.couponCode
+                ? `کد تخفیف ${order.couponCode}${
+                    fixedValue > 0 && !discountPercent
+                      ? ` (${fa(fixedValue)} تومان)`
+                      : discountPercent
+                        ? ` (${fa(discountPercent)}٪)`
+                        : ""
+                  }`
+                : `تخفیف خرید اول${discountPercent ? ` (${fa(discountPercent)}٪)` : ""}`
           }
           value={`− ${formatToman(discountAmount)}`}
         />
       )}
-      {vipBoxFee > 0 && <Row label="باکس ویژه" value={formatToman(vipBoxFee)} />}
+      {vipFromStar ? (
+        <Row
+          cls={k.disc}
+          valueCls={light ? "font-bold" : undefined}
+          label={`باکس ویژه VIP — رایگان (از مزایای ${vipboxStar})`}
+          value="رایگان"
+        />
+      ) : (
+        vipBoxFee > 0 && <Row label="باکس ویژه" value={formatToman(vipBoxFee)} />
+      )}
       {!cod && (
         <Row
+          cls={shipFromStar ? k.disc : undefined}
+          valueCls={shipFromStar && light ? "font-bold" : undefined}
           label="هزینه ارسال"
           value={
-            order.freeShipping || shippingCost === 0
-              ? "رایگان"
-              : formatToman(shippingCost)
+            shipFromStar
+              ? `رایگان — از مزایای ${freeshipStar}`
+              : order.freeShipping || shippingCost === 0
+                ? "رایگان"
+                : formatToman(shippingCost)
           }
+        />
+      )}
+      {giftStar && (
+        <Row
+          cls={k.disc}
+          valueCls={light ? "font-bold" : undefined}
+          label={`هدیهٔ وفاداری — از مزایای ${giftStar}`}
+          value="رایگان"
         />
       )}
       {cod ? (
@@ -137,7 +181,7 @@ export function InvoiceLines({
           border
           cls={k.strong}
           valueCls={k.strong}
-          label="مبلغ کل فاکتور"
+          label={totalLabel ?? "مبلغ کل فاکتور"}
           value={formatToman(order.total)}
         />
       )}

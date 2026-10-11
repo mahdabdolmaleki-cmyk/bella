@@ -377,9 +377,25 @@ body {
   }
 }
 
+/* تایمر شمارش معکوس جشنواره — هر ۳ ثانیه یک چشمک کوتاه می‌زند. */
+.festival-blink {
+  animation: festival-blink 3s ease-in-out infinite;
+}
+@keyframes festival-blink {
+  0%,
+  88%,
+  100% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.25;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .festival-sheen,
-  .festival-banner {
+  .festival-banner,
+  .festival-blink {
     animation: none;
   }
 }

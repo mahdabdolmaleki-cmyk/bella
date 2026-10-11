@@ -7,6 +7,7 @@ export const SETTING_KEYS = [
   "festivalActive",
   "festivalTitle",
   "festivalSubtitle",
+  "festivalUntil",
   "discountsBoxActive",
   "discountsBoxTitle",
   "discountsBoxSubtitle",
@@ -21,6 +22,16 @@ export const SETTING_KEYS = [
   "footerAbout",
   "tomanPerPoint",
   "tierGoldSpend",
+  "starsConfigJson",
+  "referralEnabled",
+  "referrerType",
+  "referrerValue",
+  "referrerDays",
+  "refereeType",
+  "refereeValue",
+  "refereeDays",
+  "referralPoints",
+  "referralSmsTemplate",
   "tierDiamondSpend",
   "shippingFreeThreshold",
   "journeyStages",
@@ -76,6 +87,8 @@ export type SiteSettingsMap = {
   festivalActive: string;
   festivalTitle: string;
   festivalSubtitle: string;
+  /** زمان پایان جشنواره (ms epoch)؛ خالی = بدون تایمر و بنر همیشگی است. */
+  festivalUntil: string;
   /** "1" = کارت جداگانهٔ تخفیف‌ها زیر بنر جشنواره نمایش داده می‌شود. */
   discountsBoxActive: string;
   /** عنوان کارت تخفیف‌ها. */
@@ -102,6 +115,18 @@ export type SiteSettingsMap = {
   // باشگاه مشتریان
   tomanPerPoint: string;
   tierGoldSpend: string;
+  /** پیکربندی ستاره‌های وفاداری (JSON). */
+  starsConfigJson: string;
+  // زیرمجموعه‌گیری (v43)
+  referralEnabled: string;
+  referrerType: string;
+  referrerValue: string;
+  referrerDays: string;
+  refereeType: string;
+  refereeValue: string;
+  refereeDays: string;
+  referralPoints: string;
+  referralSmsTemplate: string;
   tierDiamondSpend: string;
   /** حداقل مبلغ کالاها برای ارسال رایگان، به تومان. */
   shippingFreeThreshold: string;
@@ -402,6 +427,7 @@ export const DEFAULT_SETTINGS: SiteSettingsMap = {
   festivalActive: "true",
   festivalTitle: "جشنواره خرید اول بلا",
   festivalSubtitle: "۲۵٪ تخفیف + اتومایزر هدیه",
+  festivalUntil: "",
   discountsBoxActive: "1",
   discountsBoxTitle: "تخفیف‌های بلا",
   discountsBoxSubtitle: "ادکلن‌های مشمول تخفیف را ببینید",
@@ -417,6 +443,16 @@ export const DEFAULT_SETTINGS: SiteSettingsMap = {
     "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و رایحه‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
   tomanPerPoint: "10000",
   tierGoldSpend: "20000000",
+  starsConfigJson: "",
+  referralEnabled: "1",
+  referrerType: "percent",
+  referrerValue: "10",
+  referrerDays: "10",
+  refereeType: "percent",
+  refereeValue: "10",
+  refereeDays: "3",
+  referralPoints: "5",
+  referralSmsTemplate: "",
   tierDiamondSpend: "60000000",
   shippingFreeThreshold: "5000000",
   deliveryEstimateEnabled: "1",

@@ -171,7 +171,7 @@ export function BestsellersSection({ icon }: { icon?: string }) {
                   </span>
                   <button
                     onClick={() =>
-                      add({ id: p.id, name: p.name, price: p.price, glass: p.glass, liquid: p.liquid, sizeMl: p.sizeMl })
+                      add({ id: p.id, name: p.name, price: p.price, glass: p.glass, liquid: p.liquid, sizeMl: p.sizeMl, oldPrice: p.oldPrice, festival: p.festival, discount: p.discount, discountType: p.discountType, discountValue: p.discountValue })
                     }
                     className="flex items-center gap-1 rounded-full bg-gold px-3 py-1.5 text-[10px] font-black text-[#241a05] active:scale-90 sm:text-[11px]"
                   >

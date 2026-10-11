@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
-import { jalaliToIso, toJalali } from "@/lib/jalali";
+
 import Image from "next/image";
 import {
   Sparkles,
@@ -22,8 +22,8 @@ import {
   ExternalLink,
   AlertCircle,
   BadgePercent,
-  LayoutGrid,
   Share2,
+  UserPlus,
   Link2,
   LogIn,
   Mail,
@@ -33,7 +33,6 @@ import {
   Clock,
   ShoppingBasket,
   ShieldCheck,
-  Ticket,
 } from "lucide-react";
 import {
   parseSocials,
@@ -49,7 +48,6 @@ import {
   parseJourneyStages,
   parseEnamadSeal,
   parseFooterBadges,
-  parseShopCategories,
   type BrandCard,
   type FooterBadge,
   type JourneyStage,
@@ -87,9 +85,9 @@ const TABS = [
   { id: "brands", label: "برندها", icon: Tag, tint: "text-amber-300" },
   { id: "icons", label: "آیکن‌ها و مزیت‌ها", icon: Shapes, tint: "text-fuchsia-300" },
   { id: "footer", label: "فوتر و نمادها", icon: PanelBottom, tint: "text-emerald-300" },
-  { id: "loyalty", label: "باشگاه مشتریان", icon: Gem, tint: "text-violet-300" },
+  { id: "loyalty", label: "ستاره‌های وفاداری", icon: Gem, tint: "text-violet-300" },
+  { id: "referral", label: "زیرمجموعه‌گیری", icon: UserPlus, tint: "text-emerald-300" },
   { id: "shipping", label: "ارسال", icon: Truck, tint: "text-sky-300" },
-  { id: "categories", label: "دسته‌بندی فروشگاه", icon: LayoutGrid, tint: "text-lime-300" },
   { id: "contact", label: "تماس با ما", icon: Share2, tint: "text-rose-300" },
   { id: "terms", label: "قوانین و مقررات", icon: ScrollText, tint: "text-teal-300" },
   { id: "cart", label: "سبد رها شده", icon: ShoppingBasket, tint: "text-amber-300" },
@@ -111,7 +109,6 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
     setForm((f) => ({ ...f, [key]: value }));
 
   /* ---------------- پیامک‌ها: ارسال تست و بررسی اعتبار ---------------- */
-  const [couponDateDraft, setCouponDateDraft] = useState<Record<number, string>>({});
   const [smsTestPhone, setSmsTestPhone] = useState("");
   const [smsTestBusy, setSmsTestBusy] = useState(false);
   const [smsTestResult, setSmsTestResult] = useState<{
@@ -240,33 +237,6 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
   };
   const setBadge = (index: number, patch: Partial<FooterBadge>) =>
     writeBadges(badges.map((b, i) => (i === index ? { ...b, ...patch } : b)));
-
-  /* ---------------- دسته‌بندی‌های فروشگاه ---------------- */
-  // دقیقاً مثل نمادها، فهرست قابل ویرایش در حالت خام نگه داشته می‌شود؛
-  // اگر از پارسر می‌ساختیم، دستهٔ تازهٔ خالی همان لحظه ناپدید می‌شد.
-  const [shopCats, setShopCats] = useState<string[]>(() =>
-    parseShopCategories(initialSettings.shopCategories),
-  );
-  const writeShopCats = (list: string[]) => {
-    setShopCats(list);
-    const ready = list.map((c) => c.trim()).filter(Boolean);
-    setForm((f) => ({
-      ...f,
-      shopCategories: ready.length ? JSON.stringify(ready) : "",
-    }));
-  };
-  const setShopCat = (index: number, value: string) =>
-    writeShopCats(shopCats.map((c, i) => (i === index ? value : c)));
-  const addShopCat = () => writeShopCats([...shopCats, ""]);
-  const removeShopCat = (index: number) =>
-    writeShopCats(shopCats.filter((_, i) => i !== index));
-  const moveShopCat = (index: number, delta: number) => {
-    const target = index + delta;
-    if (target < 0 || target >= shopCats.length) return;
-    const next = [...shopCats];
-    [next[index], next[target]] = [next[target], next[index]];
-    writeShopCats(next);
-  };
 
   /* ---------------- شبکه‌های اجتماعی صفحهٔ تماس ---------------- */
   // باز هم درافت خام: پارسر هر ردیف بدون لینک را حذف می‌کند، پس
@@ -487,320 +457,6 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
       {/* ================= صفحهٔ اصلی ================= */}
       {tab === "home" && (
         <div className="space-y-4">
-          <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
-            <div className="flex items-center gap-2 text-gold">
-              <Sparkles size={16} />
-              <h2 className="text-sm font-black">بنر جشنواره / تخفیف صفحه اصلی</h2>
-            </div>
-            <p className="mt-1 text-[11px] text-sage">
-              این کارت در بالای صفحه‌ی اصلی سایت، زیر لوگو، نمایش داده می‌شود.
-            </p>
-
-            <label className="mt-4 flex items-center gap-2 text-xs font-bold text-sage">
-              <input
-                type="checkbox"
-                checked={form.festivalActive === "true"}
-                onChange={(e) => set("festivalActive", e.target.checked ? "true" : "false")}
-                className="h-4 w-4 accent-[#d4af7c]"
-              />
-              نمایش بنر جشنواره در صفحه اصلی
-            </label>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-[11px] font-bold text-sage">عنوان</label>
-                <input
-                  value={form.festivalTitle}
-                  onChange={(e) => set("festivalTitle", e.target.value)}
-                  className={inputCls}
-                  placeholder="جشنواره خرید اول بلا"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-bold text-sage">توضیح کوتاه</label>
-                <input
-                  value={form.festivalSubtitle}
-                  onChange={(e) => set("festivalSubtitle", e.target.value)}
-                  className={inputCls}
-                  placeholder="۲۵٪ تخفیف + اتومایزر هدیه"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* ---------- کارت تخفیف‌ها (باکس دوم، جدا از جشنواره) ---------- */}
-          <section className="gold-ring rounded-2xl glass-panel p-5">
-            <div className="flex items-center gap-2 text-emerald-300">
-              <BadgePercent size={16} />
-              <h2 className="text-sm font-black">کارت تخفیف‌ها (باکس دوم صفحهٔ اصلی)</h2>
-            </div>
-            <p className="mt-1 text-[11px] leading-6 text-sage">
-              کارتی جدا از بنر جشنواره؛ با کلیک روی آن، فروشگاه فقط ادکلن‌های مشمول تخفیف را
-              نشان می‌دهد (محصولاتی که «قیمت قبلی» دارند).
-            </p>
-
-            <label className="mt-4 flex items-center gap-2 text-xs font-bold text-sage">
-              <input
-                type="checkbox"
-                checked={form.discountsBoxActive === "1"}
-                onChange={(e) => set("discountsBoxActive", e.target.checked ? "1" : "")}
-                className="h-4 w-4 accent-[#d4af7c]"
-              />
-              نمایش کارت تخفیف‌ها در صفحهٔ اصلی
-            </label>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-[11px] font-bold text-sage">عنوان</label>
-                <input
-                  value={form.discountsBoxTitle}
-                  onChange={(e) => set("discountsBoxTitle", e.target.value)}
-                  className={inputCls}
-                  placeholder="تخفیف‌های بلا"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-bold text-sage">توضیح کوتاه</label>
-                <input
-                  value={form.discountsBoxSubtitle}
-                  onChange={(e) => set("discountsBoxSubtitle", e.target.value)}
-                  className={inputCls}
-                  placeholder="ادکلن‌های مشمول تخفیف را ببینید"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* ---------- تخفیف خرید اول + باکس VIP ---------- */}
-          <section className="gold-ring rounded-2xl glass-panel p-5">
-            <div className="flex items-center gap-2 text-gold">
-              <Sparkles size={16} />
-              <h2 className="text-sm font-black">تخفیف خرید اول و باکس VIP</h2>
-            </div>
-
-            <label className="mt-4 flex items-center gap-2 text-xs font-bold text-sage">
-              <input
-                type="checkbox"
-                checked={form.firstPurchaseDiscountEnabled === "1"}
-                onChange={(e) => set("firstPurchaseDiscountEnabled", e.target.checked ? "1" : "")}
-                className="h-4 w-4 accent-[#d4af7c]"
-              />
-              فعال‌بودن تخفیف خرید اول مشتری
-            </label>
-            <p className="mt-1 text-[10.5px] leading-5 text-sage/70">
-              فقط برای مشتری‌هایی که تا امروز هیچ سفارشی نداشته‌اند؛ روی جمع سبد (بدون کرایه)
-              اعمال می‌شود.
-            </p>
-            <div className="mt-3 max-w-xs">
-              <label className="mb-1 block text-[11px] font-bold text-sage">درصد تخفیف (۰ تا ۹۰)</label>
-              <input
-                type="number"
-                min={0}
-                max={90}
-                value={form.firstPurchasePercent}
-                onChange={(e) => set("firstPurchasePercent", e.target.value)}
-                className={inputCls}
-                placeholder="25"
-              />
-            </div>
-
-            <div className="mt-6 border-t border-gold/10 pt-5">
-              <label className="flex items-center gap-2 text-xs font-bold text-sage">
-                <input
-                  type="checkbox"
-                  checked={form.vipBoxEnabled === "1"}
-                  onChange={(e) => set("vipBoxEnabled", e.target.checked ? "1" : "")}
-                  className="h-4 w-4 accent-[#d4af7c]"
-                />
-                فعال‌بودن باکس ویژه (VIP) هنگام خرید
-              </label>
-              <p className="mt-1 text-[10.5px] leading-5 text-sage/70">
-                با فعال‌بودن، مشتری هنگام خرید می‌تواند انتخاب کند که ادکلن داخل باکس لوکس ارسال شود.
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-[11px] font-bold text-sage">هزینهٔ باکس (تومان)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.vipBoxFee}
-                    onChange={(e) => set("vipBoxFee", e.target.value)}
-                    className={inputCls}
-                    placeholder="150000"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-bold text-sage">عنوان باکس</label>
-                  <input
-                    value={form.vipBoxTitle}
-                    onChange={(e) => set("vipBoxTitle", e.target.value)}
-                    className={inputCls}
-                    placeholder="باکس ویژه VIP"
-                  />
-                </div>
-              </div>
-              <div className="mt-3">
-                <label className="mb-1 block text-[11px] font-bold text-sage">توضیح باکس (به مشتری)</label>
-                <input
-                  value={form.vipBoxDesc}
-                  onChange={(e) => set("vipBoxDesc", e.target.value)}
-                  className={inputCls}
-                  placeholder="ادکلن شما داخل باکس لوکس و مخملی، با روبان طلایی ارسال می‌شود."
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* ---------- کدهای تخفیف (v40) ---------- */}
-          <section className="gold-ring mt-4 rounded-2xl glass-panel p-5">
-            <div className="flex items-center gap-2 text-gold">
-              <Ticket size={16} />
-              <h2 className="text-sm font-black">کدهای تخفیف</h2>
-            </div>
-
-            <label className="mt-4 flex items-center gap-2 text-xs font-bold text-sage">
-              <input
-                type="checkbox"
-                checked={form.couponEnabled === "1"}
-                onChange={(e) => set("couponEnabled", e.target.checked ? "1" : "")}
-                className="h-4 w-4 accent-[#d4af7c]"
-              />
-              فعال‌بودن کدهای تخفیف
-            </label>
-            <p className="mt-1 text-[10.5px] leading-5 text-sage/70">
-              هر کد می‌تواند درصدی (۱ تا ۹۰٪) یا مبلغی (تومان) باشد و تا پایان «تاریخ
-              انقضای شمسی» معتبر است؛ خالی‌گذاشتن تاریخ یعنی بدون انقضا. کد تخفیف و
-              تخفیف خرید اول روی هم جمع نمی‌شوند — هرکدام که مبلغش بیشتر باشد اعمال
-              می‌شود. مبلغ تخفیف در فاکتور مشتری، «مدیریت سفارش‌ها» و «فاکتورها» نمایش
-              داده می‌شود. <b>هر کد به‌ازای هر اکانت فقط یک بار</b> قابل استفاده است و
-              <b> فقط با پرداخت شدنِ سفارش می‌سوزد</b>؛ سفارشِ پرداخت‌نشده پس از انقضا یا لغو،
-              کد را آزاد می‌کند (تا انقضا، کد روی همان سفارش قفل است و سفارشِ دوم با آن گرفته نمی‌شود).
-            </p>
-
-            {(() => {
-              type CRow = { code?: string; percent?: number; amount?: number; until?: string };
-              let list: CRow[] = [];
-              try {
-                const parsed = JSON.parse(form.couponCodesJson || "[]");
-                if (Array.isArray(parsed)) list = parsed;
-              } catch {
-                /* داده قدیمی/خراب — با اولین ویرایش سالم بازنویسی می‌شود */
-              }
-              const write = (next: CRow[]) => set("couponCodesJson", JSON.stringify(next));
-              const edit = (i: number, p: Partial<CRow>) =>
-                write(list.map((x, j) => (j === i ? { ...x, ...p } : x)));
-              const toLatin = (v: string) =>
-                v
-                  .replace(/[\u06F0-\u06F9]/g, (d) => String("۰۱۳۴۵۷۸۹".indexOf(d)))
-                  .replace(/[\u0660-\u0669]/g, (d) => String("٠١٣٤٥٧٨٩".indexOf(d)));
-              const jalStr = (iso: string) => {
-                const pp = toJalali(`${iso.slice(0, 10)}T12:00:00`);
-                if (!pp) return "";
-                const pad = (n: number) => String(n).padStart(2, "0");
-                return `${pp.jy}-${pad(pp.jm)}-${pad(pp.jd)}`;
-              };
-              return (
-                <>
-                  {list.map((c, i) => {
-                    const isAmount = !c.percent && (c.amount ?? 0) > 0;
-                    const draft = couponDateDraft[i] ?? (c.until ? jalStr(c.until) : "");
-                    const onDate = (raw: string) => {
-                      setCouponDateDraft((m) => ({ ...m, [i]: raw }));
-                      if (!raw.trim()) {
-                        edit(i, { until: "" });
-                        return;
-                      }
-                      const m2 = toLatin(raw.trim()).match(/^(\d{4})[-/]?(\d{1,2})[-/]?(\d{1,2})$/);
-                      if (m2) {
-                        const iso = jalaliToIso(+m2[1], +m2[2], +m2[3]);
-                        edit(i, { until: iso ?? c.until ?? "" });
-                      }
-                    };
-                    return (
-                      <div
-                        key={i}
-                        className="mt-3 grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_96px_104px_150px_42px]"
-                      >
-                        <label className="block">
-                          <span className="mb-1 block text-[10.5px] font-bold text-sage">کد تخفیف</span>
-                          <input
-                            value={String(c.code ?? "")}
-                            onChange={(e) => edit(i, { code: e.target.value.toUpperCase().replace(/\s+/g, "") })}
-                            className={inputCls}
-                            dir="ltr"
-                            placeholder="BELLA15"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-1 block text-[10.5px] font-bold text-sage">نوع</span>
-                          <select
-                            value={isAmount ? "amount" : "percent"}
-                            onChange={(e) => {
-                              if (e.target.value === "amount")
-                                edit(i, { percent: 0, amount: c.amount ?? Math.max(1000, (c.percent ?? 10) * 5000) });
-                              else edit(i, { amount: 0, percent: c.percent ?? 10 });
-                            }}
-                            className={`${inputCls} appearance-none`}
-                          >
-                            <option value="percent">درصد</option>
-                            <option value="amount">تومان</option>
-                          </select>
-                        </label>
-                        <label className="block">
-                          <span className="mb-1 block text-[10.5px] font-bold text-sage">
-                            {isAmount ? "مبلغ (تومان)" : "درصد (۱–۹۰)"}
-                          </span>
-                          <input
-                            type="number"
-                            min={isAmount ? 1000 : 1}
-                            max={isAmount ? 10000000 : undefined}
-                            step={isAmount ? 1000 : 1}
-                            value={isAmount ? (c.amount ?? "") : (c.percent ?? "")}
-                            onChange={(e) => {
-                              const n = Number(e.target.value) || 0;
-                              edit(i, isAmount ? { amount: n } : { percent: Math.min(90, n) });
-                            }}
-                            className={inputCls}
-                            dir="ltr"
-                            placeholder={isAmount ? "50000" : "15"}
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-1 block text-[10.5px] font-bold text-sage">
-                            تاریخ انقضا (شمسی)
-                          </span>
-                          <input
-                            value={draft}
-                            onChange={(e) => onDate(e.target.value)}
-                            className={inputCls}
-                            dir="ltr"
-                            placeholder="1405-07-13"
-                            title="قالب: 1405-07-13 — خالی یعنی بدون انقضا"
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => write(list.filter((_, j) => j !== i))}
-                          className="rounded-lg border border-red-400/30 p-2.5 text-[#8c2f3f] transition hover:bg-red-400/10"
-                          aria-label="حذف کد"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => write([...list, { code: "", percent: 10, until: "" }])}
-                    className="btn-add mt-3 rounded-full px-4 py-2 text-[11px] font-bold"
-                  >
-                    + افزودن کد جدید
-                  </button>
-                </>
-              );
-            })()}
-          </section>
-
           {/* ---------- متن مراحل صفحه اصلی ---------- */}
           <section className="gold-ring rounded-2xl glass-panel p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1392,50 +1048,220 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
         <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
           <div className="flex items-center gap-2 text-gold">
             <Gem size={16} />
-            <h2 className="text-sm font-black">باشگاه مشتریان (امتیاز و سطح عضویت)</h2>
+            <h2 className="text-sm font-black">ستاره‌های وفاداری</h2>
           </div>
           <p className="mt-1 text-[11px] leading-6 text-sage">
-            امتیاز هر مشتری از جمع خریدهای پرداخت‌شده محاسبه می‌شود و با تغییر این
-            اعداد، سطح عضویت همه مشتریان بلافاصله به‌روز می‌شود.
+            هر محصول امتیاز دارد؛ با خرید، امتیاز مشتری جمع می‌شود و هر ستاره در آستانهٔ
+            امتیاز خودش باز می‌شود. مزایای هر ستاره تجمعی است و همهٔ اعداد قابل تغییرند.
+          </p>
+          {(() => {
+            type SRow = { points?: number; title?: string; desc?: string; perks?: string[]; discountPercent?: number; discountType?: "percent" | "amount"; discountAmount?: number };
+            let list: SRow[] = [];
+            try { const p = JSON.parse(form.starsConfigJson || ""); if (Array.isArray(p)) list = p; } catch {}
+            if (!list.length) list = [
+              { points: 1, title: "ستارهٔ ۱", desc: "با خرید اول", perks: [] },
+              { points: 5, title: "ستارهٔ ۲", desc: "معادل خرید پنجم", perks: ["vipbox"] },
+              { points: 8, title: "ستارهٔ ۳", desc: "معادل خرید هشتم", perks: ["freeship"] },
+              { points: 11, title: "ستارهٔ ۴", desc: "معادل خرید یازدهم", perks: ["gift"] },
+              { points: 15, title: "ستارهٔ ۵", desc: "ویژه", perks: ["vipbox", "freeship", "gift", "discount"], discountType: "percent", discountPercent: 7 },
+            ];
+            const write = (next: SRow[]) => set("starsConfigJson", JSON.stringify(next));
+            const edit = (i: number, p: Partial<SRow>) => write(list.map((x, j) => (j === i ? { ...x, ...p } : x)));
+            const togglePerk = (i: number, perk: string) => {
+              const cur = list[i].perks || [];
+              edit(i, { perks: cur.includes(perk) ? cur.filter((x) => x !== perk) : [...cur, perk] });
+            };
+            const addStar = () => {
+              const last = list[list.length - 1];
+              const nextPoints = Math.max(0, (Number(last?.points) || 0) + 5);
+              write([...list, { points: nextPoints, title: `ستارهٔ ${list.length + 1}`, desc: "", perks: [] }]);
+            };
+            const removeStar = (i: number) => write(list.filter((_, j) => j !== i));
+            const PERKS: Array<[string, string]> = [
+              ["vipbox", "باکس VIP رایگان"],
+              ["freeship", "ارسال رایگان"],
+              ["gift", "هدیه دکانت ۱۰ میلی"],
+              ["discount", "تخفیف"],
+            ];
+            return (
+              <div className="mt-4 space-y-3">
+                {list.map((s, i) => {
+                  const dtype = s.discountType ?? (s.discountAmount ? "amount" : "percent");
+                  return (
+                    <div key={i} className="rounded-xl border border-gold/15 glass-soft p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[11px] font-black text-gold-soft">ستارهٔ {i + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeStar(i)}
+                          className="rounded-full border border-red-400/40 px-2.5 py-0.5 text-[10px] font-bold text-red-300 hover:bg-red-400/10"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <label className="block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">آستانه امتیاز</span>
+                          <input type="number" min={0} value={s.points ?? 0} onChange={(e) => edit(i, { points: Math.max(0, Number(e.target.value) || 0) })} className={inputCls} dir="ltr" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">عنوان</span>
+                          <input value={s.title ?? ""} onChange={(e) => edit(i, { title: e.target.value })} className={inputCls} />
+                        </label>
+                        <label className="col-span-2 block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">توضیح</span>
+                          <input value={s.desc ?? ""} onChange={(e) => edit(i, { desc: e.target.value })} className={inputCls} />
+                        </label>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        {PERKS.map(([key, label]) => (
+                          <label key={key} className="flex items-center gap-1.5 text-[11px] font-bold text-sage">
+                            <input type="checkbox" checked={(s.perks || []).includes(key)} onChange={() => togglePerk(i, key)} className="h-3.5 w-3.5 accent-[#d4af7c]" />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                      {(s.perks || []).includes("discount") && (
+                        <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-gold/10 bg-night/20 p-2">
+                          <label className="block">
+                            <span className="mb-1 block text-[10.5px] font-bold text-sage">نوع تخفیف</span>
+                            <select
+                              value={dtype}
+                              onChange={(e) => {
+                                const t = e.target.value as "percent" | "amount";
+                                // فقط یکی از دو مقدار فعال می‌ماند تا محاسبهٔ تخفیف یکتا باشد.
+                                edit(i, t === "amount" ? { discountType: "amount", discountPercent: 0 } : { discountType: "percent", discountAmount: 0 });
+                              }}
+                              className={inputCls}
+                            >
+                              <option value="percent">درصدی</option>
+                              <option value="amount">مبلغی (تومان)</option>
+                            </select>
+                          </label>
+                          {dtype === "percent" ? (
+                            <label className="block">
+                              <span className="mb-1 block text-[10.5px] font-bold text-sage">درصد</span>
+                              <input type="number" min={0} max={90} value={s.discountPercent ?? 7} onChange={(e) => edit(i, { discountPercent: Math.min(90, Number(e.target.value) || 0) })} className={`${inputCls} w-24`} dir="ltr" />
+                            </label>
+                          ) : (
+                            <label className="block">
+                              <span className="mb-1 block text-[10.5px] font-bold text-sage">مبلغ (تومان)</span>
+                              <input type="number" min={0} value={s.discountAmount ?? 0} onChange={(e) => edit(i, { discountAmount: Math.max(0, Number(e.target.value) || 0) })} className={`${inputCls} w-32`} dir="ltr" />
+                            </label>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={addStar}
+                  className="w-full rounded-xl border border-dashed border-gold/40 py-2.5 text-[11px] font-black text-gold-soft hover:bg-gold/10"
+                >
+                  + افزودن ستارهٔ جدید
+                </button>
+              </div>
+            );
+          })()}
+          {saveBar}
+        </section>
+      )}
+
+      {/* ================= زیرمجموعه‌گیری ================= */}
+      {tab === "referral" && (
+        <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
+          <div className="flex items-center gap-2 text-gold">
+            <UserPlus size={16} />
+            <h2 className="text-sm font-black">زیرمجموعه‌گیری (کد تخفیف دوطرفه)</h2>
+          </div>
+          <p className="mt-1 text-[11px] leading-6 text-sage">
+            مشتری هنگام ثبت‌نام «کد معرف» را وارد می‌کند؛ همان لحظه یک کد تخفیف
+            یک‌بارمصرف برای معرف و یک کد برای زیرمجموعه صادر و پیامک می‌شود و امتیاز
+            معرف افزوده می‌گردد.
           </p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-[11px] font-bold text-sage">
-                تومان به ازای یک امتیاز
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={form.tomanPerPoint}
-                onChange={(e) => set("tomanPerPoint", e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-bold text-sage">
-                آستانه عضویت طلایی (تومان)
-              </label>
+          <label className="mt-3 flex items-center gap-2 text-xs font-bold text-sage">
+            <input
+              type="checkbox"
+              checked={form.referralEnabled === "1"}
+              onChange={(e) => set("referralEnabled", e.target.checked ? "1" : "0")}
+              className="h-4 w-4 accent-[#d4af7c]"
+            />
+            سیستم زیرمجموعه‌گیری فعال باشد
+          </label>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {([
+              ["معرف (شخص)", "referrer"],
+              ["زیرمجموعه", "referee"],
+            ] as const).map(([title, side]) => (
+              <div key={side} className="rounded-xl border border-gold/15 glass-soft p-3">
+                <p className="text-xs font-black text-gold-soft">{title}</p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[10.5px] font-bold text-sage">نوع</span>
+                    <select
+                      value={side === "referrer" ? form.referrerType : form.refereeType}
+                      onChange={(e) => set(side === "referrer" ? "referrerType" : "refereeType", e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="percent">درصد</option>
+                      <option value="amount">مبلغ (تومان)</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[10.5px] font-bold text-sage">مقدار</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={side === "referrer" ? form.referrerValue : form.refereeValue}
+                      onChange={(e) => set(side === "referrer" ? "referrerValue" : "refereeValue", e.target.value)}
+                      className={inputCls}
+                      dir="ltr"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[10.5px] font-bold text-sage">مهلت (روز)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={side === "referrer" ? form.referrerDays : form.refereeDays}
+                      onChange={(e) => set(side === "referrer" ? "referrerDays" : "refereeDays", e.target.value)}
+                      className={inputCls}
+                      dir="ltr"
+                    />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold text-sage">امتیاز وفاداری به ازای هر زیرمجموعه (برای معرف)</span>
               <input
                 type="number"
                 min={0}
-                value={form.tierGoldSpend}
-                onChange={(e) => set("tierGoldSpend", e.target.value)}
+                value={form.referralPoints}
+                onChange={(e) => set("referralPoints", e.target.value)}
                 className={inputCls}
+                dir="ltr"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-bold text-sage">
-                آستانه عضویت الماسی (تومان)
-              </label>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold text-sage">شناسهٔ قالب پیامک (sms.ir)</span>
               <input
-                type="number"
-                min={0}
-                value={form.tierDiamondSpend}
-                onChange={(e) => set("tierDiamondSpend", e.target.value)}
+                value={form.referralSmsTemplate}
+                onChange={(e) => set("referralSmsTemplate", e.target.value)}
                 className={inputCls}
+                dir="ltr"
+                placeholder="مثلاً 123456"
               />
-            </div>
+              <span className="mt-1 block text-[10px] text-sage/70">
+                پارامترهای قالب: CODE (کد تخفیف)، DAYS (مهلت)، NAME (نام). خالی = پیامک ارسال نشود.
+              </span>
+            </label>
           </div>
           {saveBar}
         </section>
@@ -1668,75 +1494,6 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
 
           {saveBar}
         </div>
-      )}
-
-      {/* ================= دسته‌بندی فروشگاه ================= */}
-      {tab === "categories" && (
-        <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
-          <div className="flex items-center gap-2 text-gold">
-            <LayoutGrid size={16} />
-            <h2 className="text-sm font-black">دسته‌بندی‌های صفحهٔ فروشگاه</h2>
-          </div>
-          <p className="mt-1.5 text-[11px] leading-6 text-sage">
-            این نام‌ها همان دکمه‌های بالای صفحهٔ فروشگاه‌اند و باید دقیقاً با
-            «دسته‌بندی» ثبت‌شده در محصولات یکی باشند؛ وگرنه آن دکمه نتیجه‌ای
-            نشان نمی‌دهد. دکمهٔ «همه» خودکار اضافه می‌شود.
-          </p>
-
-          <div className="mt-4 space-y-2">
-            {shopCats.length === 0 && (
-              <p className="rounded-xl glass-soft p-4 text-center text-[11px] text-sage">
-                فهرست خالی است — در این حالت سه دستهٔ پیش‌فرض (زنانه، مردانه،
-                یونیسکس) نمایش داده می‌شود.
-              </p>
-            )}
-            {shopCats.map((cat, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <GripVertical size={14} className="shrink-0 text-sage/50" />
-                <input
-                  value={cat}
-                  onChange={(e) => setShopCat(i, e.target.value)}
-                  placeholder="مثلاً: اودی پارفوم"
-                  className={inputCls}
-                />
-                <button
-                  type="button"
-                  onClick={() => moveShopCat(i, -1)}
-                  className="rounded-lg border border-gold/25 p-2 text-gold-soft hover:bg-gold/10"
-                  aria-label="بالا"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveShopCat(i, 1)}
-                  className="rounded-lg border border-gold/25 p-2 text-gold-soft hover:bg-gold/10"
-                  aria-label="پایین"
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeShopCat(i)}
-                  className="rounded-lg border border-rose-400/30 p-2 text-rose-300 hover:bg-rose-400/10"
-                  aria-label="حذف"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={addShopCat}
-            className="btn-sky mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold"
-          >
-            <Plus size={14} /> دستهٔ جدید
-          </button>
-
-          {saveBar}
-        </section>
       )}
 
       {tab === "contact" && (

@@ -29,6 +29,8 @@ export function parseCouponList(json) {
       code: normalizeCouponCode(c?.code),
       percent: Math.min(90, Math.max(0, Math.round(Number(c?.percent) || 0))),
       amount: Math.max(0, Math.round(Number(c?.amount) || 0)),
+      minOrder: Math.max(0, Math.round(Number(c?.minOrder) || 0)),
+      maxUses: Math.max(0, Math.round(Number(c?.maxUses) || 0)),
       until: /^\d{4}-\d{2}-\d{2}$/.test(String(c?.until ?? "")) ? String(c.until) : "",
     }))
     .filter((c) => CODE_RE.test(c.code) && (c.percent > 0 || c.amount > 0));
@@ -36,7 +38,8 @@ export function parseCouponList(json) {
 
 export function couponExpired(until, now = new Date()) {
   if (!until) return false;
-  const end = new Date(`${until}T23:59:59`);
+  // پایان روز به‌صورت UTC تا نتیجه به منطقهٔ زمانی سرور وابسته نباشد.
+  const end = new Date(`${until}T23:59:59Z`);
   return !(Number.isFinite(end.getTime()) && end.getTime() > now.getTime());
 }
 
@@ -50,8 +53,10 @@ export function findCoupon(list, rawCode, now = new Date()) {
   return { coupon };
 }
 
-/** مبلغ تخفیفِ یک کوپن روی جمع کالا — درصدی یا مبلغی (تومان). */
+/** مبلغ تخفیفِ یک کوپن روی جمع کالا — اگر هم درصدی و هم مبلغی باشد، بزرگ‌تر اعمال می‌شود. */
 export function couponAmount(subtotal, coupon) {
-  if (coupon?.amount > 0) return Math.min(subtotal, coupon.amount);
-  return Math.min(subtotal, Math.round((subtotal * (coupon?.percent || 0)) / 100));
+  const byAmount = coupon?.amount > 0 ? Math.min(subtotal, coupon.amount) : 0;
+  const byPercent =
+    coupon?.percent > 0 ? Math.min(subtotal, Math.round((subtotal * coupon.percent) / 100)) : 0;
+  return Math.max(byAmount, byPercent);
 }

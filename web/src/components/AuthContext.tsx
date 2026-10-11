@@ -25,6 +25,7 @@ type LoginInput = {
   phone?: string;
   email?: string;
   ticket: string;
+  referralCode?: string;
 };
 
 // وقتی شمارهٔ مدیر اصلی وارد شود، سرور به‌جای کاربر، { admin: true } برمی‌گرداند.

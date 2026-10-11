@@ -31,6 +31,7 @@ import { ProductVisual } from "./art";
 import { BasketIcon } from "./BasketIcon";
 import { useAuth } from "./AuthContext";
 import { formatToman, toFa } from "@/lib/data";
+import { ItemCampaignTags } from "@/components/InvoiceItemTags";
 import type { ShippingOption, ShippingQuote } from "@/lib/types";
 import { Field, SelectField, TextField } from "./Field";
 import { useRouter } from "next/navigation";
@@ -44,6 +45,12 @@ export type CartLine = {
   image?: string | null;
   sizeMl: number;
   qty: number;
+  /** برای نمایش کامل فاکتور در سبد: قیمت اصلی + عضویت جشنواره/تخفیف. */
+  oldPrice?: number | null;
+  festival?: boolean;
+  discount?: boolean;
+  discountType?: "" | "percent" | "amount";
+  discountValue?: number | null;
 };
 
 type Ctx = {
@@ -275,6 +282,14 @@ export function CartDrawer() {
     fee: 0,
   });
 
+  // وفاداری ستاره‌ای — مزایای مشتری تا در فاکتورِ سبد هم نشان داده شود
+  // (مثلاً «ارسال رایگان — از مزایای ستارهٔ ۲»).
+  const [loyalty, setLoyalty] = useState<{
+    star: number;
+    perks: string[];
+    stars: { points?: number; title?: string; perks?: string[] }[];
+  } | null>(null);
+
   // تایید قوانین و مقررات برای پرداخت
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -318,7 +333,36 @@ export function CartDrawer() {
 
   const { user } = useAuth();
 
+  // مزایای ستارهٔ مشتری (فقط برای لاگین‌شده‌ها) — برای پیش‌نمایش در فاکتور سبد.
+  useEffect(() => {
+    if (!open || !user) {
+      setLoyalty(null);
+      return;
+    }
+    let alive = true;
+    fetch("/api/account/loyalty")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive || !d) return;
+        setLoyalty({
+          star: Number(d.star) || 0,
+          perks: Array.isArray(d.perks) ? d.perks : [],
+          stars: Array.isArray(d.stars) ? d.stars : [],
+        });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [open, user]);
+
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  // قیمت اصلی اقلام و مجموع تخفیف جشنواره/تخفیف (برای فاکتور کامل سبد).
+  const originalSubtotal = items.reduce(
+    (s, i) => s + (i.oldPrice != null && i.oldPrice > i.price ? i.oldPrice : i.price) * i.qty,
+    0,
+  );
+  const campaignDiscount = Math.max(0, originalSubtotal - subtotal);
 
   // The courier the buyer picked, re-read from the latest quote so the price
   // shown always belongs to the current cart and destination.
@@ -332,9 +376,29 @@ export function CartDrawer() {
   const qDiscount = quote?.discount ?? null;
   const discountAmount = qDiscount?.amount ?? 0;
   const payableGoods = Math.max(0, subtotal - discountAmount);
-  const vipFee = vipOn && vipSetting.enabled ? vipSetting.fee : 0;
+
+  // مزایای ستارهٔ مشتری + عنوانِ ستارهٔ منبعِ هر مزیت (برای فاکتورِ سبد).
+  const loyaltyPerks = loyalty?.perks ?? [];
+  const perkTitle = (key: string) => {
+    if (!loyalty) return "";
+    for (let i = 0; i < loyalty.star && i < loyalty.stars.length; i++) {
+      const st = loyalty.stars[i] || {};
+      if (Array.isArray(st.perks) && st.perks.includes(key)) return st.title || `ستارهٔ ${i + 1}`;
+    }
+    return "";
+  };
+  const freeshipPerk = loyaltyPerks.includes("freeship");
+  const vipboxPerk = loyaltyPerks.includes("vipbox");
+  const giftPerk = loyaltyPerks.includes("gift");
+  const freeshipTitle = freeshipPerk ? perkTitle("freeship") : "";
+  const vipboxTitle = vipboxPerk ? perkTitle("vipbox") : "";
+  const giftTitle = giftPerk ? perkTitle("gift") : "";
+  // با مزیتِ ستاره، باکس VIP رایگان و خودکار اعمال می‌شود (حتی بدونِ انتخاب).
+  const vipFee = vipboxPerk ? 0 : vipOn && vipSetting.enabled ? vipSetting.fee : 0;
+  // با مزیتِ ستاره، ارسال رایگان می‌شود (سرور هم همین را اعمال می‌کند).
+  const effectiveShipping = freeshipPerk ? 0 : shippingCost;
   // پس‌کرایه: کرایه درِ منزل داده می‌شود؛ آنلاین فقط کالا (+ باکس VIP).
-  const onlineTotal = codOn ? payableGoods + vipFee : payableGoods + vipFee + shippingCost;
+  const onlineTotal = codOn ? payableGoods + vipFee : payableGoods + vipFee + effectiveShipping;
   const total = onlineTotal;
 
   // Free-shipping progress uses the server threshold once we have a quote,
@@ -649,6 +713,10 @@ export function CartDrawer() {
                           <p className="truncate text-sm font-bold text-cream">{i.name}</p>
                           <p className="mt-0.5 text-[11px] text-sage">{toFa(i.sizeMl)} میل</p>
                           <p className="mt-1 text-xs font-bold text-gold-soft">{formatToman(i.price)}</p>
+                          <ItemCampaignTags
+                            item={{ price: i.price, qty: i.qty, oldPrice: i.oldPrice, festival: i.festival, discount: i.discount }}
+                            tone="dark"
+                          />
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <button
@@ -1026,33 +1094,68 @@ export function CartDrawer() {
                   {/* ── Invoice breakdown ──────────────────────────── */}
                   <div className="space-y-2 rounded-xl glass-soft px-4 py-3">
                     <div className="flex items-center justify-between text-xs text-sage">
-                      <span>جمع سبد خرید</span>
+                      <span>
+                        جمع سبد خرید{" "}
+                        {campaignDiscount > 0 && (
+                          <s className="text-sage/50">{formatToman(originalSubtotal)}</s>
+                        )}
+                      </span>
                       <span className="text-cream">{formatToman(subtotal)}</span>
                     </div>
+                    {campaignDiscount > 0 && (
+                      <div className="flex items-center justify-between text-xs text-emerald-300">
+                        <span className="flex items-center gap-1">
+                          <BadgePercent size={12} /> تخفیف جشنواره / تخفیف
+                        </span>
+                        <span>−{formatToman(campaignDiscount)}</span>
+                      </div>
+                    )}
                     {qDiscount && (
                       <div className="flex items-center justify-between text-xs text-emerald-300">
                         <span className="flex items-center gap-1">
                           <BadgePercent size={12} />
-                          {qDiscount.source === "coupon"
-                            ? qDiscount.percent
-                              ? `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.percent)}٪)`
-                              : `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.fixed ?? 0)} تومان)`
-                            : `تخفیف خرید اول (${toFa(qDiscount.percent)}٪)`}
+                          {qDiscount.source === "star"
+                            ? `تخفیف وفاداری — از مزایای ${qDiscount.title || "ستاره"}${
+                                qDiscount.percent
+                                  ? ` (${toFa(qDiscount.percent)}٪)`
+                                  : ` (${toFa(qDiscount.fixed ?? 0)} تومان)`
+                              }`
+                            : qDiscount.source === "coupon"
+                              ? qDiscount.percent
+                                ? `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.percent)}٪)`
+                                : `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.fixed ?? 0)} تومان)`
+                              : `تخفیف خرید اول (${toFa(qDiscount.percent)}٪)`}
                         </span>
                         <span>−{formatToman(discountAmount)}</span>
                       </div>
                     )}
-                    {vipOn && vipSetting.enabled && vipFee > 0 && (
-                      <div className="flex items-center justify-between text-xs text-sage">
+                    {vipboxPerk ? (
+                      <div className="flex items-center justify-between text-xs text-emerald-300">
                         <span className="flex items-center gap-1">
-                          <Gem size={12} className="text-gold" /> {vipSetting.title}
+                          <Gem size={12} className="text-gold" /> {vipSetting.title} — رایگان
+                          {vipboxTitle ? ` (از مزایای ${vipboxTitle})` : ""}
                         </span>
-                        <span className="text-cream">{formatToman(vipFee)}</span>
+                        <span>رایگان</span>
                       </div>
+                    ) : (
+                      vipOn &&
+                      vipSetting.enabled &&
+                      vipFee > 0 && (
+                        <div className="flex items-center justify-between text-xs text-sage">
+                          <span className="flex items-center gap-1">
+                            <Gem size={12} className="text-gold" /> {vipSetting.title}
+                          </span>
+                          <span className="text-cream">{formatToman(vipFee)}</span>
+                        </div>
+                      )
                     )}
                     <div className="flex items-center justify-between text-xs text-sage">
                       <span>هزینه ارسال{selected ? ` (${selected.label})` : ""}</span>
-                      {codOn && selected ? (
+                      {freeshipPerk ? (
+                        <span className="text-gold-soft">
+                          رایگان{freeshipTitle ? ` — از مزایای ${freeshipTitle}` : ""}
+                        </span>
+                      ) : codOn && selected ? (
                         <span className="text-amber-300">پس‌کرایه — درِ منزل</span>
                       ) : (
                         <span className={selected?.free ? "text-gold-soft" : "text-cream"}>
@@ -1060,6 +1163,15 @@ export function CartDrawer() {
                         </span>
                       )}
                     </div>
+                    {giftPerk && (
+                      <div className="flex items-center justify-between text-xs text-emerald-300">
+                        <span className="flex items-center gap-1">
+                          <Gem size={12} className="text-gold" /> هدیهٔ وفاداری
+                          {giftTitle ? ` — از مزایای ${giftTitle}` : ""}
+                        </span>
+                        <span>رایگان</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between border-t border-gold/15 pt-2">
                       <span className="text-xs font-bold text-gold-soft">مبلغ قابل پرداخت</span>
                       <span className="text-base font-black text-gold-soft">{formatToman(total)}</span>

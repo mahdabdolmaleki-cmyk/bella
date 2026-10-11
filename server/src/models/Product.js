@@ -39,6 +39,9 @@ const productSchema = new mongoose.Schema(
     id: { type: Number, unique: true }, // unique already builds the index
     name: { type: String, required: true, trim: true, maxlength: 120 },
     nameEn: { type: String, required: true, trim: true, maxlength: 120 },
+    // نوع محصول: «perfume» = ادکلن/عطر (با نُتِ رایحه، ماندگاری، ویژوالِ شیشه)؛
+    // «general» = سایر محصولات (خوشبوکننده، اسپری و…) با فرم و صفحهٔ ساده‌تر.
+    productType: { type: String, default: "perfume", enum: ["perfume", "general"], index: true },
     tagline: { type: String, default: "", maxlength: 200 },
     description: { type: String, default: "", maxlength: 2000 },
     topNotes: { type: String, default: "", maxlength: 200 },
@@ -52,8 +55,21 @@ const productSchema = new mongoose.Schema(
     glass: { type: String, default: "#0e3b26" },
     liquid: { type: String, default: "#d4af37" },
     category: { type: String, default: "یونیسکس", index: true },
+    // شناسهٔ گرهٔ دستهٔ درختی (Category). منبع حقیقت اتصال محصول به دسته؛
+    // نام `category` فقط برای نمایش همگام نگه داشته می‌شود.
+    categoryId: { type: Number, default: null, index: true },
     badge: { type: String, default: null },
     bestseller: { type: Boolean, default: false },
+    // امتیاز وفاداری این محصول (برای سیستم ستاره‌ها) — در فرم محصول ثبت می‌شود.
+    points: { type: Number, default: 1, min: 0, max: 100000 },
+    // عضویت در کمپین‌ها: بنر جشنواره و بنر تخفیف‌ها هر کدام فقط محصولات
+    // علامت‌خوردهٔ خودشان را در فروشگاه فیلتر می‌کنند.
+    festival: { type: Boolean, default: false, index: true },
+    discount: { type: Boolean, default: false, index: true },
+    // نوع و مقدار تخفیفِ اعمال‌شده تا در کارت/صفحهٔ محصول درست نمایش داده شود:
+    // discountType = "percent" | "amount" | "" ؛ discountValue = عدد (درصد یا تومان).
+    discountType: { type: String, default: "", enum: ["", "percent", "amount"] },
+    discountValue: { type: Number, default: null },
     active: { type: Boolean, default: true },
     image: { type: String, default: null },
     // Inventory. Never exposed to customers — see toDTO() vs toAdminDTO().
@@ -122,6 +138,7 @@ productSchema.methods.toDTO = function () {
     id: this.id,
     name: clean(this.name),
     nameEn: clean(this.nameEn),
+    productType: this.productType === "general" ? "general" : "perfume",
     tagline: clean(this.tagline),
     description: clean(this.description),
     topNotes: clean(this.topNotes),
@@ -135,8 +152,14 @@ productSchema.methods.toDTO = function () {
     glass: this.glass,
     liquid: this.liquid,
     category: clean(this.category),
+    categoryId: this.categoryId ?? null,
     badge: this.badge != null ? clean(this.badge) : null,
     bestseller: this.bestseller,
+    points: this.points ?? 1,
+    festival: this.festival === true,
+    discount: this.discount === true,
+    discountType: this.discountType || "",
+    discountValue: this.discountValue ?? null,
     active: this.active,
     image: this.image ?? null,
     inStock: this.allowBackorder || this.stock > 0,

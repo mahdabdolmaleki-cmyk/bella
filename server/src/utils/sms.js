@@ -323,3 +323,20 @@ export async function getSmsCredit() {
   if (!r.ok) return { ok: false, error: r.error || "دریافت اعتبار ناموفق بود." };
   return { ok: true, credit: Number(r.data) || 0, unit: "credit" };
 }
+
+/**
+ * ارسال قالبیِ عمومی با شناسهٔ قالب دلخواه و پارامترها (v43).
+ * paramValues: { NAME: value } — مثل { CODE: "BL123", DAYS: 10 }.
+ * برای رویدادهایی مثل کد تخفیف زیرمجموعه‌گیری که قالبشان در تنظیمات پیامک
+ * تعریف می‌شود. اگر سرویس پیامک پیکربندی نشده باشد، در کنسول چاپ می‌شود.
+ */
+export async function sendTemplateSms(phone, templateId, paramValues = {}) {
+  const tid = Number(templateId) || 0;
+  if (providerState() !== "smsir" || !tid) {
+    const txt = Object.entries(paramValues).map(([k, v]) => `${k}=${v}`).join(" ");
+    return consoleDelivery(phone, `[قالب ${templateId || "-"}] ${txt}`);
+  }
+  const parameters = Object.entries(paramValues).map(([name, value]) => ({ name, value }));
+  const r = await sendVerify(tid, phone, parameters);
+  return r.ok;
+}

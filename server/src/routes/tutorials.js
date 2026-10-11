@@ -73,7 +73,7 @@ router.get(
   rateLimit({ name: "tutorials-read", windowMs: 60 * 1000, max: 120 }),
   optionalUser,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const tutorial = await Tutorial.findOne({ id, published: true });
@@ -102,7 +102,7 @@ router.post(
   rateLimit({ name: "tutorials-vote", windowMs: 60 * 1000, max: 30 }),
   optionalUser,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const raw = int(req.body?.value, { min: -1, max: 1, fallback: null, clamp: false });
@@ -143,7 +143,7 @@ router.get(
   "/:id/comments",
   rateLimit({ name: "tutorial-comments-list", windowMs: 60 * 1000, max: 120 }),
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const limit = int(req.query.limit, { min: 1, max: 50, fallback: 20 }) || 20;
@@ -171,7 +171,7 @@ router.post(
   rateLimit({ name: "tutorial-comments-create", windowMs: 60 * 60 * 1000, max: 10 }),
   optionalUser,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const exists = await Tutorial.exists({ id, published: true });

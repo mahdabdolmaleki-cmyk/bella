@@ -1,5 +1,8 @@
 import { Router } from "express";
 import Order from "../models/Order.js";
+import User from "../models/User.js";
+import { parseStarsConfig, starLevelFor, starPerks } from "../utils/stars.js";
+import { ensureReferralCode } from "../utils/referral.js";
 import Message from "../models/Message.js";
 import Product from "../models/Product.js";
 import Settings from "../models/Settings.js";
@@ -14,13 +17,13 @@ import { int, str } from "../utils/validate.js";
  * Customer-account extras: the loyalty club (points + membership tier) and the
  * favourites list.
  *
- * IMPORTANT DESIGN DECISION — points are DERIVED, never stored as a mutable
- * balance. They are recomputed from the customer's settled orders on every
- * request. That means:
- *   - changing the conversion rate in the admin panel instantly and correctly
- *     re-values every customer, with no migration job;
- *   - a refunded or cancelled order cannot leave phantom points behind;
- *   - there is no balance field an attacker could try to inflate.
+ * DESIGN — امتیاز وفاداری در فیلد User.points «ذخیره» می‌شود (نه بازمحاسبه در
+ * هر درخواست). این مقدار از این مسیرها به‌صورت یک‌بارمصرف تغییر می‌کند:
+ *   1) ثبت سفارش (وضعیت «در انتظار تأیید») — awardOrderPoints در models/Order.js
+ *      امتیاز را می‌دهد؛ اگر همان سفارش «لغو شد» شود، revokeOrderPoints دقیقاً
+ *      همان مقدار را کم می‌کند (هر دو اتمیک و idempotent)؛
+ *   2) زیرمجموعه‌گیری — utils/referral.js؛
+ *   3) ویرایش دستی مدیر در پنل.
  */
 const router = Router();
 
@@ -33,17 +36,7 @@ const SETTLED_MATCH = {
   $or: [{ paymentStatus: "paid" }, { status: "تحویل داده شد" }],
 };
 
-export const TIERS = [
-  { key: "regular", label: "عادی", icon: "✦", color: "#93ac9c" },
-  { key: "gold", label: "طلایی", icon: "★", color: "#d4af37" },
-  { key: "diamond", label: "الماسی", icon: "◆", color: "#8fd3ff" },
-];
-
-function tierFor(totalSpent, goldAt, diamondAt) {
-  if (diamondAt > 0 && totalSpent >= diamondAt) return "diamond";
-  if (goldAt > 0 && totalSpent >= goldAt) return "gold";
-  return "regular";
-}
+// (کد مردهٔ TIERS/tierFor حذف شد — سیستم وفاداری ستاره‌ای جایگزین شده است.)
 
 router.use(requireUser);
 router.use(rateLimit({ name: "account-api", windowMs: 60 * 1000, max: 120 }));
@@ -54,10 +47,14 @@ router.use(rateLimit({ name: "account-api", windowMs: 60 * 1000, max: 120 }));
 router.get(
   "/loyalty",
   ah(async (req, res) => {
+    // وفاداری ستاره‌ای (v42): امتیاز ذخیره‌شدهٔ کاربر + آستانه‌های قابل‌تنظیم.
     const settings = await Settings.getSingleton();
-    const perPoint = Math.max(1, Number(settings.tomanPerPoint) || 10000);
-    const goldAt = Math.max(0, Number(settings.tierGoldSpend) || 0);
-    const diamondAt = Math.max(0, Number(settings.tierDiamondSpend) || 0);
+    const cfg = parseStarsConfig(settings.starsConfigJson);
+    const me = await User.findById(req.user._id).select("points vip referralCode referredBy");
+    // هر مشتری باید کد معرف داشته باشد تا بخش زیرمجموعه‌گیری همیشه نشان داده شود.
+    const referralCode = me ? await ensureReferralCode(me) : "";
+    const points = me?.points ?? 0;
+    const star = starLevelFor(points, cfg);
 
     const rows = await Order.aggregate([
       { $match: { user: req.user._id, ...SETTLED_MATCH } },
@@ -65,31 +62,36 @@ router.get(
     ]);
     const totalSpent = rows[0]?.totalSpent || 0;
     const orders = rows[0]?.orders || 0;
-    const points = Math.floor(totalSpent / perPoint);
-    const tier = tierFor(totalSpent, goldAt, diamondAt);
 
-    const nextThreshold =
-      tier === "regular" && goldAt > 0
-        ? { tier: "gold", at: goldAt }
-        : tier === "gold" && diamondAt > 0
-          ? { tier: "diamond", at: diamondAt }
-          : null;
+    // تعداد زیرمجموعه‌هایی که با کدِ این مشتری ثبت‌نام کرده‌اند.
+    const referralCount = me ? await User.countDocuments({ referredBy: me._id }) : 0;
 
+    // مزایا به‌صورت آرایهٔ کلید (برای نمایش) + جزئیات تخفیف (درصدی/مبلغی).
+    const ben = starPerks(star, cfg);
+    const perks = ["vipbox", "freeship", "gift"].filter((k) => ben[k]);
+    if (ben.discountPercent > 0 || ben.discountAmount > 0) perks.push("discount");
+
+    const nextStar = star < cfg.length ? cfg[star] : null;
     res.json({
       points,
-      tier,
-      tiers: TIERS,
+      star,
+      stars: cfg,
+      perks,
+      discountPercent: ben.discountPercent,
+      discountAmount: ben.discountAmount,
+      vip: me?.vip === true,
+      referralCode,
+      referralCount,
       totalSpent,
       orders,
-      tomanPerPoint: perPoint,
-      thresholds: { gold: goldAt, diamond: diamondAt },
-      next: nextThreshold
+      next: nextStar
         ? {
-            ...nextThreshold,
-            remaining: Math.max(0, nextThreshold.at - totalSpent),
+            title: nextStar.title,
+            at: Number(nextStar.points) || 0,
+            remaining: Math.max(0, (Number(nextStar.points) || 0) - points),
             progress:
-              nextThreshold.at > 0
-                ? Math.min(100, Math.round((totalSpent / nextThreshold.at) * 100))
+              (Number(nextStar.points) || 0) > 0
+                ? Math.min(100, Math.round((points / (Number(nextStar.points) || 1)) * 100))
                 : 0,
           }
         : null,
@@ -113,7 +115,7 @@ router.get(
 router.post(
   "/favorites",
   ah(async (req, res) => {
-    const productId = int(req.body?.productId, { min: 1, max: 1e9 });
+    const productId = int(req.body?.productId, { min: 1, max: 1e9, clamp: false });
     if (productId === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const exists = await Product.exists({ id: productId, active: true });
@@ -231,7 +233,7 @@ router.post(
 router.delete(
   "/favorites/:productId",
   ah(async (req, res) => {
-    const productId = int(req.params.productId, { min: 1, max: 1e9 });
+    const productId = int(req.params.productId, { min: 1, max: 1e9, clamp: false });
     if (productId === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
     await req.user.updateOne({ $pull: { favorites: productId } });
     res.json({ ok: true, favorite: false });

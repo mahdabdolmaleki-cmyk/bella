@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, Loader2, Receipt, Search, Trash2 } from "lucide-react";
 import { formatToman } from "@/lib/data";
 import { InvoiceLines } from "@/components/InvoiceLines";
+import { ItemCampaignTags } from "@/components/InvoiceItemTags";
 
 export type Customer = {
   id: string;
@@ -15,6 +16,9 @@ export type Customer = {
   phoneVerified?: boolean;
   orderCount: number;
   totalSpent: number;
+  points?: number;
+  vip?: boolean;
+  star?: number;
 };
 
 // همان Order DTO که مشتری در حساب خودش می‌بیند (برای تفکیک دقیق فاکتور).
@@ -78,12 +82,12 @@ function InvoiceCard({ order }: { order: InvoiceOrder }) {
       <div className="mt-2.5 space-y-1">
         {order.items.map((it) => (
           <div key={it.id} className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="min-w-0 truncate text-cream">
-              {it.name}
-              <span className="text-sage">
-                {" "}
-                × {faNum(it.qty)}
+            <span className="min-w-0 text-cream">
+              <span className="truncate">
+                {it.name}
+                <span className="text-sage"> × {faNum(it.qty)}</span>
               </span>
+              <ItemCampaignTags item={it} tone="light" />
             </span>
             <span className="shrink-0 text-gold-soft">{formatToman(it.price * it.qty)}</span>
           </div>
@@ -117,6 +121,13 @@ export default function UsersAdmin() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // v42: تفکیک ستاره/VIP + ویرایش وفاداری مشتری (فقط ادمین).
+  const [starFilter, setStarFilter] = useState<number | "all">("all");
+  const [vipOnly, setVipOnly] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editPoints, setEditPoints] = useState("0");
+  const [editVip, setEditVip] = useState(false);
+  const [savingLoyalty, setSavingLoyalty] = useState(false);
   // v39: فاکتورهای خرید مشتری — باز/بسته در همان ردیف
   const [openId, setOpenId] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Record<string, InvoiceOrder[] | "loading" | string>>({});
@@ -124,7 +135,11 @@ export default function UsersAdmin() {
   const loadCustomers = useCallback(async (query = "") => {
     setError("");
     try {
-      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(query)}`);
+      const p = new URLSearchParams();
+      p.set("search", query);
+      if (starFilter !== "all") p.set("star", String(starFilter));
+      if (vipOnly) p.set("vip", "1");
+      const res = await fetch(`/api/admin/users?${p.toString()}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setCustomers(data.users ?? []);
@@ -132,7 +147,7 @@ export default function UsersAdmin() {
       setError("خطا در دریافت فهرست مشتریان.");
       setCustomers([]);
     }
-  }, []);
+  }, [starFilter, vipOnly]);
 
   useEffect(() => {
     void loadCustomers();
@@ -181,6 +196,36 @@ export default function UsersAdmin() {
     }
   };
 
+  const openEdit = (c: Customer) => {
+    setEditId(c.id);
+    setEditPoints(String(c.points ?? 0));
+    setEditVip(c.vip === true);
+  };
+
+  const saveLoyalty = async () => {
+    if (!editId) return;
+    setSavingLoyalty(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/users/${editId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ points: Number(editPoints) || 0, vip: editVip }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error ?? "ذخیره نشد.");
+        return;
+      }
+      setEditId(null);
+      await loadCustomers(search);
+    } catch {
+      setError("ارتباط با سرور برقرار نشد.");
+    } finally {
+      setSavingLoyalty(false);
+    }
+  };
+
   return (
     <div>
       <h1 className="text-xl font-black text-cream">مدیریت مشتریان</h1>
@@ -214,6 +259,34 @@ export default function UsersAdmin() {
           </button>
         </div>
 
+        {/* تفکیک ستاره + بخش VIP */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold text-sage">ستاره:</span>
+          {(["all", 1, 2, 3, 4, 5] as Array<number | "all">).map((lv) => (
+            <button
+              key={String(lv)}
+              type="button"
+              onClick={() => setStarFilter(lv)}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                starFilter === lv
+                  ? "border border-gold/60 bg-gold/15 text-gold-soft"
+                  : "border border-gold/20 text-sage hover:bg-gold/10"
+              }`}
+            >
+              {lv === "all" ? "همه" : `★ ${lv}`}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setVipOnly((v) => !v)}
+            className={`rounded-full px-3 py-1 text-[11px] font-bold transition ${
+              vipOnly ? "border border-gold/60 bg-gold/15 text-gold-soft" : "border border-gold/20 text-sage hover:bg-gold/10"
+            }`}
+          >
+            فقط VIP
+          </button>
+        </div>
+
         {!customers ? (
           <div className="mt-6 flex items-center gap-2 text-sage">
             <Loader2 size={16} className="animate-spin" /> در حال بارگذاری…
@@ -229,7 +302,18 @@ export default function UsersAdmin() {
                 <div key={customer.id} className="gold-ring rounded-2xl glass-panel p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-cream">{customer.name}</p>
+                      <p className="flex flex-wrap items-center gap-2 truncate text-sm font-bold text-cream">
+                        {customer.name}
+                        {customer.vip && (
+                          <span className="rounded-full border border-gold/60 bg-gold/15 px-2 py-0.5 text-[9.5px] font-black text-gold-soft">
+                            VIP
+                          </span>
+                        )}
+                        <span className="rounded-full border border-gold/20 px-2 py-0.5 text-[9.5px] font-bold text-gold-soft">
+                          {"★".repeat(Math.min(5, customer.star ?? 0)) || "—"} ·{" "}
+                          {(customer.points ?? 0).toLocaleString("fa-IR")} امتیاز
+                        </span>
+                      </p>
                       <p className="mt-0.5 truncate text-xs text-gold-soft">
                         {customer.email || "بدون ایمیل"}
                       </p>
@@ -257,6 +341,13 @@ export default function UsersAdmin() {
                           size={13}
                           className={`transition-transform ${open ? "rotate-180" : ""}`}
                         />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(customer)}
+                        className="rounded-lg border border-gold/30 px-3 py-1.5 text-[11px] font-bold text-gold-soft transition hover:bg-gold/10"
+                      >
+                        وفاداری
                       </button>
                       <button
                         type="button"
@@ -291,6 +382,49 @@ export default function UsersAdmin() {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {editId === customer.id && (
+                    <div className="mt-3 border-t border-gold/15 pt-3">
+                      <p className="text-[11px] font-black text-gold-soft">ویرایش وفاداری (فقط ادمین)</p>
+                      <div className="mt-2 flex flex-wrap items-end gap-3">
+                        <label className="block">
+                          <span className="mb-1 block text-[10.5px] font-bold text-sage">امتیاز (ستاره)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editPoints}
+                            onChange={(e) => setEditPoints(e.target.value)}
+                            className={`${inputCls} w-32`}
+                            dir="ltr"
+                          />
+                        </label>
+                        <label className="flex items-center gap-2 pb-2 text-xs font-bold text-sage">
+                          <input
+                            type="checkbox"
+                            checked={editVip}
+                            onChange={(e) => setEditVip(e.target.checked)}
+                            className="h-4 w-4 accent-[#d4af7c]"
+                          />
+                          مشتری VIP باشد
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void saveLoyalty()}
+                          disabled={savingLoyalty}
+                          className="rounded-full border border-gold/40 px-4 py-1.5 text-[11px] font-bold text-gold-soft hover:bg-gold/10 disabled:opacity-50"
+                        >
+                          {savingLoyalty ? "در حال ذخیره…" : "ذخیره"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditId(null)}
+                          className="rounded-full border border-gold/20 px-4 py-1.5 text-[11px] font-bold text-sage hover:bg-gold/10"
+                        >
+                          انصراف
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

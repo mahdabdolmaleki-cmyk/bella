@@ -19,7 +19,7 @@ router.get(
   "/:productId",
   rateLimit({ name: "reviews-list", windowMs: 60 * 1000, max: 120 }),
   ah(async (req, res) => {
-    const productId = int(req.params.productId, { min: 1, max: 1e9 });
+    const productId = int(req.params.productId, { min: 1, max: 1e9, clamp: false });
     if (productId === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const limit = int(req.query.limit, { min: 1, max: 50, fallback: 20 }) || 20;
@@ -76,7 +76,7 @@ router.post(
   rateLimit({ name: "reviews-create", windowMs: 60 * 60 * 1000, max: 8 }),
   optionalUser,
   ah(async (req, res) => {
-    const productId = int(req.params.productId, { min: 1, max: 1e9 });
+    const productId = int(req.params.productId, { min: 1, max: 1e9, clamp: false });
     if (productId === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
 
     const product = await Product.findOne({ id: productId, active: true }).select("_id id");
@@ -100,12 +100,29 @@ router.post(
       }
     }
 
+    // سقف روزانهٔ نقد: هر کاربر (و برای مهمان، هر IP) حداکثر ۱۰ نقد در روز —
+    // جایگزینِ انتشار بدون نظارت، برای جلوگیری از اسپم.
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const dailyMatch = req.user ? { user: req.user._id } : { ip: clientIp(req) };
+    const todayCount = await Review.countDocuments({
+      ...dailyMatch,
+      createdAt: { $gte: startOfToday },
+    });
+    if (todayCount >= 10) {
+      return res.status(429).json({
+        error: "به سقف ۱۰ نقد در روز رسیده‌اید. لطفاً فردا دوباره تلاش کنید.",
+      });
+    }
+
     let verifiedBuyer = false;
     if (req.user) {
+      // فقط سفارش پرداخت‌شده یا تحویل‌شده کاربر را «خریدار تأییدشده» می‌کند.
       verifiedBuyer = Boolean(
         await Order.exists({
           user: req.user._id,
           "items.id": productId,
+          $or: [{ paymentStatus: "paid" }, { status: "تحویل داده شد" }],
         })
       );
     }

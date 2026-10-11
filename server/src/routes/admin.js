@@ -4,9 +4,11 @@ import Product, {
   PRODUCT_DESCRIPTION_BLOCK_TYPES,
   PRODUCT_HIGHLIGHT_MAX,
 } from "../models/Product.js";
+import Category from "../models/Category.js";
 import Order, { ORDER_STATUSES } from "../models/Order.js";
 import Message from "../models/Message.js";
-import Settings, { NUMERIC_SETTINGS } from "../models/Settings.js";
+import Settings, { NUMERIC_SETTINGS, clearSettingsCache } from "../models/Settings.js";
+import { parseStarsConfig, starLevelFor } from "../utils/stars.js";
 import User from "../models/User.js";
 import {
   readLogs,
@@ -116,6 +118,7 @@ router.post(
     if (!data.name || !data.nameEn || data.price == null) {
       return res.status(400).json({ error: "\u0646\u0627\u0645\u060c \u0646\u0627\u0645 \u0627\u0646\u06af\u0644\u06cc\u0633\u06cc \u0648 \u0642\u06cc\u0645\u062a \u0627\u0644\u0632\u0627\u0645\u06cc \u0627\u0633\u062a." });
     }
+    await applyCategory(data, req.body);
     const product = new Product(data);
     await product.save();
     logActivity(req, { action: "product.create", target: product.name, status: 201, meta: `stock=${product.stock}` });
@@ -127,12 +130,13 @@ router.patch(
   "/products/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0646\u0627\u0645\u0639\u062a\u0628\u0631." });
     const product = await Product.findOne({ id });
     if (!product) return res.status(404).json({ error: "\u0645\u062d\u0635\u0648\u0644 \u06cc\u0627\u0641\u062a \u0646\u0634\u062f." });
     const previousMedia = productMediaUrls(product);
     Object.assign(product, sanitizeProduct(req.body || {}, true));
+    await applyCategory(product, req.body);
     await product.save();
     const currentMedia = productMediaUrls(product);
     for (const url of previousMedia) {
@@ -143,12 +147,86 @@ router.patch(
   })
 );
 
+// POST /api/admin/products/campaign — انتخاب تکی/چندتایی/همهٔ محصولات برای
+// کمپین جشنواره یا تخفیف + ثبت درصد/مبلغ تخفیف و تگ (برچسب).
+// تخفیف درصدی: oldPrice = price / (1 - p/100)؛ مبلغی: oldPrice = price + amount.
+router.post(
+  "/products/campaign",
+  requireAdminWrite,
+  ah(async (req, res) => {
+    const ids = Array.isArray(req.body?.ids)
+      ? req.body.ids.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)
+      : [];
+    const all = req.body?.all === true;
+    if (!all && !ids.length) return res.status(400).json({ error: "محصولی انتخاب نشده است." });
+
+    const pct = req.body?.discountPercent !== undefined ? int(req.body.discountPercent, { min: 0, max: 90, fallback: null }) : null;
+    const amt = req.body?.discountAmount !== undefined ? int(req.body.discountAmount, { min: 0, max: 1e12, fallback: null }) : null;
+    const hasCampaignField = req.body?.festival !== undefined || req.body?.discount !== undefined;
+    const hasPriceField = pct !== null || amt !== null;
+    const hasBadge = req.body?.badge !== undefined;
+    if (!hasCampaignField && !hasPriceField && !hasBadge)
+      return res.status(400).json({ error: "تغییری برای اعمال مشخص نشده است." });
+
+    const festivalOn = req.body?.festival === true || req.body?.festival === "1";
+    const discountOn = req.body?.discount === true || req.body?.discount === "1";
+    // تگ جشنواره: هنگام افزودن به جشنواره، تگ فعلی محصول بازنویسی می‌شود.
+    const festBadge = str(req.body?.badge ?? "جشنواره", { max: 40 }) || "جشنواره";
+
+    const docs = await Product.find(all ? { active: true } : { id: { $in: ids } });
+    let count = 0;
+    for (const p of docs) {
+      if (req.body?.festival !== undefined) {
+        p.festival = festivalOn;
+        // افزودن به جشنواره ⇒ تگ محصول (اگر دارد) به تگ جشنواره تغییر می‌کند.
+        if (festivalOn) p.badge = festBadge;
+      }
+      if (req.body?.discount !== undefined) {
+        p.discount = discountOn;
+        if (discountOn) {
+          // ذخیرهٔ نوع و مقدار تخفیف تا در کارت/صفحهٔ محصول درست نمایش داده شود.
+          if (pct !== null) {
+            p.discountType = "percent";
+            p.discountValue = pct;
+            p.oldPrice = Math.round(p.price / (1 - pct / 100));
+          } else if (amt !== null) {
+            p.discountType = "amount";
+            p.discountValue = amt;
+            p.oldPrice = p.price + amt;
+          }
+        } else {
+          p.discountType = "";
+          p.discountValue = null;
+        }
+      }
+      // اگر فقط تگ (بدون تغییر جشنواره) فرستاده شد، همان اعمال می‌شود.
+      if (hasBadge && req.body?.festival === undefined) p.badge = str(req.body.badge, { max: 40 }) || null;
+      await p.save();
+      count++;
+    }
+
+    logActivity(req, {
+      action: "product.campaign",
+      target: all ? "همه محصولات" : `${ids.length} محصول`,
+      status: 200,
+      meta: [
+        req.body?.festival !== undefined ? `festival=${festivalOn ? 1 : 0}` : "",
+        req.body?.discount !== undefined ? `discount=${discountOn ? 1 : 0}` : "",
+        pct !== null ? `pct=${pct}` : "",
+        amt !== null ? `amt=${amt}` : "",
+        hasBadge ? `badge=1` : "",
+      ].filter(Boolean).join(","),
+    });
+    res.json({ ok: true, count });
+  })
+);
+
 // Adjust inventory only: POST /products/:id/stock { delta } or { set }
 router.post(
   "/products/:id/stock",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0646\u0627\u0645\u0639\u062a\u0628\u0631." });
 
     const setTo = req.body?.set === undefined ? null : int(req.body.set, { min: 0, max: 1000000 });
@@ -177,7 +255,7 @@ router.delete(
   "/products/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "\u0634\u0646\u0627\u0633\u0647 \u0646\u0627\u0645\u0639\u062a\u0628\u0631." });
     const product = await Product.findOne({ id });
     if (!product) return res.status(404).json({ error: "\u0645\u062d\u0635\u0648\u0644 \u06cc\u0627\u0641\u062a \u0646\u0634\u062f." });
@@ -208,7 +286,7 @@ router.patch(
   "/orders/:id",
   requireAdminWrite,
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     const status = str(req.body?.status, { max: 40 });
     // The courier barcode is optional: an admin may only be updating it, or
     // only the status, or both in one request.
@@ -236,6 +314,8 @@ router.patch(
       if (order.paymentStatus !== "paid") order.paymentStatus = "failed";
       // لغو شد → به‌صورت پیش‌فرض از گزارش فروش حذف می‌شود (v36)
       order.excludeFromSales = true;
+      // آزادسازی کلید یکتای کوپن تا کدِ یک‌بارمصرفِ این مشتری دوباره قابل استفاده باشد.
+      order.couponUseKey = undefined;
     }
 
     if (hasTracking) order.trackingCode = trackingCode;
@@ -293,7 +373,7 @@ router.get(
 // ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------
-function customerDTO(user, stats) {
+function customerDTO(user, stats, starLevel = 0) {
   return {
     id: String(user._id),
     name: user.name,
@@ -304,6 +384,9 @@ function customerDTO(user, stats) {
     createdAt: user.createdAt,
     orderCount: stats?.count || 0,
     totalSpent: stats?.total || 0,
+    points: user.points ?? 0,
+    vip: user.vip === true,
+    star: starLevel,
   };
 }
 
@@ -319,6 +402,11 @@ router.get(
       filter.$or = [{ name: re }, { email: re }, { phone: re }];
     }
 
+    // تفکیک بر اساس ستاره / VIP (v42) — ستاره از امتیاز و پیکربندی محاسبه می‌شود.
+    const starFilter = int(req.query?.star, { min: 0, max: 9, fallback: null });
+    const vipOnly = str(req.query?.vip, { max: 2 }) === "1";
+    if (vipOnly) filter.vip = true;
+
     const users = await User.find(filter).sort({ createdAt: -1 }).limit(500);
     const ids = users.map((u) => u._id);
     const agg = await Order.aggregate([
@@ -326,8 +414,15 @@ router.get(
       { $group: { _id: "$user", count: { $sum: 1 }, total: { $sum: "$total" } } },
     ]);
     const statsById = new Map(agg.map((a) => [String(a._id), a]));
+    const starsCfg = parseStarsConfig((await Settings.getSingleton()).starsConfigJson);
+    const levelOf = (u) => starLevelFor(u.points ?? 0, starsCfg);
 
-    res.json({ users: users.map((u) => customerDTO(u, statsById.get(String(u._id)))) });
+    let list = users;
+    if (starFilter !== null) list = list.filter((u) => levelOf(u) === starFilter);
+
+    res.json({
+      users: list.map((u) => customerDTO(u, statsById.get(String(u._id)), levelOf(u))),
+    });
   })
 );
 
@@ -355,6 +450,31 @@ router.get(
       meta: `count=${orders.length}`,
     });
     res.json({ orders: orders.map((o) => o.toDTO()) });
+  })
+);
+
+// ویرایش وفاداری مشتری (v42): فقط ادمین می‌تواند امتیاز یا وضعیت VIP را تغییر
+// دهد. ستاره خودکار از امتیاز و پیکربندی ستاره‌ها بازموکیده می‌شود.
+router.patch(
+  "/users/:id",
+  requireAdminWrite,
+  ah(async (req, res) => {
+    const user = await User.findOne({ _id: req.params.id, deletedAt: null });
+    if (!user) return res.status(404).json({ error: "کاربر یافت نشد." });
+
+    if (req.body?.points !== undefined)
+      user.points = int(req.body.points, { min: 0, max: 10000000, fallback: user.points ?? 0 }) ?? 0;
+    if (req.body?.vip !== undefined) user.vip = req.body.vip === true || req.body.vip === "1";
+    await user.save();
+
+    const starsCfg = parseStarsConfig((await Settings.getSingleton()).starsConfigJson);
+    logActivity(req, {
+      action: "customer.loyalty",
+      target: user.name,
+      status: 200,
+      meta: `points=${user.points},vip=${user.vip ? 1 : 0}`,
+    });
+    res.json({ user: customerDTO(user, null, starLevelFor(user.points ?? 0, starsCfg)) });
   })
 );
 
@@ -457,6 +577,18 @@ router.put(
       festivalActive: 6,
       festivalTitle: 120,
       festivalSubtitle: 200,
+      festivalUntil: 20,
+      starsConfigJson: 8000,
+      // زیرمجموعه‌گیری (v43)
+      referralEnabled: 2,
+      referrerType: 8,
+      referrerValue: 12,
+      referrerDays: 4,
+      refereeType: 8,
+      refereeValue: 12,
+      refereeDays: 4,
+      referralPoints: 8,
+      referralSmsTemplate: 12,
       footerAbout: 1000,
       // Home-page scroll story (JSON) + bottle colours.
       journeyStages: 4000,
@@ -681,6 +813,7 @@ router.put(
       }
     }
     await doc.save();
+    clearSettingsCache(); // کش getSingleton باطل شود تا تغییرات ادمین آنی دیده شوند
     logActivity(req, { action: "settings.update", status: 200 });
     res.json({ settings: doc.toDTO(true) });
   })
@@ -909,6 +1042,9 @@ function sanitizeProduct(body, partial = false) {
   for (const [field, max] of Object.entries(textFields)) {
     if (!partial || body[field] !== undefined) out[field] = str(body[field], { max });
   }
+  // نوع محصول: ادکلن یا سایر. فقط دو مقدارِ مجاز.
+  if (!partial || body.productType !== undefined)
+    out.productType = body.productType === "general" ? "general" : "perfume";
   if (!partial || body.glass !== undefined) out.glass = isHexColor(body.glass, "#0e3b26");
   if (!partial || body.liquid !== undefined) out.liquid = isHexColor(body.liquid, "#d4af37");
   if (!partial || body.image !== undefined) out.image = safeImage(body.image);
@@ -953,8 +1089,26 @@ function sanitizeProduct(body, partial = false) {
       .filter((value) => typeof value === "string" && value.length > 0);
   }
   if (!partial || body.bestseller !== undefined) out.bestseller = bool(body.bestseller);
+  if (!partial || body.points !== undefined)
+    out.points = int(body.points, { min: 0, max: 100000, fallback: 1 }) ?? 1;
   if (!partial || body.active !== undefined) out.active = bool(body.active);
   return out;
+}
+
+/**
+ * اتصال محصول به دستهٔ درختی بر اساس «شناسهٔ» گره.
+ * اگر `categoryId` معتبر فرستاده شد، نام نمایشی `category` هم از روی گره
+ * همگام می‌شود تا صفحهٔ محصول بدون وابستگی به درخت، نام درست را نشان دهد.
+ */
+async function applyCategory(target, body) {
+  const cid = body?.categoryId;
+  if (cid === undefined || cid === null || cid === "") return;
+  const id = Number(cid);
+  if (!Number.isFinite(id)) return;
+  const cat = await Category.findOne({ id });
+  if (!cat) return; // شناسهٔ نامعتبر → نادیده گرفته می‌شود تا داده خراب نشود
+  target.categoryId = id;
+  target.category = cat.name;
 }
 
 export default router;

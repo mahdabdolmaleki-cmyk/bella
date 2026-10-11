@@ -10,6 +10,8 @@ export type ProductDTO = {
   id: number;
   name: string;
   nameEn: string;
+  /** نوع محصول: ادکلن/عطر یا سایر محصولات (خوشبوکننده، اسپری و…). */
+  productType?: "perfume" | "general";
   tagline: string;
   description: string;
   topNotes: string;
@@ -23,6 +25,14 @@ export type ProductDTO = {
   glass: string;
   liquid: string;
   category: string;
+  /** شناسهٔ گرهٔ دستهٔ درختی که محصول به آن وصل است. */
+  categoryId?: number | null;
+  /** عضویت در کمپین جشنواره / تخفیف (ادمین تعیین می‌کند). */
+  festival?: boolean;
+  discount?: boolean;
+  /** نوع تخفیف اعمال‌شده: "percent" | "amount" | "" و مقدار آن (درصد یا تومان). */
+  discountType?: "" | "percent" | "amount";
+  discountValue?: number | null;
   badge: string | null;
   bestseller: boolean;
   active: boolean;

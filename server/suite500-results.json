@@ -1,0 +1,3431 @@
+{
+  "total": 551,
+  "pass": 551,
+  "fail": 0,
+  "byGroup": {
+    "404": {
+      "p": 1,
+      "f": 0
+    },
+    "seed": {
+      "p": 1,
+      "f": 0
+    },
+    "auth": {
+      "p": 40,
+      "f": 0
+    },
+    "products": {
+      "p": 62,
+      "f": 0
+    },
+    "categories": {
+      "p": 2,
+      "f": 0
+    },
+    "settings": {
+      "p": 3,
+      "f": 0
+    },
+    "health": {
+      "p": 2,
+      "f": 0
+    },
+    "cart": {
+      "p": 13,
+      "f": 0
+    },
+    "orders": {
+      "p": 52,
+      "f": 0
+    },
+    "coupon": {
+      "p": 15,
+      "f": 0
+    },
+    "shipping": {
+      "p": 45,
+      "f": 0
+    },
+    "payment": {
+      "p": 15,
+      "f": 0
+    },
+    "reviews": {
+      "p": 32,
+      "f": 0
+    },
+    "reviews-admin": {
+      "p": 5,
+      "f": 0
+    },
+    "tutorials": {
+      "p": 10,
+      "f": 0
+    },
+    "comments": {
+      "p": 7,
+      "f": 0
+    },
+    "comments-admin": {
+      "p": 3,
+      "f": 0
+    },
+    "account": {
+      "p": 21,
+      "f": 0
+    },
+    "admin": {
+      "p": 28,
+      "f": 0
+    },
+    "sec": {
+      "p": 23,
+      "f": 0
+    },
+    "race": {
+      "p": 10,
+      "f": 0
+    },
+    "edge": {
+      "p": 9,
+      "f": 0
+    },
+    "shipping2": {
+      "p": 31,
+      "f": 0
+    },
+    "products2": {
+      "p": 36,
+      "f": 0
+    },
+    "orders2": {
+      "p": 25,
+      "f": 0
+    },
+    "sec2": {
+      "p": 20,
+      "f": 0
+    },
+    "account2": {
+      "p": 14,
+      "f": 0
+    },
+    "admin2": {
+      "p": 16,
+      "f": 0
+    },
+    "edge2": {
+      "p": 10,
+      "f": 0
+    }
+  },
+  "results": [
+    {
+      "group": "seed",
+      "name": "ساخت ۵ محصول",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «1» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «12» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «123456» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «02112345678» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «009120000000» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «abcdefg» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «0912abcd000» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «0912000000» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «091200000000» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «null» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp شمارهٔ نامعتبر «undefined» → رد(۴۰۰/۴۲۹)",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "auth",
+      "name": "otp بدون body → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp کانال نامعتبر → ۴۰۰/۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp sms معتبر + devCode",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "verify کد درست → ticket",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "verify کد غلط → ۴xx",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "verify کد خالی → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "verify هم phone هم email → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "verify بدون phone/email → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل معتبر",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل نامعتبر → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل «» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل «a» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل «a@» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل «@b.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل «a b@c.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل «a@b» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "otp ایمیل «a@@b.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "login با ticket → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "login بدون ticket → ۴۰۰/۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "login ticket نامعتبر → ۴xx",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "/auth/me بدون کوکی → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "/auth/me کوکی معتبر → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "/auth/me توکن خراب → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "/auth/me توکن امضای غلط → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "/auth/logout → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "ادمین بدون کوکی → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "ادمین با توکن کاربر → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "auth",
+      "name": "ادمین با توکن ادمین → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "لیست",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "تک‌محصول",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «0» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «-1» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «-5» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «abc» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «1e3» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «  » → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «%20» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «null» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «undefined» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «1 OR 1» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «1;DROP» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «99999999999» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id نامعتبر «2147483648» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id اعشاری «1.5» → بدون کرش (trunc)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "id ناموجود → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "محصول غیرفعال → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=price_asc → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=price_desc → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=newest → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=oldest → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=popular → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=xxx → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=(خالی) → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "sort=PRICE_ASC → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "limit=0 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "limit=-1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "limit=1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "limit=12 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "limit=100 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "limit=9999 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "limit=abc → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "page=0 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "page=-1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "page=1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "page=2 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "page=99999 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "page=abc → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «A» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «1791710898578» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «()» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «.*» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «$gt» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «%» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «_» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «'» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «\"» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «<script>» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "search «عطر» → ۲۰۰ (escape)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "فیلتر موجودی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "فیلتر دسته",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "قیمت min/max",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "min>max → بدون خطا",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "minPrice منفی → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "maxPrice=0 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "آرایهٔ search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "DTO قیمت عددی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "DTO عمومی inStock دارد",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "DTO عمومی stock عددی ندارد (عمدی)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "related → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products",
+      "name": "related id نامعتبر → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "categories",
+      "name": "لیست دسته‌ها",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "categories",
+      "name": "آرایه است",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "settings",
+      "name": "تنظیمات عمومی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "settings",
+      "name": "شکل settings",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "settings",
+      "name": "کلید خصوصی لو نمی‌رود",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "health",
+      "name": "/health روت → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "health",
+      "name": "/health دوباره",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "404",
+      "name": "مسیر ناموجود → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track مهمان → tracked:false",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track کاربر → tracked:true",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track سبد خالی → cleared",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track بدون items → ۲۰۰/۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track آیتم «{\"id\":\"x\",\"qty\":1}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track آیتم «{\"id\":14,\"qty\":1}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track آیتم «{\"id\":10,\"qty\":500}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track آیتم «{\"id\":10,\"qty\":-5}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track آیتم «{\"id\":10,\"qty\":0}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track آیتم «{\"id\":-1,\"qty\":1}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "track آیتم تکراری → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "abandoned بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "cart",
+      "name": "abandoned با ادمین → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "بدون terms → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "terms رشته → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "سبد خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "بدون items → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "نام خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "نام ۱ حرف (lenient) → 200/201",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "orders",
+      "name": "نام خیلی بلند → 200/201/400",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "orders",
+      "name": "شماره خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "شماره کوتاه → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "شماره ثابت (isPhone lenient) → 200/201",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "orders",
+      "name": "شماره حروف → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "ایمیل خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "ایمیل بد → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "ایمیل بدون @ → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "استان خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "استان نامعتبر → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "شهر خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "شهر ۱ حرف → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "کدپستی خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "کدپستی ۹ رقم → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "کدپستی ۱۱ رقم → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "کدپستی همه یک → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "کدپستی رقم۴=۲ → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "کدپستی حروف → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "آدرس خالی → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "آدرس کوتاه → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "روش ارسال نامعتبر → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "کالای ناموجود → 409",
+      "pass": true,
+      "info": "s=409"
+    },
+    {
+      "group": "orders",
+      "name": "کالای غیرفعال → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "id نامعتبر آیتم → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "id منفی آیتم → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "qty صفر → 200/201/400",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "orders",
+      "name": "qty منفی → 200/201/400",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "orders",
+      "name": "بیش از ۵۰ قلم → 400",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "orders",
+      "name": "بدون لاگین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "سفارش معتبر → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "کد سفارش BL-",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "کاهش موجودی (< ۱۰۰۰)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "دستکاری قیمت → قیمت DB",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "qty=1 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "qty=2 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "qty=3 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "qty=50 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "qty=99 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "روش tipax → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "روش post-pishtaz → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "روش chapar → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "پیک تهران(غیربومی) → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "پس‌کرایه → onlinePaid<total",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "پس‌کرایه با پیشتاز(بدون COD) → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "ارسال رایگان بالای آستانه",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders",
+      "name": "تخفیف خرید اول پس از لغو → ۲۰٪",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن AMT100 → 100000",
+      "pass": true,
+      "info": "got=100000"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن BOTH → 750000",
+      "pass": true,
+      "info": "got=750000"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن PCT10 → 500000",
+      "pass": true,
+      "info": "got=500000"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن PCT50 → 2500000",
+      "pass": true,
+      "info": "got=2500000"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن amt100 → 100000",
+      "pass": true,
+      "info": "got=100000"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن  AmT100  → 100000",
+      "pass": true,
+      "info": "got=100000"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن نامعتبر «NOPE» → ۴۰۰",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن نامعتبر «XXXX» → ۴۰۰",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن نامعتبر «old» → ۴۰۰",
+      "pass": true,
+      "info": "s=400"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن خالی «» → ۲۰۱ بدون تخفیف",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن خالی « » → ۲۰۱ بدون تخفیف",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن MIN زیر حد → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "coupon",
+      "name": "minOrder سفارش بزرگ → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "coupon",
+      "name": "کوپن منقضی → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "coupon",
+      "name": "یک‌بارمصرف استفادهٔ دوم → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "GET /options → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "options دارای provinces",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote تهران → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote البرز → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote قم → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote قزوین → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote مرکزی → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote سمنان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote زنجان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote اردبیل → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote آذربایجان شرقی → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote آذربایجان غربی → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote کردستان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote کرمانشاه → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote همدان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote لرستان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote ایلام → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote خوزستان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote چهارمحال و بختیاری → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote کهگیلویه و بویراحمد → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote فارس → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote بوشهر → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote هرمزگان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote کرمان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote یزد → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote اصفهان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote خراسان رضوی → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote خراسان شمالی → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote خراسان جنوبی → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote سیستان و بلوچستان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote گلستان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote مازندران → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote گیلان → ۲۰۰+options",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote استان «مریخ» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote استان «» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote استان «tehran» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote استان «تهران » → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote استان «TEHRAN» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote بدون province → ۲۰۰/۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote subtotal=0 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote subtotal=1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote subtotal=100000 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote subtotal=1000000 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote subtotal=99999999 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping",
+      "name": "quote subtotal=-100 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/start بدون درگاه → ۵۰۳",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/start کد ناموجود → ۴۰۴/۵۰۳",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/start غیرمالک → ۴۰۴/۵۰۳",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status درست → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status شماره غلط → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status کد ناموجود → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status کد «» → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status کد «BL-» → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status کد «BL-NOPE» → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status کد «abc» → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status کد «BL-7CC3FDC1E5A8x» → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/recheck ناموجود → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/recheck درست → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/callback بدون Authority → redirect/200",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "payment",
+      "name": "/start با کوکی مالک → مجاز",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز 1 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز 2 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز 3 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز 4 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز 5 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز نامعتبر «0» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز نامعتبر «-1» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز نامعتبر «6» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز نامعتبر «100» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز نامعتبر «abc» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز نامعتبر «» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز اعشاری 3.5 → بدون کرش (trunc)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "متن «0 حرف» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "متن «5 حرف» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "متن «9 حرف» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "متن «10 حرف» → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "متن ۵۰۰۰ → کوتاه/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نام «0 حرف» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نام «1 حرف» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نام «2 حرف» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نام «81 حرف» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نام «200 حرف» → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "محصول ناموجود → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "id نامعتبر → ۴۰۰/۴۰۴/۴۲۹",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "verifiedBuyer پرداخت‌نشده → false",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نقد تکراری → ۴۰۹",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "لیست + average",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "صفحه 1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "صفحه 2 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "صفحه 99 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "صفحه abc → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews",
+      "name": "سقف نقد روزانه → ۴۲۹",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews-admin",
+      "name": "پاسخ ادمین → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews-admin",
+      "name": "پاسخ در DTO عمومی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews-admin",
+      "name": "حذف ادمین → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews-admin",
+      "name": "حذف بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "reviews-admin",
+      "name": "پاسخ بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "لیست → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "تک‌آموزش → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "id نامعتبر → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "رأی 1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "رأی -1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "رأی 0 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "رأی نامعتبر «2» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "رأی نامعتبر «5» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "رأی نامعتبر «-2» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "tutorials",
+      "name": "رأی نامعتبر «abc» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments",
+      "name": "نظر → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments",
+      "name": "بی‌درنگ منتشر",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments",
+      "name": "نظر متن کوتاه «» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments",
+      "name": "نظر متن کوتاه «ک» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments",
+      "name": "نظر متن کوتاه «کو» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments",
+      "name": "نظر بدون نام → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments",
+      "name": "نظر روی آموزش ناموجود → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments-admin",
+      "name": "پاسخ ادمین → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments-admin",
+      "name": "حذف ادمین → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "comments-admin",
+      "name": "حذف بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "/loyalty بدون لاگین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "/loyalty → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "افزودن علاقه‌مندی 10",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "افزودن علاقه‌مندی 11",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "افزودن علاقه‌مندی 13",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "افزودن تکراری idempotent",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "ناموجود → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "id نامعتبر «x» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "id نامعتبر «-1» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "id نامعتبر «0» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "id نامعتبر «» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "لیست علاقه‌مندی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "حذف علاقه‌مندی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "حذف بدون لاگین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "درخواست لغو خود → ok",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "درخواست لغو دیگران → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "درخواست لغو تکراری → already",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "لغو روی لغوشده → ۴۰۹",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "cancel کد «x» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "cancel کد «BL-NOPE» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account",
+      "name": "cancel کد «» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "stats → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "order-status-counts → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "orders → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "users → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "categories → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "logs → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "settings → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "stock POST set → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "stock اعمال شد",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "stock POST delta → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "stock delta اعمال شد",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "ویرایش محصول → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "ویرایش بدون فیلد → ۲۰۰/۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "ساخت محصول بدون نام → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "قیمت نامعتبر «-100» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "قیمت نامعتبر «0» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "قیمت نامعتبر «abc» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "قیمت نامعتبر «1000000000000000» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "تغییر وضعیت به «در انتظار تأیید» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "تغییر وضعیت به «در حال آماده‌سازی» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "تغییر وضعیت به «ارسال شد» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "تغییر وضعیت به «تحویل داده شد» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "تغییر وضعیت به «لغو شد» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "وضعیت نامعتبر → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "لغو → آزادسازی موجودی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "حذف محصول → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "حذف id نامعتبر → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin",
+      "name": "reviews لیست → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "/admin/orders بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "/admin/users بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "/admin/stats بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "/admin/settings بدون ادمین → ۴۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «' OR '1'='1» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «1; DROP TABL» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «{\"$gt\":\"\"}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «{$ne:null}» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «<script>aler» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «%00» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «../../../etc» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «\\u0000» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «admin'--» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در search «1 UNION SELE» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "injection در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "IDOR: order دیگران → ۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "payload بزرگ → کوتاه/رد",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "بدون Content-Type → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec",
+      "name": "متد نامعتبر (PUT روی products) → ۴xx",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "۵ سفارش هم‌زمان روی ۱ موجودی → دقیقاً ۱",
+      "pass": true,
+      "info": "atomic $inc"
+    },
+    {
+      "group": "race",
+      "name": "کوپن هم‌زمان → حداکثر ۱",
+      "pass": true,
+      "info": "couponUseKey unique"
+    },
+    {
+      "group": "race",
+      "name": "۲۰ GET هم‌زمان products → همه ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "۱۰ GET هم‌زمان settings → همه ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "افزودن هم‌زمان علاقه‌مندی → بدون خطا",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "سفارش تصادفی 1 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "سفارش تصادفی 2 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "سفارش تصادفی 3 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "سفارش تصادفی 4 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "race",
+      "name": "سفارش تصادفی 5 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "qty=0 → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "qty=1 → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "qty=-1 → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "qty=99 → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "qty=100 → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "qty=1000 → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "health نهایی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "settings نهایی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge",
+      "name": "products نهایی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین تهران → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین البرز → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین قم → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین قزوین → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین مرکزی → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین سمنان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین زنجان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین اردبیل → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین آذربایجان شرقی → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین آذربایجان غربی → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین کردستان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین کرمانشاه → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین همدان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین لرستان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین ایلام → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین خوزستان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین چهارمحال و بختیاری → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین کهگیلویه و بویراحمد → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین فارس → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین بوشهر → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین هرمزگان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین کرمان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین یزد → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین اصفهان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین خراسان رضوی → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین خراسان شمالی → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین خراسان جنوبی → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین سیستان و بلوچستان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین گلستان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین مازندران → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "shipping2",
+      "name": "quote سنگین گیلان → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «sort=price_asc&limit=5» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «sort=price_desc&page=1» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «inStock=1&sort=newest» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «category=1&sort=price_asc» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «minPrice=0&maxPrice=99999999» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «search=A&sort=price_asc» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «limit=3&page=1» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «limit=3&page=2» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «inStock=1&minPrice=100000» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "فیلتر «sort=newest&limit=100» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «B» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «BIG» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «oos» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «ناموجود» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «!» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «@» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «#» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «123» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «a b c» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "search «عطر تلخ» → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "تک‌محصول 10 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "تک‌محصول 11 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "تک‌محصول 13 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "تک‌محصول 12 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "related 10 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "related 11 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "related 13 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "limit=2 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "limit=3 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "limit=7 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "limit=13 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "limit=25 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "limit=50 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "sort=price_asc ترتیب دارد",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "sort=price_desc ترتیب دارد",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "products2",
+      "name": "sort=newest ترتیب دارد",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «a@b» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «@b.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «a b@c.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «a@@b.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «a@b..com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «plainaddress» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «a@.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «a b c@d.com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "ایمیل «a@b,com» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «0000000000» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «1234567890» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «0123456789» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «9999999999» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «12345 6789» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «۱۲۳۴۵۶۷۸۹۰» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «123456789a» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "کدپستی «12345678901234» → ۴۰۰/۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان «» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان « » → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان «تهر» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان «TEHRAN» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان «tehran» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان «مریخ» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان «123» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "orders2",
+      "name": "استان «تهران\\ntehr» → ۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «' OR 1=1--» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «admin» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «\" OR \"\"=\"» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «1' AND '1'» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «%27%20OR%2» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «Robert'); » در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «{{7*7}}» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «${7*7}» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «<img src=x» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «javascript» در search → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «' OR 1=1--» در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «admin» در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «\" OR \"\"=\"» در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «1' AND '1'» در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «%27%20OR%2» در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «Robert'); » در name نقد → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «' OR 1=1--» در customerName → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «admin» در customerName → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «\" OR \"\"=\"» در customerName → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "sec2",
+      "name": "injection «1' AND '1'» در customerName → بدون کرش",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "افزودن 10 → ok",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "افزودن 11 → ok",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "افزودن 13 → ok",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "افزودن 12 → ok",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "حذف 10 → false",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "حذف 11 → false",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "حذف 13 → false",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "حذف 12 → false",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "id نامعتبر «abc» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "id نامعتبر «-100» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "id نامعتبر «999999999999» → ۴۰۰/۴۰۴",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "id اعشاری «1.5» → بدون کرش (trunc)",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "loyalty کاربر تازه → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "account2",
+      "name": "favorites کاربر تازه → خالی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "ساخت محصول 1 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "ویرایش محصول 1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "stock set محصول 1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "حذف محصول 1 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "ساخت محصول 2 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "ویرایش محصول 2 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "stock set محصول 2 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "حذف محصول 2 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "ساخت محصول 3 → ۲۰۱",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "ویرایش محصول 3 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "stock set محصول 3 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "حذف محصول 3 → ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "وضعیت «در انتظار تأیید» → ۲۰۰/۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "وضعیت «لغو شد» → ۲۰۰/۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "وضعیت «xyz» → ۲۰۰/۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "admin2",
+      "name": "وضعیت «» → ۲۰۰/۴۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge2",
+      "name": "۳۰ GET هم‌زمان categories → همه ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge2",
+      "name": "۱۵ GET هم‌زمان تک‌محصول → همه ۲۰۰",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge2",
+      "name": "سفارش qty=1 → ۲۰۱/۴۰۹(موجودی)",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "edge2",
+      "name": "سفارش qty=2 → ۲۰۱/۴۰۹(موجودی)",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "edge2",
+      "name": "سفارش qty=5 → ۲۰۱/۴۰۹(موجودی)",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "edge2",
+      "name": "سفارش qty=10 → ۲۰۱/۴۰۹(موجودی)",
+      "pass": true,
+      "info": "s=201"
+    },
+    {
+      "group": "edge2",
+      "name": "سفارش qty=50 → ۲۰۱/۴۰۹(موجودی)",
+      "pass": true,
+      "info": "s=409"
+    },
+    {
+      "group": "edge2",
+      "name": "سفارش qty=99 → ۲۰۱/۴۰۹(موجودی)",
+      "pass": true,
+      "info": "s=409"
+    },
+    {
+      "group": "edge2",
+      "name": "health پایانی",
+      "pass": true,
+      "info": ""
+    },
+    {
+      "group": "edge2",
+      "name": "settings پایانی",
+      "pass": true,
+      "info": ""
+    }
+  ]
+}

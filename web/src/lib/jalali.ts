@@ -135,3 +135,53 @@ export function jalaliFromIso(iso: string): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return faDigits(`${p.jy}-${pad(p.jm)}-${pad(p.jd)}`);
 }
+
+// ── تاریخ+ساعت شمسی در منطقهٔ زمانی تهران (UTC+3:30) ──────────────
+// برای تایمر بنر جشنواره: ادمین تاریخ/ساعت شمسی به وقت تهران وارد می‌کند و
+// ذخیرهٔ نهایی epoch میلی‌ثانیه است تا مقایسهٔ انقضا در سرور استاندارد بماند.
+const TEHRAN_OFFSET = "+03:30";
+
+/** اجزای شمسی + ساعت تهران → epoch میلی‌ثانیه؛ null اگر نامعتبر. */
+export function jalaliDateTimeToMs(
+  jy: number,
+  jm: number,
+  jd: number,
+  hh: number,
+  mm: number,
+): number | null {
+  const g = jalaliToIso(jy, jm, jd);
+  if (!g) return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const H = Math.min(23, Math.max(0, hh | 0));
+  const M = Math.min(59, Math.max(0, mm | 0));
+  const t = Date.parse(`${g}T${pad(H)}:${pad(M)}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(t) ? null : t;
+}
+
+export type JalaliDateTime = { jy: number; jm: number; jd: number; hh: number; mm: number };
+
+/** epoch میلی‌ثانیه → اجزای شمسی + ساعت به وقت تهران؛ null اگر نامعتبر. */
+export function msToJalaliDateTime(ms: number): JalaliDateTime | null {
+  if (!Number.isFinite(ms)) return null;
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tehran",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(ms));
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
+    const gy = +get("year");
+    const gm = +get("month");
+    const gd = +get("day");
+    const hh = (+get("hour")) % 24;
+    const mm = +get("minute");
+    const j = d2j(g2d(gy, gm, gd));
+    return { jy: j.jy, jm: j.jm, jd: j.jd, hh, mm };
+  } catch {
+    return null;
+  }
+}

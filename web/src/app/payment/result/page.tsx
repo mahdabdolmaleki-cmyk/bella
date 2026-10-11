@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { InvoiceLines } from "@/components/InvoiceLines";
 
 type PaymentInfo = {
   code: string;
@@ -21,6 +22,12 @@ type PaymentInfo = {
   discountPercent?: number;
   couponCode?: string;
   couponFixed?: number;
+  vipBox?: boolean;
+  vipBoxFee?: number;
+  starLevel?: number;
+  starGift?: boolean;
+  starPerksApplied?: { key: string; star?: number; title?: string }[];
+  discountSource?: "none" | "first" | "coupon" | "star" | string;
 };
 
 function ResultBody() {
@@ -116,62 +123,18 @@ function ResultBody() {
           )}
           {info && (
             <>
-              <div className="flex justify-between">
-                <span className="text-sage">جمع کالاها</span>
-                <span className="text-cream">
-                  {(info.subtotal ?? info.total - (info.shippingCost ?? 0)).toLocaleString("fa-IR")} تومان
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sage">
-                  هزینه ارسال{info.shippingLabel ? ` (${info.shippingLabel})` : ""}
-                </span>
-                <span className={info.freeShipping ? "text-gold-soft" : "text-cream"}>
-                  {info.freeShipping || !info.shippingCost
-                    ? "رایگان"
-                    : `${info.shippingCost.toLocaleString("fa-IR")} تومان`}
-                </span>
-              </div>
+              {/* فاکتورِ مشترک — همهٔ مزایای ستاره (ارسال رایگان، باکس VIP، تخفیف،
+                  هدیه) با ذکرِ ستارهٔ منبع، دقیقاً مانندِ بقیهٔ فاکتورها. */}
+              <InvoiceLines
+                order={info}
+                tone="dark"
+                totalLabel={paid ? "مبلغ پرداخت‌شده" : "مبلغ سفارش"}
+              />
               {!!info.shippingEtaDays && (
                 <div className="flex justify-between">
                   <span className="text-sage">زمان تحویل</span>
                   <span className="text-cream">
                     تا {info.shippingEtaDays.toLocaleString("fa-IR")} روز کاری
-                  </span>
-                </div>
-              )}
-              {!!(info.discountAmount ?? 0) && (
-                <div className="flex justify-between text-emerald-300">
-                  <span>
-                    {info.couponCode
-                      ? info.couponFixed
-                        ? `کد تخفیف ${info.couponCode} (${info.couponFixed.toLocaleString("fa-IR")} تومان)`
-                        : `کد تخفیف ${info.couponCode} (${(info.discountPercent ?? 0).toLocaleString("fa-IR")}٪)`
-                      : `تخفیف خرید اول (${(info.discountPercent ?? 0).toLocaleString("fa-IR")}٪)`}
-                  </span>
-                  <span>− {info.discountAmount!.toLocaleString("fa-IR")} تومان</span>
-                </div>
-              )}
-              {info.shippingCod && !!info.shippingCost ? (
-                <>
-                  <div className="flex justify-between border-t border-gold/15 pt-2 font-bold">
-                    <span className="text-gold-soft">
-                      {paid ? "مبلغ پرداخت‌شدهٔ آنلاین" : "مبلغ قابل پرداخت آنلاین"}
-                    </span>
-                    <span className="text-gold-soft">
-                      {(info.onlinePaid ?? info.total).toLocaleString("fa-IR")} تومان
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-amber-300">
-                    <span>پس کرایه — هنگام تحویل</span>
-                    <span>{info.shippingCost.toLocaleString("fa-IR")} تومان</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex justify-between border-t border-gold/15 pt-2 font-bold">
-                  <span className="text-gold-soft">{paid ? "مبلغ پرداخت‌شده" : "مبلغ سفارش"}</span>
-                  <span className="text-gold-soft">
-                    {(info.onlinePaid ?? info.total).toLocaleString("fa-IR")} تومان
                   </span>
                 </div>
               )}

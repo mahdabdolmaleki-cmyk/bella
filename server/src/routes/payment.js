@@ -1,5 +1,5 @@
 import { Router } from "express";
-import Order from "../models/Order.js";
+import Order, { awardOrderPoints } from "../models/Order.js";
 import Product from "../models/Product.js";
 import Settings from "../models/Settings.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -238,7 +238,10 @@ router.post(
     // درخواستِ درگاه منقضی/لغو شده، همین‌جا به «pending» برنمی‌گردد.
     await Order.updateOne(
       { _id: order._id, paymentStatus: { $in: ["unpaid", "pending"] } },
-      { $set: { authority: out.authority, paymentStatus: "pending" } }
+      {
+        $set: { authority: out.authority, paymentStatus: "pending" },
+        $addToSet: { authorities: out.authority },
+      }
     );
 
     logActivity(req, {
@@ -298,7 +301,7 @@ router.get(
     }
 
     const order = await Order.findOne({
-      authority,
+      $or: [{ authority }, { authorities: authority }],
     });
 
     if (!order) {
@@ -630,6 +633,7 @@ router.get(
           status: 200,
           meta: `ref=${verified.refId} amount=${recovered.total} (سفارش منقضی‌شده بازیابی شد — موجودی را بررسی کنید)`,
         });
+        await awardOrderPoints(recovered);
         notifyOrderPlaced(recovered);
         return res.redirect(
           resultRedirect({ status: "ok", code: recovered.code, ref: verified.refId })
@@ -656,6 +660,10 @@ router.get(
     // Payment successfully transitioned the order to paid.
     // Stock remains committed and therefore must NOT be released.
     // -----------------------------------------------------------------------
+
+    // اهدای امتیاز وفاداری (idempotent) — findOneAndUpdate قلاب post("save")
+    // را اجرا نمی‌کند، پس صریحاً اینجا صدا زده می‌شود.
+    await awardOrderPoints(paidOrder);
 
     logActivity(req, {
       action: "payment.paid",
@@ -808,6 +816,7 @@ router.post(
           status: 200,
           meta: `ref=${verified.refId} (از مسیر recheck — موجودی را بررسی کنید)`,
         });
+        await awardOrderPoints(paidOrder);
         notifyOrderPlaced(paidOrder);
         return res.json({ paymentStatus: "paid", refId: verified.refId });
       }
@@ -818,6 +827,7 @@ router.post(
       return res.status(409).json({ paymentStatus: current?.paymentStatus, error: "وضعیت سفارش تغییر کرد." });
     }
 
+    await awardOrderPoints(paidOrder);
     logActivity(req, {
       action: "payment.paid",
       target: paidOrder.code,
@@ -851,7 +861,9 @@ router.get(
       code,
     }).select(
       "code total subtotal shippingCost shippingLabel shippingEtaDays " +
-        "freeShipping shippingCod paymentStatus refId paidAt status timeline user phone"
+        "freeShipping shippingCod paymentStatus refId paidAt status timeline user phone " +
+        "discountAmount discountPercent couponCode couponFixed " +
+        "vipBox vipBoxFee starLevel starGift starPerksApplied discountSource"
     );
 
     if (!order) {
@@ -893,6 +905,22 @@ router.get(
       shippingLabel: order.shippingLabel || "",
       shippingEtaDays: order.shippingEtaDays || 0,
       freeShipping: Boolean(order.freeShipping),
+
+      // تخفیف و مزایای ستاره — تا فاکتورِ صفحهٔ نتیجهٔ پرداخت هم کامل باشد.
+      discountAmount: order.discountAmount ?? 0,
+      discountPercent: order.discountPercent ?? 0,
+      couponCode: order.couponCode || "",
+      couponFixed: order.couponFixed ?? 0,
+      vipBox: Boolean(order.vipBox),
+      vipBoxFee: order.vipBoxFee ?? 0,
+      starLevel: order.starLevel ?? 0,
+      starGift: order.starGift === true,
+      starPerksApplied: (order.starPerksApplied || []).map((p) => ({
+        key: p.key,
+        star: p.star ?? 0,
+        title: p.title || "",
+      })),
+      discountSource: order.discountSource || "none",
 
       paymentStatus: order.paymentStatus,
 

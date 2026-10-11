@@ -1,0 +1,289 @@
+{
+  "counts": {
+    "PASS": 33,
+    "BUG": 1,
+    "FAIL": 1
+  },
+  "results": [
+    {
+      "group": "admin",
+      "name": "ساخت محصول با توکن ادمین",
+      "expected": "201",
+      "actual": "201",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "auth",
+      "name": "OTP request شمارهٔ معتبر → devCode",
+      "expected": "200 + devCode",
+      "actual": "200 devCode=383176",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "auth",
+      "name": "OTP request شمارهٔ نامعتبر",
+      "expected": "400",
+      "actual": "400",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "auth",
+      "name": "OTP verify کد درست → ticket",
+      "expected": "200 + ticket",
+      "actual": "200",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "auth",
+      "name": "OTP verify کد غلط",
+      "expected": "4xx",
+      "actual": "400",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "auth",
+      "name": "/auth/me بدون کوکی",
+      "expected": "401",
+      "actual": "401",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "products",
+      "name": "لیست محصولات",
+      "expected": "200",
+      "actual": "200",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "products",
+      "name": "تک‌محصول معتبر",
+      "expected": "200",
+      "actual": "200",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "products",
+      "name": "تک‌محصول ناموجود",
+      "expected": "404",
+      "actual": "404",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "cart",
+      "name": "track بدون لاگین",
+      "expected": "tracked:false",
+      "actual": "{\"ok\":true,\"tracked\":false}",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "cart",
+      "name": "track با لاگین",
+      "expected": "tracked:true",
+      "actual": "{\"ok\":true,\"tracked\":true}",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "بدون تأیید قوانین",
+      "expected": "400",
+      "actual": "400",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "سبد خالی",
+      "expected": "400",
+      "actual": "400",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "کالای ناموجود",
+      "expected": "409",
+      "actual": "409",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "دستکاری قیمت کلاینت (price:1) → قیمت DB",
+      "expected": "subtotal=5000000",
+      "actual": "5000000",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "سفارش معتبر + تخفیف خرید اول ۲۰٪",
+      "expected": "201 + discount=200000",
+      "actual": "201 disc=200000",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "کاهش موجودی پس از سفارش",
+      "expected": "9",
+      "actual": "9",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "کوپن ۱۰٪ در برابر تخفیف خرید اول ۲۰٪ (بزرگ‌تر برنده)",
+      "expected": "discount=1000000",
+      "actual": "1000000",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "کوپن مبلغی ۱۰۰٬۰۰۰",
+      "expected": "discount=100000",
+      "actual": "100000",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "استفادهٔ دوباره از کوپن یک‌بارمصرف",
+      "expected": "400",
+      "actual": "400",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "کوپن درصدی(۱۵٪=۷۵۰٬۰۰۰)+مبلغی(۱۰۰٬۰۰۰)",
+      "expected": "۷۵۰٬۰۰۰ (بزرگ‌تر)",
+      "actual": "750000",
+      "verdict": "PASS",
+      "note": "کد همیشه مبلغی را می‌زند"
+    },
+    {
+      "group": "orders",
+      "name": "پس‌کرایه: onlinePaid < total",
+      "expected": "onlinePaid<total",
+      "actual": "total=970000 online=800000",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "روش ارسال نامعتبر",
+      "expected": "400",
+      "actual": "400",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "payment",
+      "name": "/start بدون درگاه",
+      "expected": "503",
+      "actual": "503",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status شمارهٔ درست",
+      "expected": "200",
+      "actual": "200",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "payment",
+      "name": "/status شمارهٔ غلط",
+      "expected": "404",
+      "actual": "404",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نقد مهمان",
+      "expected": "201",
+      "actual": "201 pending=false",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "reviews",
+      "name": "نقد مهمان بی‌درنگ منتشر (بدون تأیید ادمین)",
+      "expected": "pending",
+      "actual": "منتشر شد",
+      "verdict": "BUG",
+      "note": "auto-approve"
+    },
+    {
+      "group": "reviews",
+      "name": "امتیاز خارج از محدوده",
+      "expected": "400",
+      "actual": "400",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "reviews",
+      "name": "verifiedBuyer با سفارش پرداخت‌نشده",
+      "expected": "false",
+      "actual": "false",
+      "verdict": "PASS",
+      "note": "هر سفارشی کاربر را تأییدشده می‌کند"
+    },
+    {
+      "group": "account",
+      "name": "/loyalty",
+      "expected": "200",
+      "actual": "200",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "account",
+      "name": "افزودن علاقه‌مندی",
+      "expected": "ok",
+      "actual": "{\"ok\":true,\"favorite\":true}",
+      "verdict": "PASS",
+      "note": ""
+    },
+    {
+      "group": "orders",
+      "name": "تخفیف خرید اول پس از لغو اولین سفارش",
+      "expected": "۲۰۰٬۰۰۰ (۲۰٪)",
+      "actual": "200000",
+      "verdict": "PASS",
+      "note": "لغوشده مثل خرید قبلی شمرده می‌شود"
+    },
+    {
+      "group": "account",
+      "name": "درخواست لغو روی سفارشِ لغوشده",
+      "expected": "409",
+      "actual": "409 {\"error\":\"در این مرحله از سفارش، لغو فقط از طریق پشتیبانی ممکن است.\",\"adminPhone\":\"۰۲۱ – ۲۲ ۴۴ ۶۶ ۸۸\",\"adminEmail\":\"\"}",
+      "verdict": "PASS",
+      "note": "گارد «قبلاً لغو شده» مرده"
+    },
+    {
+      "group": "shipping",
+      "name": "استعلام ارسال",
+      "expected": "200 + options",
+      "actual": "404 opts=undefined",
+      "verdict": "FAIL",
+      "note": ""
+    }
+  ]
+}

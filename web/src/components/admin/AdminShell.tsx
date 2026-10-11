@@ -14,6 +14,8 @@ import {
   GraduationCap,
   DatabaseBackup,
   Sparkles,
+  Tags,
+  PartyPopper,
     LogOut,
   ExternalLink,
   Menu,
@@ -41,6 +43,8 @@ const NAV: NavItem[] = [
     tint: "text-sky-300",
   },
   { href: "/admin/products", label: "محصولات", icon: Package, tint: "text-amber-300" },
+  { href: "/admin/categories", label: "دسته‌بندی‌ها", icon: Tags, tint: "text-orange-300" },
+  { href: "/admin/campaigns", label: "جشنواره/تخفیف", icon: PartyPopper, tint: "text-rose-300" },
   { href: "/admin/orders", label: "سفارش‌ها", icon: ShoppingBasket, tint: "text-emerald-300" },
   {
     href: "/admin/reviews",

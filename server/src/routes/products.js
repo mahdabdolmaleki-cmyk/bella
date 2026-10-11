@@ -1,6 +1,9 @@
 import { Router } from "express";
 import Product from "../models/Product.js";
+import Category, { buildTree, descendantIds } from "../models/Category.js";
+import Settings from "../models/Settings.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { cacheResponse } from "../utils/cache.js";
 import { ah } from "../utils/asyncHandler.js";
 import { str, int } from "../utils/validate.js";
 
@@ -24,6 +27,7 @@ function escapeRegex(value) {
 router.get(
   "/",
   rateLimit({ name: "products-list", windowMs: 60 * 1000, max: 120 }),
+  cacheResponse(5000, (req) => "products:" + req.originalUrl),
   ah(async (req, res) => {
     // BUG FIX: `?search=a&search=b` made req.query.search an array and
     // `.trim()` threw a 500. str() coerces safely and caps the length.
@@ -51,20 +55,36 @@ router.get(
     const priceMin = int(req.query.priceMin, { min: 0, max: 1e12, fallback: null, clamp: false });
     const priceMax = int(req.query.priceMax, { min: 0, max: 1e12, fallback: null, clamp: false });
     const inStockOnly = req.query.inStock === "1" || req.query.inStock === "true";
-    // فقط ادکلن‌های مشمول تخفیف (قیمت قبلی ثبت‌شده و بالاتر از قیمت فعلی).
+    // بنر تخفیف‌ها و بنر جشنواره هر کدام فقط محصولات علامت‌خوردهٔ خودشان را
+    // نشان می‌دهند؛ عضویت در هر کمپین را ادمین تعیین می‌کند.
     const discountOnly = req.query.discount === "1" || req.query.discount === "true";
+    const festivalOnly = req.query.festival === "1" || req.query.festival === "true";
 
     const filter = { active: true };
-    if (category && category !== "همه") filter.category = category;
+    // فیلتر دسته: اگر عدد بود = شناسهٔ گرهٔ درخت (با همهٔ زیرشاخه‌ها)،
+    // وگرنه نام قدیمی (برای سازگاری عقب‌مانده).
+    if (category && category !== "همه") {
+      if (/^\d+$/.test(category)) {
+        const all = (await Category.find().lean()).map((c) => ({
+          id: c.id,
+          parentId: c.parentId ?? null,
+        }));
+        filter.categoryId = { $in: descendantIds(all, Number(category)) };
+      } else {
+        filter.category = category;
+      }
+    }
     if (brands.length) filter.brand = { $in: brands };
     if (concentrations.length) filter.concentration = { $in: concentrations };
     if (sizes.length) filter.sizeMl = { $in: sizes };
-    if (discountOnly) {
-      filter.$and = [
-        ...(filter.$and || []),
-        { oldPrice: { $gt: 0 } },
-        { $expr: { $gt: ["$oldPrice", "$price"] } },
-      ];
+    if (discountOnly) filter.discount = true;
+    if (festivalOnly) {
+      // اگر ادمین تایمر گذاشته و تمام شده (یا جشنواره غیرفعال است)، فیلتر اعمال
+      // نمی‌شود تا محصولات به حالت عادی برگردند — نه یک فروشگاه جشنوارهٔ خالی.
+      const st = await Settings.getSingleton();
+      const until = Number(st.festivalUntil) || 0;
+      const festivalOn = st.festivalActive === "true" && (!until || Date.now() < until);
+      if (festivalOn) filter.festival = true;
     }
 
     // فصل و رایحه متن آزادند («بهار، پاییز»)، پس باید درونشان جست‌وجو کرد
@@ -165,9 +185,21 @@ router.get(
 
     const clean = (list) => list.filter(Boolean).map(String).sort();
 
+    // درخت دسته‌های فعال برای فیلتر درختی فروشگاه.
+    const activeCats = (
+      await Category.find({ active: true }).sort({ order: 1, id: 1 }).lean()
+    ).map((c) => ({
+      id: c.id,
+      name: c.name,
+      parentId: c.parentId ?? null,
+      order: c.order ?? 0,
+      icon: c.icon || "",
+    }));
+
     res.json({
       brands: clean(brands),
       categories: clean(categories),
+      categoryTree: buildTree(activeCats),
       concentrations: clean(concentrations),
       seasons: explode(seasons),
       scentTypes: explode(scentTypes),
@@ -182,7 +214,8 @@ router.get(
   "/:id",
   rateLimit({ name: "products-detail", windowMs: 60 * 1000, max: 120 }),
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(400).json({ error: "شناسه نامعتبر است." });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
     const product = await Product.findOne({ id, active: true });
     if (!product) return res.status(404).json({ error: "محصول یافت نشد." });
@@ -205,7 +238,8 @@ router.get(
   "/:id/related",
   rateLimit({ name: "products-related", windowMs: 60 * 1000, max: 120 }),
   ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(400).json({ error: "شناسه نامعتبر است." });
+    const id = int(req.params.id, { min: 1, max: 1e9, clamp: false });
     if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
     const limit = int(req.query.limit, { min: 1, max: 12, fallback: 4 }) || 4;
 
@@ -265,81 +299,6 @@ router.get(
     res.json({
       products: scored.slice(0, limit).map((row) => row.p.toDTO()),
     });
-  })
-);
-
-/**
- * GET /api/products/:id/related?limit=4
- *
- * «عطرهای مشابه» for the product page. Similarity is computed from what a
- * perfume actually smells like instead of from purchase history, so it works
- * from day one with an empty orders collection:
- *   • shared scent notes (top / heart / base) — the strongest signal
- *   • same scent family / season
- *   • same brand, category or concentration
- *   • a close price bracket, so a cheap bottle is never answered with a
- *     ten-times-more-expensive one
- */
-router.get(
-  "/:id/related",
-  rateLimit({ name: "products-related", windowMs: 60 * 1000, max: 120 }),
-  ah(async (req, res) => {
-    const id = int(req.params.id, { min: 1, max: 1e9 });
-    if (id === null) return res.status(400).json({ error: "شناسه نامعتبر است." });
-    const limit = int(req.query.limit, { min: 1, max: 12, fallback: 4 }) || 4;
-
-    const base = await Product.findOne({ id, active: true }).lean();
-    if (!base) return res.status(404).json({ error: "محصول یافت نشد." });
-
-    const others = await Product.find({ active: true, id: { $ne: id } }).limit(200);
-
-    // Notes are typed free-form by admins, separated by ، , / - or newlines.
-    const words = (value) =>
-      String(value || "")
-        .toLowerCase()
-        .split(/[\u060c\u061b,;\/\-\n\r]+/)
-        .map((w) => w.trim())
-        .filter((w) => w.length > 2);
-
-    const baseNotes = new Set([
-      ...words(base.topNotes),
-      ...words(base.heartNotes),
-      ...words(base.baseNotes),
-      ...words(base.scentType),
-    ]);
-    const baseSeason = new Set(words(base.season));
-
-    const scored = others.map((p) => {
-      let score = 0;
-
-      const notes = new Set([
-        ...words(p.topNotes),
-        ...words(p.heartNotes),
-        ...words(p.baseNotes),
-        ...words(p.scentType),
-      ]);
-      for (const note of notes) if (baseNotes.has(note)) score += 4;
-      for (const season of words(p.season)) if (baseSeason.has(season)) score += 2;
-
-      if (base.category && p.category === base.category) score += 3;
-      if (base.brand && p.brand === base.brand) score += 3;
-      if (base.concentration && p.concentration === base.concentration) score += 1;
-      if (base.suitableFor && p.suitableFor === base.suitableFor) score += 1;
-
-      if (base.price > 0 && p.price > 0) {
-        const gap = Math.abs(p.price - base.price) / base.price;
-        if (gap <= 0.35) score += 3;
-        else if (gap <= 0.7) score += 1.5;
-        else if (gap > 1.2) score -= 1.5;
-      }
-
-      if (p.bestseller) score += 0.75; // gentle nudge, never the deciding factor
-
-      return { p, score };
-    });
-
-    scored.sort((a, b) => b.score - a.score || b.p.price - a.p.price);
-    res.json({ products: scored.slice(0, limit).map((row) => row.p.toDTO()) });
   })
 );
 

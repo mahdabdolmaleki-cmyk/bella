@@ -53,6 +53,12 @@ export type Order = {
   /** باکس ویژه VIP. */
   vipBox?: boolean;
   vipBoxFee?: number;
+  /** وفاداری ستاره‌ای — مزایای اعمال‌شده + منبع هرکدام (ستارهٔ چندم) برای فاکتور. */
+  starLevel?: number;
+  starGift?: boolean;
+  starPerksApplied?: { key: string; star?: number; title?: string }[];
+  /** منبعِ تخفیفِ اعمال‌شده: none | first | coupon | star */
+  discountSource?: "none" | "first" | "coupon" | "star" | string;
   /** درخواست لغو از سمت مشتری. */
   cancelRequested?: boolean;
   cancelRequestedAt?: string | Date | null;
@@ -115,7 +121,7 @@ export type ShippingQuote = {
   /** تخفیف خرید اول — فقط برای نمایش در فاکتور سبد. */
   firstPurchaseDiscount?: { percent: number; amount: number } | null;
   /** v40: تخفیف برتر (کد یا خرید اول) — همان چیزی که سرور اعمال می‌کند. */
-  discount?: { source: "first" | "coupon"; percent: number; amount: number; fixed?: number; code: string } | null;
+  discount?: { source: "first" | "coupon" | "star"; percent: number; amount: number; fixed?: number; code: string; star?: number; title?: string } | null;
   coupon?: {
     input: string;
     applied: { code: string; percent: number; amount: number; fixed?: number; until?: string } | null;
@@ -231,13 +237,32 @@ export type TierInfo = {
   color: string;
 };
 
+export type StarInfo = {
+  points?: number;
+  title?: string;
+  desc?: string;
+  perks?: string[];
+  discountPercent?: number;
+  /** نوع تخفیف این ستاره: درصدی یا مبلغی. */
+  discountType?: "percent" | "amount";
+  /** مبلغ تخفیف (تومان) وقتی discountType === "amount". */
+  discountAmount?: number;
+};
+
 export type LoyaltyInfo = {
   points: number;
-  tier: TierKey;
-  tiers: TierInfo[];
+  star: number;
+  stars: StarInfo[];
+  perks: string[];
+  /** درصد تخفیف فعالِ ستاره (۰ اگر مبلغی یا بدون تخفیف). */
+  discountPercent?: number;
+  /** مبلغ تخفیف فعالِ ستاره به تومان (۰ اگر درصدی یا بدون تخفیف). */
+  discountAmount?: number;
+  vip: boolean;
+  referralCode: string;
+  /** تعداد زیرمجموعه‌هایی که با کدِ این مشتری ثبت‌نام کرده‌اند. */
+  referralCount: number;
   totalSpent: number;
   orders: number;
-  tomanPerPoint: number;
-  thresholds: { gold: number; diamond: number };
-  next: { tier: TierKey; at: number; remaining: number; progress: number } | null;
+  next: { title: string; at: number; remaining: number; progress: number } | null;
 };

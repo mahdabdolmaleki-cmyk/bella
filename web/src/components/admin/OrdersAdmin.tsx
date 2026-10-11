@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ChevronDown, Package, MessageCircle, Phone, MapPin, Mail, Truck, Save, BellRing, BarChart3 } from "lucide-react";
 import { formatToman, toFa } from "@/lib/data";
 import { InvoiceLines } from "@/components/InvoiceLines";
+import { ItemCampaignTags } from "@/components/InvoiceItemTags";
 import type { Order } from "@/lib/types";
 
 type Message = {
@@ -42,6 +43,10 @@ export default function OrdersAdmin({
 }) {
   const [tab, setTab] = useState<"orders" | "messages">("orders");
   const [orders, setOrders] = useState(initialOrders);
+  // تفکیک سفارش‌ها بر اساس وضعیت (همه / هر وضعیت).
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const statusList = [...new Set(orders.map((o) => o.status))];
+  const visibleOrders = statusFilter === "all" ? orders : orders.filter((o) => o.status === statusFilter);
   const [openId, setOpenId] = useState<number | null>(null);
   // Draft tracking codes, keyed by order id, so typing in one row never
   // touches another and nothing is saved until the admin presses ذخیره.
@@ -190,10 +195,42 @@ export default function OrdersAdmin({
 
       {tab === "orders" && (
         <div className="mt-5 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                statusFilter === "all" ? "bg-gold text-[#241a05]" : "border border-gold/25 text-gold-soft hover:bg-gold/10"
+              }`}
+            >
+              همه ({orders.length.toLocaleString("fa-IR")})
+            </button>
+            {statusList.map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                  statusFilter === s ? "bg-gold text-[#241a05]" : "border border-gold/25 text-gold-soft hover:bg-gold/10"
+                }`}
+              >
+                {s} ({orders.filter((o) => o.status === s).length.toLocaleString("fa-IR")})
+              </button>
+            ))}
+          </div>
           {orders.length === 0 && <p className="text-sm text-sage">هنوز سفارشی ثبت نشده است.</p>}
-          {orders.map((o) => {
+          {orders.length > 0 && visibleOrders.length === 0 && (
+            <p className="text-sm text-sage">سفارشی با این وضعیت نیست.</p>
+          )}
+          {visibleOrders.map((o) => {
             const items = Array.isArray(o.items)
-              ? (o.items as { id: number; name: string; qty: number; price: number }[])
+              ? (o.items as {
+                  id: number;
+                  name: string;
+                  qty: number;
+                  price: number;
+                  oldPrice?: number | null;
+                  festival?: boolean;
+                  discount?: boolean;
+                }[])
               : [];
             const open = openId === o.id;
             return (
@@ -304,6 +341,7 @@ export default function OrdersAdmin({
                         <div key={it.id} className="flex items-center justify-between text-xs text-cream/90">
                           <span>
                             {it.name} × {it.qty.toLocaleString("fa-IR")}
+                            <ItemCampaignTags item={it} tone="dark" />
                           </span>
                           <span className="text-sage">{formatToman(it.price * it.qty)}</span>
                         </div>

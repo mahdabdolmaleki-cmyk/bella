@@ -899,24 +899,7 @@ function CommentsTab({ onPending }: { onPending: (value: number) => void }) {
               )}
 
               <div className="mt-3 flex flex-wrap gap-2">
-                {c.status !== "approved" && (
-                  <button
-                    onClick={() => patch(c.id, { status: "approved" })}
-                    disabled={busyId === c.id}
-                    className="btn-emerald inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[11px] font-bold disabled:opacity-50"
-                  >
-                    <Check size={12} /> تأیید
-                  </button>
-                )}
-                {c.status !== "rejected" && (
-                  <button
-                    onClick={() => patch(c.id, { status: "rejected" })}
-                    disabled={busyId === c.id}
-                    className="btn-ghost inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[11px] font-bold disabled:opacity-50"
-                  >
-                    <X size={12} /> رد
-                  </button>
-                )}
+                {/* نظرات بی‌درنگ منتشر می‌شوند؛ مدیر فقط پاسخ می‌دهد یا حذف می‌کند. */}
                 <button
                   onClick={() => {
                     setReplyFor(replyFor === c.id ? null : c.id);

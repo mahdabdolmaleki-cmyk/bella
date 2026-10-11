@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { nextSequence } from "./Counter.js";
+import User from "./User.js";
 
 export const PAYMENT_STATUSES = ["unpaid", "pending", "paid", "failed", "refunded"];
 
@@ -18,6 +19,14 @@ const orderItemSchema = new mongoose.Schema(
     qty: { type: Number, required: true, min: 1, max: 99 },
     price: { type: Number, required: true, min: 0 },
     image: { type: String, default: null },
+    // Snapshot of the campaign state at purchase time so every invoice
+    // (customer + admin) can show «جشنواره/تخفیف» and the per-line discount
+    // even if the product is later removed from the campaign.
+    oldPrice: { type: Number, default: null },
+    festival: { type: Boolean, default: false },
+    discount: { type: Boolean, default: false },
+    // امتیاز وفاداری این قلم در لحظهٔ خرید (برای اهدای ستاره پس از نشست).
+    points: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -87,11 +96,30 @@ const orderSchema = new mongoose.Schema(
       maxlength: 12,
     },
     couponFixed: { type: Number, default: 0, min: 0 }, // v41: مبلغ تومانِ کد تخفیفِ مبلغی
+    // کلید یکتای «کوپن:شماره» تا دو سفارشِ هم‌زمان با یک کدِ یک‌بارمصرف با خطای
+    // یکتایی (11000) رد شوند. sparse: سفارشِ بدون کوپن این فیلد را ندارد.
+    couponUseKey: { type: String, maxlength: 80, unique: true, sparse: true },
     // true یعنی کرایه درِ منزل (پس‌کرایه) پرداخت می‌شود؛ آنلاین فقط کالا.
     shippingCod: { type: Boolean, default: false },
     // ---- باکس ویژه (VIP) ----
     vipBox: { type: Boolean, default: false },
     vipBoxFee: { type: Number, default: 0, min: 0 },
+    // وفاداری ستاره‌ای (v42): سطح ستارهٔ مشتری در لحظهٔ خرید + هدیهٔ دکانت.
+    starLevel: { type: Number, default: 0, min: 0 },
+    starGift: { type: Boolean, default: false },
+    // کدام مزایای ستاره روی این سفارش اعمال شد + منبع هرکدام (ستارهٔ چندم)،
+    // تا در فاکتور دقیقاً نوشته شود «مثلاً باکس VIP رایگان — از مزایای ستارهٔ ۲».
+    starPerksApplied: {
+      type: [{ key: String, star: Number, title: String }],
+      default: [],
+    },
+    // منبعِ تخفیفِ اعمال‌شده: none | coupon | first | star
+    discountSource: { type: String, default: "none" },
+    // اهدای امتیاز هنگام ثبت سفارش فقط یک‌بار انجام می‌شود؛ مقدارِ اهداشده
+    // نگه داشته می‌شود تا هنگام لغو، دقیقاً همان مقدار بازپس گرفته شود.
+    pointsAwarded: { type: Boolean, default: false },
+    pointsAwardedAmount: { type: Number, default: 0 },
+    pointsRevoked: { type: Boolean, default: false },
     // درخواست لغو از سمت مشتری (v35) — ادمین در پنل می‌بیند و پاک می‌کند.
     cancelRequested: { type: Boolean, default: false },
     cancelRequestedAt: { type: Date, default: null },
@@ -101,6 +129,9 @@ const orderSchema = new mongoose.Schema(
     // Gateway transaction handle; unique per order, sparse so unpaid orders
     // do not collide on null.
     authority: { type: String, default: null, maxlength: 100, index: true, sparse: true },
+    // همهٔ authorityهای صادرشده برای این سفارش (اگر مشتری چند بار /start بزند)،
+    // تا پرداخت با authority قدیمی‌تر هم در callback به سفارش برسد.
+    authorities: { type: [String], default: [] },
     refId: { type: String, default: null, maxlength: 60 },
     cardPan: { type: String, default: null, maxlength: 30 },
     paidAt: { type: Date, default: null },
@@ -138,6 +169,10 @@ orderSchema.methods.toDTO = function () {
       qty: i.qty,
       price: i.price,
       image: i.image ?? null,
+      oldPrice: i.oldPrice ?? null,
+      festival: i.festival === true,
+      discount: i.discount === true,
+      points: i.points ?? 0,
     })),
     subtotal: this.subtotal ?? Math.max(0, this.total - (this.shippingCost || 0)),
     discountPercent: this.discountPercent ?? 0,
@@ -149,6 +184,14 @@ orderSchema.methods.toDTO = function () {
     shippingCod: Boolean(this.shippingCod),
     vipBox: Boolean(this.vipBox),
     vipBoxFee: this.vipBoxFee ?? 0,
+    starLevel: this.starLevel ?? 0,
+    starGift: this.starGift === true,
+    starPerksApplied: (this.starPerksApplied || []).map((p) => ({
+      key: p.key,
+      star: p.star ?? 0,
+      title: p.title || "",
+    })),
+    discountSource: this.discountSource || "none",
     cancelRequested: Boolean(this.cancelRequested),
     cancelRequestedAt: this.cancelRequestedAt ?? null,
     excludeFromSales: Boolean(this.excludeFromSales),
@@ -184,5 +227,78 @@ orderSchema.methods.onlinePayable = function onlinePayable() {
 
 orderSchema.index({ paymentStatus: 1, stockCommitted: 1, createdAt: 1 });
 
+// وضعیت «لغو شد» — تنها وضعیتی که امتیازِ اهداشده را بازپس می‌گیرد.
+export const CANCELLED_STATUS = ORDER_STATUSES[ORDER_STATUSES.length - 1];
+
+/**
+ * اهدای یک‌بارهٔ امتیاز وفاداری — همان لحظهٔ ثبت سفارش.
+ *
+ * سفارش با وضعیت «در انتظار تأیید» ساخته می‌شود، پس قلاب post("save") در اولین
+ * ذخیره (یعنی ثبت سفارش) امتیاز را می‌دهد؛ لازم نیست صبر کنیم تا پرداخت شود.
+ *
+ * idempotent: با claim اتمیکِ pointsAwarded فقط یک‌بار داده می‌شود و مقدارِ
+ * اهداشده در pointsAwardedAmount ثبت می‌شود تا هنگام لغو دقیقاً همان مقدار کم
+ * شود. سفارشِ لغوشده امتیاز نمی‌گیرد.
+ *
+ * @returns {Promise<number>} امتیازی که واقعاً اضافه شد (۰ اگر داده نشد).
+ */
+export async function awardOrderPoints(order) {
+  try {
+    if (!order?._id || !order.user) return 0;
+    if (order.pointsAwarded || order.pointsRevoked) return 0;
+    if (order.status === CANCELLED_STATUS) return 0;
+    const pts = (order.items || []).reduce((s, i) => s + (i.points || 0) * (i.qty || 0), 0);
+    // claim اتمیک: فقط یک مسیر می‌تواند pointsAwarded را false→true ببرد.
+    const claimed = await Order.updateOne(
+      { _id: order._id, pointsAwarded: { $ne: true }, pointsRevoked: { $ne: true } },
+      { $set: { pointsAwarded: true, pointsAwardedAmount: pts } }
+    );
+    if (claimed.modifiedCount !== 1) return 0;
+    if (pts > 0) await User.updateOne({ _id: order.user }, { $inc: { points: pts } });
+    return pts;
+  } catch {
+    /* خطای اهدای امتیاز نباید ثبت سفارش را خراب کند */
+    return 0;
+  }
+}
+
+/**
+ * بازپس‌گیری امتیاز هنگام لغو سفارش — دقیقاً همان مقدارِ اهداشده
+ * (pointsAwardedAmount) از مشتری کم می‌شود. idempotent با پرچم pointsRevoked،
+ * پس لغوِ دوبار یا saveهای بعدی امتیاز را دوبار کم نمی‌کنند.
+ *
+ * @returns {Promise<number>} امتیازی که واقعاً کم شد (۰ اگر کم نشد).
+ */
+export async function revokeOrderPoints(order) {
+  try {
+    if (!order?._id) return 0;
+    if (order.status !== CANCELLED_STATUS) return 0;
+    // claim اتمیک از روی وضعیتِ واقعیِ DB (نه فیلدهای ممکن‌است‌کهنهٔ حافظه) و
+    // خواندن مقدارِ اهداشدهٔ واقعی برای کسرِ دقیق. new:false سندِ قبل از
+    // به‌روزرسانی را می‌دهد که pointsAwardedAmount درست دارد.
+    const claimed = await Order.findOneAndUpdate(
+      { _id: order._id, pointsAwarded: true, pointsRevoked: { $ne: true } },
+      { $set: { pointsRevoked: true } },
+      { new: false }
+    );
+    if (!claimed) return 0;
+    const pts = Number(claimed.pointsAwardedAmount) || 0;
+    if (pts > 0 && claimed.user) await User.updateOne({ _id: claimed.user }, { $inc: { points: -pts } });
+    return pts;
+  } catch {
+    /* خطای بازپس‌گیری نباید لغو سفارش را خراب کند */
+    return 0;
+  }
+}
+
+// قلاب save — ثبت سفارش یا تغییر وضعیت آن. اگر وضعیت «لغو شد» شد امتیاز را
+// بازپس می‌گیرد، وگرنه (اولین ثبت = در انتظار تأیید) امتیاز می‌دهد.
+// مهم: این قلاب باید پیش از mongoose.model() ثبت شود تا روی مدل اعمال شود.
+orderSchema.post("save", async function (doc) {
+  if (doc.status === CANCELLED_STATUS) await revokeOrderPoints(doc);
+  else await awardOrderPoints(doc);
+});
+
 const Order = mongoose.model("Order", orderSchema);
+
 export default Order;

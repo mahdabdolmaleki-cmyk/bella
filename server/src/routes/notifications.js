@@ -7,6 +7,7 @@ import { ah } from "../utils/asyncHandler.js";
 import { logActivity } from "../utils/activityLog.js";
 import { str, int } from "../utils/validate.js";
 import { sendMailDetailed, announcementMail } from "../utils/mailer.js";
+import { sendSms, getLastSmsError } from "../utils/sms.js";
 
 /**
  * اطلاع‌رسانی به مشتریان — announcement e-mails.
@@ -91,7 +92,13 @@ router.post(
   ah(async (req, res) => {
     const subject = str(req.body?.subject, { max: 160 });
     const body = str(req.body?.body, { max: 8000 });
-    const audience = req.body?.audience === "all" ? "all" : "selected";
+    const rawAud = req.body?.audience;
+    const audience = rawAud === "all" ? "all" : rawAud === "vip" ? "vip" : "selected";
+    // کانال ارسال: ایمیل / پیامک (sms.ir) / هر دو — v43.
+    const channelRaw = req.body?.channel;
+    const channel = channelRaw === "sms" ? "sms" : channelRaw === "both" ? "both" : "email";
+    const wantEmail = channel !== "sms";
+    const wantSms = channel !== "email";
     const ids = Array.isArray(req.body?.userIds)
       ? req.body.userIds.map((v) => str(v, { max: 40 })).filter(Boolean).slice(0, MAX_RECIPIENTS)
       : [];
@@ -106,48 +113,64 @@ router.post(
       return res.status(400).json({ error: "دست‌کم یک مشتری را انتخاب کنید." });
     }
 
-    const filter = { deletedAt: null, email: { $nin: [null, ""] } };
+    const filter = { deletedAt: null };
+    if (audience === "vip") filter.vip = true;
     if (audience === "selected") {
-      // Only ids that look like ObjectIds reach the query — a malformed id
-      // would otherwise throw a CastError and return a 500.
       const clean = ids.filter((id) => /^[a-f\d]{24}$/i.test(id));
       if (clean.length === 0) {
         return res.status(400).json({ error: "فهرست مشتریان انتخابی معتبر نیست." });
       }
       filter._id = { $in: clean };
     }
+    // فقط کسانی که راه ارتباطیِ کانالِ انتخابی را دارند.
+    if (wantEmail && wantSms) filter.$or = [{ email: { $nin: [null, ""] } }, { phone: { $nin: [null, ""] } }];
+    else if (wantEmail) filter.email = { $nin: [null, ""] };
+    else filter.phone = { $nin: [null, ""] };
 
-    const people = await User.find(filter).select("name email").limit(MAX_RECIPIENTS).lean();
+    const people = await User.find(filter).select("name email phone").limit(MAX_RECIPIENTS).lean();
     if (people.length === 0) {
-      return res.status(404).json({ error: "مشتری‌ای با ایمیل معتبر پیدا نشد." });
+      return res.status(404).json({ error: "مشتری‌ای با راه ارتباطی معتبر پیدا نشد." });
     }
 
     let sent = 0;
     let failed = 0;
     let lastError = "";
 
+    const smsText = `${subject}\n${body}`.slice(0, 900);
+
     // Simple fixed-size worker pool over the recipient list.
     let cursor = 0;
     async function worker() {
       while (cursor < people.length) {
         const person = people[cursor++];
-        const mail = announcementMail(subject, body, person.name);
-        try {
-          const result = await sendMailDetailed(
-            person.email,
-            mail.subject,
-            mail.text,
-            mail.html
-          );
-          if (result.ok) {
-            sent += 1;
-          } else {
+        if (wantEmail && person.email) {
+          const mail = announcementMail(subject, body, person.name);
+          try {
+            const result = await sendMailDetailed(person.email, mail.subject, mail.text, mail.html);
+            if (result.ok) {
+              sent += 1;
+            } else {
+              failed += 1;
+              if (!lastError) lastError = result.error;
+            }
+          } catch (err) {
             failed += 1;
-            if (!lastError) lastError = result.error;
+            if (!lastError) lastError = String(err?.message || err).slice(0, 300);
           }
-        } catch (err) {
-          failed += 1;
-          if (!lastError) lastError = String(err?.message || err).slice(0, 300);
+        }
+        if (wantSms && person.phone) {
+          try {
+            const ok = await sendSms(person.phone, smsText);
+            if (ok) {
+              sent += 1;
+            } else {
+              failed += 1;
+              if (!lastError) lastError = getLastSmsError() || "خطای سرویس پیامک";
+            }
+          } catch (err) {
+            failed += 1;
+            if (!lastError) lastError = String(err?.message || err).slice(0, 300);
+          }
         }
       }
     }
@@ -159,27 +182,28 @@ router.post(
       subject,
       body,
       audience,
+      channel,
       total: people.length,
       sent,
       failed,
-      sampleRecipients: people.slice(0, 5).map((p) => p.email),
+      sampleRecipients: people.slice(0, 5).map((p) => p.email || p.phone),
       lastError,
       sentByLabel: "مدیر اصلی",
     });
 
     logActivity(req, {
       action: "notify.send",
-      target: audience === "all" ? "all-customers" : `${people.length} customers`,
+      target: audience === "all" ? "all-customers" : audience === "vip" ? "vip-customers" : `${people.length} customers`,
       success: failed === 0,
       status: 200,
-      meta: `${subject} | sent=${sent} failed=${failed}`,
+      meta: `${subject} | ${channel} | sent=${sent} failed=${failed}`,
     });
 
     const allFailed = sent === 0;
     res.status(allFailed ? 502 : 200).json({
       ok: failed === 0,
       error: allFailed
-        ? `هیچ ایمیلی تحویل سرویس‌دهنده نشد. ${lastError || "تنظیمات سرویس ایمیل را بررسی کنید."}`
+        ? `هیچ پیامی تحویل سرویس‌دهنده نشد. ${lastError || "تنظیمات سرویس ایمیل/پیامک را بررسی کنید."}`
         : undefined,
       total: people.length,
       sent,

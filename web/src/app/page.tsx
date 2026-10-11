@@ -18,9 +18,10 @@ export default async function HomePage() {
   return (
     <>
       <Journey
-        festivalActive={settings.festivalActive === "true"}
-        festivalTitle={settings.festivalTitle}
-        festivalSubtitle={settings.festivalSubtitle}
+          festivalActive={settings.festivalActive === "true"}
+          festivalTitle={settings.festivalTitle}
+          festivalSubtitle={settings.festivalSubtitle}
+          festivalUntil={settings.festivalUntil}
         discountsActive={settings.discountsBoxActive === "1"}
         discountsTitle={settings.discountsBoxTitle}
         discountsSubtitle={settings.discountsBoxSubtitle}

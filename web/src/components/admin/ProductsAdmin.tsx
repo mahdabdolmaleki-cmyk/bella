@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Plus,
   Pencil,
@@ -24,12 +24,14 @@ import { ProductVisual } from "@/components/art";
 import SiteIcon from "@/components/SiteIcon";
 import { ICON_NAMES, ICON_LABELS, type IconName } from "@/lib/icons";
 import type { Product, ProductHighlight } from "@/lib/types";
+import { flattenTree, categoryPathName, type CategoryNode } from "@/lib/categories";
 
 // دسته‌بندی‌های پیش‌فرض فقط زمانی استفاده می‌شوند که ادمین هنوز دستهٔ خودش را
 // در تنظیمات نساخته باشد. لیست واقعی از طریق prop به این کامپوننت می‌رسد.
 const DEFAULT_CATEGORIES = ["زنانه", "مردانه", "یونیسکس"];
 
 const EMPTY_FORM = {
+  productType: "perfume" as "perfume" | "general",
   name: "",
   nameEn: "",
   tagline: "",
@@ -43,10 +45,13 @@ const EMPTY_FORM = {
   oldPrice: "",
   sizeMl: "100",
   stock: "0",
+  points: "1",
   allowBackorder: false,
   glass: "#0e3b26",
   liquid: "#d4af7c",
   category: DEFAULT_CATEGORIES[0],
+  // شناسهٔ گرهٔ دستهٔ درختی — منبع حقیقتِ اتصال محصول به دسته.
+  categoryId: null as number | null,
   badge: "",
   bestseller: false,
   active: true,
@@ -88,6 +93,7 @@ function productDescriptionBlocks(p: Product): ProductDescriptionBlock[] {
 
 function productToForm(p: Product): FormState {
   return {
+    productType: p.productType === "general" ? "general" : "perfume",
     name: p.name,
     nameEn: p.nameEn,
     tagline: p.tagline,
@@ -101,10 +107,12 @@ function productToForm(p: Product): FormState {
     oldPrice: p.oldPrice ? String(p.oldPrice) : "",
     sizeMl: String(p.sizeMl),
     stock: String((p as { stock?: number }).stock ?? 0),
+    points: String((p as { points?: number }).points ?? 1),
     allowBackorder: Boolean((p as { allowBackorder?: boolean }).allowBackorder),
     glass: p.glass,
     liquid: p.liquid,
     category: p.category,
+    categoryId: (p.categoryId as number | null) ?? null,
     badge: p.badge || "",
     bestseller: p.bestseller,
     active: p.active,
@@ -133,7 +141,27 @@ export default function ProductsAdmin({
   // دسته‌بندی‌هایی که ادمین در «تنظیمات ← دسته‌بندی فروشگاه» ساخته است. اگر
   // خالی بود، به سه دستهٔ پیش‌فرض برمی‌گردیم تا فرم هیچ‌وقت بدون گزینه نماند.
   const categoryOptions = categories && categories.length ? categories : DEFAULT_CATEGORIES;
+  // درخت دسته‌بندی (منبع جدید اتصال محصول). به‌جای نام، شناسهٔ گره ذخیره می‌شود.
+  const [catTree, setCatTree] = useState<CategoryNode[]>([]);
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((d) => setCatTree(d.categories || []))
+      .catch(() => {});
+  }, []);
+  const catOptions = useMemo(() => flattenTree(catTree), [catTree]);
   const [items, setItems] = useState<Product[]>(initialProducts);
+  // تفکیک لیست محصولات بر اساس دسته (همه / هر دسته).
+  const [catFilter, setCatFilter] = useState<number | null | "all">("all");
+  // گروه‌بندی بر اساس «شناسهٔ» دسته (نه نام) تا نام کامل مسیر دیده شود.
+  const catList = useMemo(
+    () => [...new Set(items.map((p) => (p.categoryId as number | null) ?? null))],
+    [items],
+  );
+  const visible =
+    catFilter === "all"
+      ? items
+      : items.filter((p) => ((p.categoryId as number | null) ?? null) === catFilter);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -399,6 +427,7 @@ export default function ProductsAdmin({
       ...form,
       price: Number(form.price),
       stock: Number(form.stock) || 0,
+      points: Math.max(0, Number(form.points) || 0),
       allowBackorder: form.allowBackorder,
       oldPrice: form.oldPrice ? Number(form.oldPrice) : null,
       sizeMl: Number(form.sizeMl),
@@ -475,8 +504,32 @@ export default function ProductsAdmin({
         </button>
       </div>
 
+      {/* تفکیک بر اساس دسته */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setCatFilter("all")}
+          className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+            catFilter === "all" ? "bg-gold text-[#241a05]" : "border border-gold/25 text-gold-soft hover:bg-gold/10"
+          }`}
+        >
+          همه ({toFa(items.length)})
+        </button>
+        {catList.map((cid) => (
+          <button
+            key={String(cid)}
+            onClick={() => setCatFilter(cid)}
+            className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+              catFilter === cid ? "bg-gold text-[#241a05]" : "border border-gold/25 text-gold-soft hover:bg-gold/10"
+            }`}
+          >
+            {categoryPathName(catTree, cid)} (
+            {toFa(items.filter((p) => ((p.categoryId as number | null) ?? null) === cid).length)})
+          </button>
+        ))}
+      </div>
+
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((p) => (
+        {visible.map((p) => (
           <div
             key={p.id}
             className={`gold-ring rounded-2xl border p-4 ${
@@ -510,7 +563,7 @@ export default function ProductsAdmin({
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               <span className="rounded-full border border-gold/20 px-2 py-0.5 text-[10px] text-sage">
-                {p.category}
+                {categoryPathName(catTree, p.categoryId ?? null)}
               </span>
               {p.badge && (
                 <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
@@ -568,6 +621,33 @@ export default function ProductsAdmin({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
+              {/* ---------- نوع محصول ---------- */}
+              <div className="mb-4 rounded-2xl border border-gold/15 glass-panel p-3.5">
+                <p className="mb-2 text-xs font-black text-gold-soft">نوع محصول</p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["perfume", "ادکلن / عطر", "با نُتِ رایحه، ماندگاری، پخش بو و ویژوالِ شیشه"],
+                      ["general", "سایر محصولات", "خوشبوکننده، اسپری و… — فرم و صفحهٔ ساده‌تر"],
+                    ] as const
+                  ).map(([val, title, desc]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => set("productType", val)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-right transition ${
+                        form.productType === val
+                          ? "border-gold bg-gold/10"
+                          : "border-sage/25 hover:border-gold/40"
+                      }`}
+                    >
+                      <span className="block text-xs font-black text-cream">{title}</span>
+                      <span className="block text-[10px] text-sage">{desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-start gap-4">
                 <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-pine/30 to-night">
                   <ProductVisual
@@ -616,6 +696,7 @@ export default function ProductsAdmin({
                     jpg، png، webp یا gif — حداکثر ۵ مگابایت. اگر عکسی انتخاب نکنی، از بطری طراحی‌شده‌ی زیر استفاده می‌شه.
                   </p>
 
+                  {form.productType === "perfume" && (
                   <details className="mt-3">
                     <summary className="cursor-pointer text-[11px] font-bold text-sage hover:text-gold-soft">
                       رنگ‌های بطری پیش‌فرض (در صورت نبود عکس)
@@ -641,6 +722,7 @@ export default function ProductsAdmin({
                       </div>
                     </div>
                   </details>
+                  )}
                 </div>
               </div>
 
@@ -1078,26 +1160,30 @@ export default function ProductsAdmin({
                 />
               </div>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <Field label="نُت‌های سر">
-                  <input value={form.topNotes} onChange={(e) => set("topNotes", e.target.value)} className={inputCls} />
-                </Field>
-                <Field label="نُت‌های میانی">
-                  <input value={form.heartNotes} onChange={(e) => set("heartNotes", e.target.value)} className={inputCls} />
-                </Field>
-                <Field label="نُت‌های پایه">
-                  <input value={form.baseNotes} onChange={(e) => set("baseNotes", e.target.value)} className={inputCls} />
-                </Field>
-              </div>
+              {form.productType === "perfume" && (
+                <>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <Field label="نُت‌های سر">
+                      <input value={form.topNotes} onChange={(e) => set("topNotes", e.target.value)} className={inputCls} />
+                    </Field>
+                    <Field label="نُت‌های میانی">
+                      <input value={form.heartNotes} onChange={(e) => set("heartNotes", e.target.value)} className={inputCls} />
+                    </Field>
+                    <Field label="نُت‌های پایه">
+                      <input value={form.baseNotes} onChange={(e) => set("baseNotes", e.target.value)} className={inputCls} />
+                    </Field>
+                  </div>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Field label="ماندگاری">
-                  <input value={form.longevity} onChange={(e) => set("longevity", e.target.value)} className={inputCls} />
-                </Field>
-                <Field label="پخش بو">
-                  <input value={form.sillage} onChange={(e) => set("sillage", e.target.value)} className={inputCls} />
-                </Field>
-              </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Field label="ماندگاری">
+                      <input value={form.longevity} onChange={(e) => set("longevity", e.target.value)} className={inputCls} />
+                    </Field>
+                    <Field label="پخش بو">
+                      <input value={form.sillage} onChange={(e) => set("sillage", e.target.value)} className={inputCls} />
+                    </Field>
+                  </div>
+                </>
+              )}
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <Field label="قیمت فعلی (تومان)">
@@ -1145,6 +1231,21 @@ export default function ProductsAdmin({
                 </Field>
               </div>
 
+              <div className="mt-3">
+                <Field label="امتیاز وفاداری این محصول (ستاره)">
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.points}
+                    onChange={(e) => set("points", e.target.value)}
+                    className={inputCls}
+                  />
+                  <p className="mt-1 text-[10px] text-sage/70">
+                    با هر خریدِ نشسته، مجموع امتیاز اقلام به ستارهٔ مشتری اضافه می‌شود.
+                  </p>
+                </Field>
+              </div>
+
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <Field label="حجم (میلی‌لیتر)">
                   <input
@@ -1155,16 +1256,39 @@ export default function ProductsAdmin({
                   />
                 </Field>
                 <Field label="دسته‌بندی">
-                  <select value={form.category} onChange={(e) => set("category", e.target.value)} className={inputCls}>
-                    {(categoryOptions.includes(form.category)
-                      ? categoryOptions
-                      : [form.category, ...categoryOptions].filter(Boolean)
-                    ).map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                  {catOptions.length > 0 ? (
+                    // درخت دسته‌ها با تورفتگی نمایش داده می‌شود و «شناسهٔ» گره ذخیره می‌شود.
+                    <select
+                      value={form.categoryId ?? ""}
+                      onChange={(e) => {
+                        const id = e.target.value ? Number(e.target.value) : null;
+                        const node = catOptions.find((n) => n.id === id);
+                        setForm((f) => ({
+                          ...f,
+                          categoryId: id,
+                          category: node ? node.name : f.category,
+                        }));
+                      }}
+                      className={inputCls}
+                    >
+                      <option value="">— انتخاب دسته —</option>
+                      {catOptions.map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {"\u00A0\u00A0\u00A0".repeat(n.depth)}
+                          {n.depth > 0 ? "↳ " : ""}
+                          {n.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select value={form.category} onChange={(e) => set("category", e.target.value)} className={inputCls}>
+                      {categoryOptions.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </Field>
                 <Field label="برچسب (مثلاً «تخفیف جشنواره»)">
                   <input
@@ -1207,6 +1331,7 @@ export default function ProductsAdmin({
                       className={inputCls}
                     />
                   </Field>
+                  {form.productType === "perfume" && (
                   <Field label="نوع غلظت">
                     <input
                       value={form.concentration}
@@ -1215,6 +1340,7 @@ export default function ProductsAdmin({
                       className={inputCls}
                     />
                   </Field>
+                  )}
                   <Field label="کشور سازنده">
                     <input
                       value={form.madeIn}
@@ -1222,30 +1348,34 @@ export default function ProductsAdmin({
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="نوع رایحه">
-                    <input
-                      value={form.scentType}
-                      onChange={(e) => set("scentType", e.target.value)}
-                      placeholder="مانند: چوبی ادویه‌ای"
-                      className={inputCls}
-                    />
-                  </Field>
-                  <Field label="ساختار رایحه">
-                    <input
-                      value={form.scentStructure}
-                      onChange={(e) => set("scentStructure", e.target.value)}
-                      placeholder="مانند: سه لایه‌ای (سر، میانی، پایه)"
-                      className={inputCls}
-                    />
-                  </Field>
-                  <Field label="فصل پیشنهادی">
-                    <input
-                      value={form.season}
-                      onChange={(e) => set("season", e.target.value)}
-                      placeholder="مانند: پاییز و زمستان"
-                      className={inputCls}
-                    />
-                  </Field>
+                  {form.productType === "perfume" && (
+                    <>
+                      <Field label="نوع رایحه">
+                        <input
+                          value={form.scentType}
+                          onChange={(e) => set("scentType", e.target.value)}
+                          placeholder="مانند: چوبی ادویه‌ای"
+                          className={inputCls}
+                        />
+                      </Field>
+                      <Field label="ساختار رایحه">
+                        <input
+                          value={form.scentStructure}
+                          onChange={(e) => set("scentStructure", e.target.value)}
+                          placeholder="مانند: سه لایه‌ای (سر، میانی، پایه)"
+                          className={inputCls}
+                        />
+                      </Field>
+                      <Field label="فصل پیشنهادی">
+                        <input
+                          value={form.season}
+                          onChange={(e) => set("season", e.target.value)}
+                          placeholder="مانند: پاییز و زمستان"
+                          className={inputCls}
+                        />
+                      </Field>
+                    </>
+                  )}
                 </div>
               </div>
 

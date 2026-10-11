@@ -164,6 +164,7 @@ export default function Journey({
   festivalActive = true,
   festivalTitle = "جشنواره خرید اول بلا",
   festivalSubtitle = "۲۵٪ تخفیف + اتومایزر هدیه",
+  festivalUntil = "",
   discountsActive = false,
   discountsTitle = "تخفیف‌های بلا",
   discountsSubtitle = "ادکلن‌های مشمول تخفیف را ببینید",
@@ -177,6 +178,8 @@ export default function Journey({
   festivalActive?: boolean;
   festivalTitle?: string;
   festivalSubtitle?: string;
+  /** زمان پایان جشنواره (ms epoch). خالی = بدون تایمر. */
+  festivalUntil?: string;
   /** کارت دوم — تخفیف‌ها (جدا از بنر جشنواره). */
   discountsActive?: boolean;
   discountsTitle?: string;
@@ -189,6 +192,25 @@ export default function Journey({
   bottleImage?: string;
 } = {}) {
   const [i, setI] = useState(0);
+
+  // ── تایمر شمارش معکوس جشنواره ─────────────────────────
+  // اگر ادمین زمانی برای پایان جشنواره ثبت نکرده باشد (festivalUntil خالی)،
+  // بنر بدون تایمر و همیشگی است؛ وگرنه با رسیدن به صفر، بنر پنهان می‌شود و
+  // محصولات به حالت عادی برمی‌گردند (سرور هم فیلتر جشنواره را غیرفعال می‌کند).
+  const untilMs = Number(festivalUntil) || 0;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!untilMs) return;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [untilMs]);
+  const festivalExpired = untilMs > 0 && now >= untilMs;
+  const remain = Math.max(0, untilMs - now);
+  const rd = Math.floor(remain / 86400000);
+  const rh = Math.floor((remain % 86400000) / 3600000);
+  const rm = Math.floor((remain % 3600000) / 60000);
+  const rs = Math.floor((remain % 60000) / 1000);
   // BUG FIX: `done` used to reset to false on every return to the home page, so
   // visitors were trapped in the intro animation again and again. The choice is
   // now remembered for the browsing session.
@@ -473,7 +495,7 @@ export default function Journey({
               </button>
             </motion.div>
 
-            {festivalActive && (
+            {festivalActive && !festivalExpired && (
               <motion.div
                 initial={{ opacity: 0, y: 46, scale: 0.8 }}
                 animate={{ opacity: 1, y: [46, -6, 0], scale: [0.8, 1.05, 1] }}
@@ -562,13 +584,25 @@ export default function Journey({
                       </p>
                     </div>
 
-                    <Link
-                      href="/shop"
-                      className="shimmer-btn flex shrink-0 items-center gap-1 rounded-full px-3.5 py-2 text-[11px] font-black text-[#241a05] shadow-[0_6px_20px_rgba(212,175,55,0.4)] active:scale-95"
-                    >
-                      دیدن تخفیف‌ها
-                      <ChevronLeft size={13} />
-                    </Link>
+                    <div className="flex shrink-0 flex-col items-center gap-1.5">
+                      {untilMs > 0 && (
+                        <div
+                          dir="ltr"
+                          className="festival-blink rounded-xl bg-black/25 px-3 py-1 text-center text-base font-black tabular-nums tracking-wider text-[#ffe3a3] shadow-[0_0_16px_rgba(255,90,90,0.4)] sm:text-lg"
+                        >
+                          {rd > 0 && <span className="text-[#ffe3c2]">{rd.toLocaleString("fa-IR")}d </span>}
+                          {String(rh).padStart(2, "0")}:{String(rm).padStart(2, "0")}:
+                          {String(rs).padStart(2, "0")}
+                        </div>
+                      )}
+                      <Link
+                        href="/shop?festival=1"
+                        className="shimmer-btn flex items-center gap-1 rounded-full px-3.5 py-2 text-[11px] font-black text-[#241a05] shadow-[0_6px_20px_rgba(212,175,55,0.4)] active:scale-95"
+                      >
+                        دیدن جشنواره
+                        <ChevronLeft size={13} />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </motion.div>

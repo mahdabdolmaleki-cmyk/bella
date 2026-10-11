@@ -1,6 +1,8 @@
 import { Router } from "express";
 import User from "../models/User.js";
 import Order from "../models/Order.js";
+import Settings from "../models/Settings.js";
+import { applyReferral, ensureReferralCode } from "../utils/referral.js";
 import { requireUser } from "../middleware/authMiddleware.js";
 import { rateLimit, penalise, resetLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
@@ -344,6 +346,18 @@ router.post(
     }
 
     const user = await findOrCreateVerifiedUser({ email, phone });
+
+    // زیرمجموعه‌گیری (v43): اگر کد معرف وارد شده و این کاربر هنوز معرف ندارد،
+    // رابطه برقرار و کد تخفیف هر دو طرف + امتیاز معرف + پیامک صادر می‌شود.
+    try {
+      const settings = await Settings.getSingleton();
+      if (String(settings.referralEnabled || "1") === "1") {
+        if (req.body?.referralCode) await applyReferral(user, req.body.referralCode, settings);
+        else await ensureReferralCode(user); // هر کاربر کد معرفی خودش را دارد
+      }
+    } catch {
+      /* خطای زیرمجموعه‌گیری نباید ورود را خراب کند */
+    }
 
     res.cookie(
       USER_COOKIE,

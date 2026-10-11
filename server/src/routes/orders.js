@@ -10,6 +10,9 @@ import { logActivity } from "../utils/activityLog.js";
 import { str, int, bool, isPhone, isEmail, isPostalCode, addressIssue } from "../utils/validate.js";
 import { isZarinpalConfigured } from "../utils/zarinpal.js";
 import { parseCouponList, findCoupon, couponAmount } from "../utils/coupon.js";
+import ReferralCode from "../models/ReferralCode.js";
+import { parseStarsConfig, starLevelFor, starPerks, starPerkSources } from "../utils/stars.js";
+import User from "../models/User.js";
 import { notifyOrderPlaced } from "../utils/orderNotify.js";
 import AbandonedCart from "../models/AbandonedCart.js";
 import {
@@ -68,14 +71,20 @@ router.post(
     const shippingMethodKey = str(req.body?.shippingMethod, { max: 30 }) || DEFAULT_SHIPPING_METHOD;
     // پس‌کرایه: کرایه درِ منزل پرداخت می‌شود؛ آنلاین فقط قیمت کالاها.
     const cod = bool(req.body?.shippingCod);
+    // وفاداری ستاره‌ای (v42): مزایای ستارهٔ مشتری به‌صورت خودکار در خرید لحاظ می‌شود.
+    const starsCfg = parseStarsConfig(siteSettings.starsConfigJson);
+    const starLevel = req.user ? starLevelFor(req.user.points ?? 0, starsCfg) : 0;
+    const starBen = starPerks(starLevel, starsCfg);
+    if (req.user?.vip) starBen.vipbox = true; // VIP فقط توسط ادمین؛ باکس رایگان
     // باکس ویژه VIP — هزینه همیشه از تنظیمات خوانده می‌شود، نه از مشتری.
+    // اگر مشتری مزیتِ «باکس VIP رایگان» داشته باشد، حتی بدون انتخابِ دستی هم
+    // به‌صورت خودکار و رایگان روی سفارش اعمال می‌شود (ویژگیِ ستاره).
     const wantsVip = bool(req.body?.vipBox);
-    const vipBox =
-      wantsVip && siteSettings.vipBoxEnabled === "1"
-        ? true
-        : false;
+    const vipBox = siteSettings.vipBoxEnabled === "1" && (wantsVip || starBen.vipbox);
     const vipBoxFee = vipBox
-      ? Math.max(0, Math.min(10_000_000, Math.round(Number(siteSettings.vipBoxFee) || 0)))
+      ? starBen.vipbox
+        ? 0
+        : Math.max(0, Math.min(10_000_000, Math.round(Number(siteSettings.vipBoxFee) || 0)))
       : 0;
 
     const termsAccepted = bool(req.body?.termsAccepted);
@@ -105,7 +114,7 @@ router.post(
     // Merge duplicate ids and clamp quantities.
     const wanted = new Map();
     for (const item of rawItems) {
-      const id = int(item?.id, { min: 1, max: 1e9 });
+      const id = int(item?.id, { min: 1, max: 1e9, clamp: false });
       const qty = int(item?.qty, { min: 1, max: MAX_QTY, fallback: 1 }) || 1;
       if (id === null) continue;
       wanted.set(id, Math.min(MAX_QTY, (wanted.get(id) || 0) + qty));
@@ -127,6 +136,11 @@ router.post(
       price: p.price,
       qty: wanted.get(p.id),
       image: p.image,
+      // Snapshot of campaign state for the invoice (جشنواره/تخفیف + مبلغ تخفیف قلم).
+      oldPrice: p.oldPrice ?? null,
+      festival: p.festival === true,
+      discount: p.discount === true,
+      points: p.points ?? 1,
       // Carried only for the weight calculation; not persisted on the order.
       sizeMl: p.sizeMl,
     }));
@@ -146,17 +160,26 @@ router.post(
     // کد تخفیف و تخفیف خرید اول روی هم جمع نمی‌شوند؛ هرکدام که بیشتر باشد.
     let discountPercent = 0;
     let discountAmount = 0;
+    let discountSource = "none"; // none | first | coupon | star — برای نمایشِ دقیق در فاکتور
     let couponCodeUsed = "";
     let couponFixedValue = 0; // v41 — کدِ مبلغی (تومان)
+    let referralUsedId = null; // v43 — کد رفرال یک‌بارمصرفی که باید پس از ثبت سفارش بسوزد
+    let referralUsedCode = "";
     if (siteSettings.firstPurchaseDiscountEnabled === "1") {
       const pct = Math.min(90, Math.max(0, Math.round(Number(siteSettings.firstPurchasePercent) || 0)));
       if (pct > 0) {
         const ident = { $or: [{ phone }] };
         if (req.user) ident.$or.push({ user: req.user._id });
-        const previous = await Order.exists(ident).catch(() => null);
+        // سفارشِ لغوشده یا ناموفق «خرید قبلی» حساب نمی‌شود (سازگار با بررسیِ کوپن).
+        const previous = await Order.exists({
+          ...ident,
+          status: { $ne: ORDER_STATUSES[ORDER_STATUSES.length - 1] },
+          paymentStatus: { $ne: "failed" },
+        }).catch(() => null);
         if (!previous) {
           discountPercent = pct;
           discountAmount = Math.min(subtotal, Math.round((subtotal * pct) / 100));
+          discountSource = "first";
         }
       }
     }
@@ -166,40 +189,87 @@ router.post(
         return res.status(400).json({ error: "کدهای تخفیف فعلاً غیرفعال هستند." });
       }
       const found = findCoupon(parseCouponList(siteSettings.couponCodesJson), rawCoupon);
-      if (found.reason === "notfound") {
-        return res.status(400).json({ error: "چنین کد تخفیفی وجود ندارد." });
+      let coupon = found.coupon || null;
+      if (!coupon) {
+        if (found.reason === "expired") {
+          return res.status(400).json({ error: "تاریخ انقضای این کد تخفیف گذشته است." });
+        }
+        // fallback (v43): کد تخفیف یک‌بارمصرفِ زیرمجموعه‌گیری، tied به حساب کاربر.
+        const up = rawCoupon.toUpperCase();
+        const rc = req.user ? await ReferralCode.findOne({ code: up, owner: req.user._id }) : null;
+        if (rc) {
+          if (rc.used) return res.status(400).json({ error: "این کد یک‌بارمصرف قبلاً استفاده شده است." });
+          if (rc.expiresAt && rc.expiresAt.getTime() < Date.now()) {
+            return res.status(400).json({ error: "مهلت این کد تخفیف تمام شده است." });
+          }
+          coupon = { code: rc.code, percent: rc.percent, amount: rc.amount, until: "" };
+          referralUsedId = rc._id;
+          referralUsedCode = rc.code;
+        } else {
+          const other = await ReferralCode.findOne({ code: up }).select("_id").lean();
+          if (other) return res.status(400).json({ error: "این کد متعلق به حساب شما نیست." });
+          return res.status(400).json({ error: "چنین کد تخفیفی وجود ندارد." });
+        }
       }
-      if (found.reason === "expired") {
-        return res.status(400).json({ error: "تاریخ انقضای این کد تخفیف گذشته است." });
+      // بررسی یک‌بارمصرفی فقط برای کوپن سراسری (کد رفرال با flag خودش می‌سوزد).
+      if (!referralUsedId) {
+        const usedOr = [{ phone }];
+        if (req.user) usedOr.push({ user: req.user._id });
+        const CANCELLED = ORDER_STATUSES[ORDER_STATUSES.length - 1];
+        const usedBase = { couponCode: coupon.code, $or: usedOr };
+        if (await Order.exists({ ...usedBase, paymentStatus: "paid", status: { $ne: CANCELLED } })) {
+          return res.status(400).json({
+            error: "شما پیش‌تر با این کد خریدی انجام داده‌اید؛ هر کد برای هر اکانت فقط یک‌بار قابل استفاده است.",
+          });
+        }
+        if (await Order.exists({ ...usedBase, paymentStatus: { $in: ["unpaid", "pending"] }, status: { $ne: CANCELLED } })) {
+          return res.status(400).json({
+            error: "این کد فعلاً روی سفارشِ پرداخت‌نشدهٔ دیگری از شما باز است؛ اگر پرداختش نکنید، پس از انقضا دوباره آزاد می‌شود.",
+          });
+        }
       }
-      // v45 (قانون نهایی): کد تخفیف فقط با «خرید واقعی» می‌سوزد — نه با ثبت سفارش:
-      //  • سوخته: این اکانت سفارشِ پرداخت‌شده‌ای (paid) با همین کد دارد که بعداً
-      //    لغو نشده باشد. سفارشِ پرداختی که لغو شود، کد را آزاد می‌کند.
-      //  • قفلِ موقت: یک سفارشِ بازِ پرداخت‌نشده (unpaid/pending) با همین کد وجود
-      //    دارد → نمی‌شود هم‌زمان سفارش دوم با همان کد زد. با انقضای sweeper یا
-      //    لغو شدن، خودبه‌خود آزاد می‌شود.
-      //  • پرداختِ سفارشِ منقضی‌شده در payment.js رد می‌شود (paymentStatus=failed
-      //    دیگر قابل پرداخت نیست)، پس حفره‌ای برای دو‌برداشتنِ تخفیف وجود ندارد.
-      const usedOr = [{ phone }];
-      if (req.user) usedOr.push({ user: req.user._id });
-      const CANCELLED = ORDER_STATUSES[ORDER_STATUSES.length - 1];
-      const usedBase = { couponCode: found.coupon.code, $or: usedOr };
-      if (await Order.exists({ ...usedBase, paymentStatus: "paid", status: { $ne: CANCELLED } })) {
+      if (coupon.minOrder && subtotal < coupon.minOrder) {
         return res.status(400).json({
-          error: "شما پیش‌تر با این کد خریدی انجام داده‌اید؛ هر کد برای هر اکانت فقط یک‌بار قابل استفاده است.",
+          error: `این کد تخفیف فقط برای خریدهای بالای ${Number(coupon.minOrder).toLocaleString("fa-IR")} تومان معتبر است.`,
         });
       }
-      if (await Order.exists({ ...usedBase, paymentStatus: { $in: ["unpaid", "pending"] }, status: { $ne: CANCELLED } })) {
-        return res.status(400).json({
-          error: "این کد فعلاً روی سفارشِ پرداخت‌نشدهٔ دیگری از شما باز است؛ اگر پرداختش نکنید، پس از انقضا دوباره آزاد می‌شود.",
-        });
-      }
-      const amount = couponAmount(subtotal, found.coupon);
+      const amount = couponAmount(subtotal, coupon);
       if (amount > discountAmount) {
-        discountPercent = found.coupon.amount > 0 ? 0 : found.coupon.percent;
-        couponFixedValue = found.coupon.amount > 0 ? found.coupon.amount : 0;
+        // وقتی کوپن هم درصدی و هم مبلغی است، هرکدام بزرگ‌تر باشد همان ثبت می‌شود.
+        const byAmount = coupon.amount > 0 ? Math.min(subtotal, coupon.amount) : 0;
+        const byPercent =
+          coupon.percent > 0 ? Math.min(subtotal, Math.round((subtotal * coupon.percent) / 100)) : 0;
+        if (byAmount >= byPercent) {
+          discountPercent = 0;
+          couponFixedValue = byAmount; // مبلغِ واقعاً اعمال‌شده (سقف‌خورده)
+        } else {
+          discountPercent = coupon.percent;
+          couponFixedValue = 0;
+        }
         discountAmount = amount;
-        couponCodeUsed = found.coupon.code;
+        couponCodeUsed = coupon.code;
+        discountSource = "coupon";
+      }
+    }
+    // تخفیف ستاره (وفاداری) هم مانند بقیهٔ تخفیف‌ها؛ بزرگ‌تر اعمال می‌شود.
+    // می‌تواند درصدی یا مبلغی باشد — هرکدام مبلغِ تخفیف بزرگ‌تری بدهد همان.
+    {
+      const starByPercent =
+        starBen.discountPercent > 0 ? Math.min(subtotal, Math.round((subtotal * starBen.discountPercent) / 100)) : 0;
+      const starByAmount = starBen.discountAmount > 0 ? Math.min(subtotal, starBen.discountAmount) : 0;
+      const starAmount = Math.max(starByPercent, starByAmount);
+      if (starAmount > 0 && starAmount > discountAmount) {
+        if (starByAmount >= starByPercent) {
+          discountPercent = 0;
+          couponFixedValue = starByAmount; // تخفیف مبلغیِ ستاره
+          discountAmount = starByAmount;
+        } else {
+          discountPercent = starBen.discountPercent;
+          couponFixedValue = 0;
+          discountAmount = starByPercent;
+        }
+        couponCodeUsed = "";
+        discountSource = "star";
       }
     }
     const payable = subtotal - discountAmount;
@@ -220,6 +290,11 @@ router.post(
     if (!shipping) {
       return res.status(400).json({ error: "روش ارسالی برای این مقصد در دسترس نیست." });
     }
+    // ستارهٔ ۳+: ارسال رایگان خودکار.
+    if (starBen.freeship) {
+      shipping.cost = 0;
+      shipping.free = true;
+    }
     // اگر مشتری روشی را فرستاده که مدیر غیرفعال کرده (یا برای این مقصد نیست)،
     // بی‌صدا روش دیگری با قیمت دیگر جایگزین نمی‌شود؛ باید دوباره انتخاب کند.
     if (req.body?.shippingMethod && shipping.key !== shippingMethodKey) {
@@ -236,6 +311,20 @@ router.post(
     const showEta = siteSettings.deliveryEstimateEnabled !== "";
     const shippingEtaDays = showEta ? (shipping.etaDays?.max || 0) : 0;
     const total = payable + shipping.cost + vipBoxFee;
+
+    // مزایای ستاره‌ای که واقعاً روی این سفارش اعمال شد + منبع هرکدام (ستارهٔ چندم).
+    // فقط مزایایی که عملاً اثر گذاشته‌اند ثبت می‌شوند (مثلاً تخفیف ستاره تنها
+    // وقتی که برندهٔ «بزرگ‌تر» شده باشد). برای نمایشِ دقیق در فاکتور.
+    const perkSrc = starPerkSources(starLevel, starsCfg);
+    const starPerksApplied = [];
+    const pushPerk = (key) => {
+      const s = perkSrc[key];
+      if (s) starPerksApplied.push({ key, star: s.star, title: s.title });
+    };
+    if (starBen.freeship) pushPerk("freeship");
+    if (starBen.vipbox) pushPerk("vipbox");
+    if (starBen.gift) pushPerk("gift");
+    if (discountSource === "star") pushPerk("discount");
 
     // Only the persisted fields go into the order document.
     const orderItems = items.map(({ sizeMl: _sizeMl, ...rest }) => rest);
@@ -299,9 +388,14 @@ router.post(
           discountAmount,
           couponCode: couponCodeUsed,
           couponFixed: couponFixedValue,
+          couponUseKey: couponCodeUsed ? `${couponCodeUsed}:${phone}` : undefined,
           shippingCod: cod,
           vipBox,
           vipBoxFee,
+          starLevel,
+          starGift: starBen.gift === true,
+          starPerksApplied,
+          discountSource,
           shippingCost: shipping.cost,
           shippingMethod: shipping.key,
           shippingLabel: shipping.label,
@@ -315,8 +409,15 @@ router.post(
           paymentStatus: "unpaid",
         });
       } catch (err) {
-        // Duplicate order code is safe to retry with a new code.
         if (err?.code === 11000) {
+          // تصادم روی کلید یکتای کوپن → کد یک‌بارمصرف هم‌زمان استفاده شده است.
+          if (err?.keyPattern?.couponUseKey || err?.keyValue?.couponUseKey) {
+            await releaseReserved();
+            return res
+              .status(400)
+              .json({ error: "این کد تخفیف هم‌زمان استفاده شد. دوباره تلاش کنید." });
+          }
+          // در غیر این صورت تصادمِ کد سفارش است → تلاش دوباره با کد جدید.
           continue;
         }
 
@@ -347,6 +448,14 @@ router.post(
       status: 201,
       meta: `total=${total} shipping=${shipping.key}:${shipping.cost}${cod ? " cod" : ""}${discountPercent ? ` first=${discountPercent}%` : ""}${vipBox ? " vip" : ""}`,
     });
+
+    // v43: اگر کد رفرال یک‌بارمصرف برنده و اعمال شد، همین‌جا می‌سوزد.
+    if (referralUsedId && couponCodeUsed === referralUsedCode) {
+      await ReferralCode.updateOne(
+        { _id: referralUsedId },
+        { $set: { used: true, usedAt: new Date(), usedOnOrder: order.code } }
+      ).catch(() => {});
+    }
 
     // پیامک/ایمیل «سفارش ثبت شد» + خبر مدیر:
     // با درگاه فعال، بعد از تأیید پرداخت در routes/payment.js ارسال می‌شود؛

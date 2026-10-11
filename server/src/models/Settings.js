@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS = {
   festivalActive: "true",
   festivalTitle: "جشنواره خرید اول بلا",
   festivalSubtitle: "۲۵٪ تخفیف + اتومایزر هدیه",
+  festivalUntil: "",
   footerAbout:
     "مزون بلا از سال ۱۳۹۸ با الهام از عطرسازی کلاسیک فرانسوی و اسانس‌های شرقی، رایحه‌هایی ماندگار برای سلیقه‌های خاص می‌آفریند.",
   // Loyalty club: how many Toman of settled purchases earn one point, and the
@@ -14,6 +15,18 @@ export const DEFAULT_SETTINGS = {
   tomanPerPoint: 10000,
   tierGoldSpend: 20000000,
   tierDiamondSpend: 60000000,
+  // پیکربندی ستاره‌های وفاداری (JSON) — آستانهٔ امتیاز + مزایای هر ستاره.
+  starsConfigJson: "",
+  // زیرمجموعه‌گیری (v43) — کد تخفیف دوطرفه + امتیاز معرف + پیامک قالبی.
+  referralEnabled: "1",
+  referrerType: "percent",
+  referrerValue: "10",
+  referrerDays: "10",
+  refereeType: "percent",
+  refereeValue: "10",
+  refereeDays: "3",
+  referralPoints: "5",
+  referralSmsTemplate: "",
   // Minimum goods subtotal (Toman) that makes eligible couriers free.
   shippingFreeThreshold: 5000000,
   // زمان تحویل سفارش به مشتری
@@ -176,6 +189,7 @@ const settingsSchema = new mongoose.Schema({
   festivalActive: { type: String, default: DEFAULT_SETTINGS.festivalActive },
   festivalTitle: { type: String, default: DEFAULT_SETTINGS.festivalTitle, maxlength: 120 },
   festivalSubtitle: { type: String, default: DEFAULT_SETTINGS.festivalSubtitle, maxlength: 200 },
+  festivalUntil: { type: String, default: DEFAULT_SETTINGS.festivalUntil, maxlength: 20 },
   discountsBoxActive: { type: String, default: DEFAULT_SETTINGS.discountsBoxActive, maxlength: 4 },
   discountsBoxTitle: { type: String, default: DEFAULT_SETTINGS.discountsBoxTitle, maxlength: 80 },
   discountsBoxSubtitle: { type: String, default: DEFAULT_SETTINGS.discountsBoxSubtitle, maxlength: 160 },
@@ -195,6 +209,17 @@ const settingsSchema = new mongoose.Schema({
   tomanPerPoint: { type: Number, default: DEFAULT_SETTINGS.tomanPerPoint, min: 1 },
   tierGoldSpend: { type: Number, default: DEFAULT_SETTINGS.tierGoldSpend, min: 0 },
   tierDiamondSpend: { type: Number, default: DEFAULT_SETTINGS.tierDiamondSpend, min: 0 },
+  starsConfigJson: { type: String, default: DEFAULT_SETTINGS.starsConfigJson, maxlength: 8000 },
+  // زیرمجموعه‌گیری (v43)
+  referralEnabled: { type: String, default: DEFAULT_SETTINGS.referralEnabled, maxlength: 2 },
+  referrerType: { type: String, default: DEFAULT_SETTINGS.referrerType, maxlength: 8 },
+  referrerValue: { type: String, default: DEFAULT_SETTINGS.referrerValue, maxlength: 12 },
+  referrerDays: { type: String, default: DEFAULT_SETTINGS.referrerDays, maxlength: 4 },
+  refereeType: { type: String, default: DEFAULT_SETTINGS.refereeType, maxlength: 8 },
+  refereeValue: { type: String, default: DEFAULT_SETTINGS.refereeValue, maxlength: 12 },
+  refereeDays: { type: String, default: DEFAULT_SETTINGS.refereeDays, maxlength: 4 },
+  referralPoints: { type: String, default: DEFAULT_SETTINGS.referralPoints, maxlength: 8 },
+  referralSmsTemplate: { type: String, default: DEFAULT_SETTINGS.referralSmsTemplate, maxlength: 12 },
   shippingFreeThreshold: {
     type: Number,
     default: DEFAULT_SETTINGS.shippingFreeThreshold,
@@ -324,14 +349,35 @@ const settingsSchema = new mongoose.Schema({
   emailCancelAdminEnabled: { type: String, default: DEFAULT_SETTINGS.emailCancelAdminEnabled, maxlength: 1 },
 });
 
-settingsSchema.statics.getSingleton = async function () {
-  // findOneAndUpdate+upsert is atomic: two concurrent first-time requests used
-  // to both call create() and one of them threw a duplicate-key 500.
-  return this.findOneAndUpdate(
+// v43: کش حافظه‌ای کوتاه‌مدت — قبلاً «هر درخواست» یک upsert به Mongo می‌زد.
+// حالا نتیجه برای چند ثانیه کش می‌شود و فقط در نبودِ کش، upsert امن اجرا می‌شود.
+// با ذخیرهٔ ادمین، clearSettingsCache() کش را باطلال می‌کند.
+const SETTINGS_TTL_MS = 5000;
+let _memoPromise = null;
+let _memoAt = 0;
+
+export function clearSettingsCache() {
+  _memoPromise = null;
+  _memoAt = 0;
+}
+
+settingsSchema.statics.getSingleton = function () {
+  // کش باید «promise» باشد نه «Query». یک Query در Mongoose فقط یک‌بار قابل
+  // اجراست؛ کش‌کردنِ خودِ Query و await دوبارهٔ آن، در هر درخواست دوم داخلِ
+  // بازهٔ TTL خطای «Query was already executed» می‌داد (۵۰۰).
+  if (_memoPromise && Date.now() - _memoAt < SETTINGS_TTL_MS) return _memoPromise;
+  _memoPromise = this.findOneAndUpdate(
     { key: "site" },
     { $setOnInsert: { key: "site" } },
     { new: true, upsert: true, setDefaultsOnInsert: true }
-  );
+  )
+    .exec()
+    .catch((e) => {
+      _memoPromise = null; // خطا را کش نکن؛ درخواست بعد دوباره تلاش کند
+      throw e;
+    });
+  _memoAt = Date.now();
+  return _memoPromise;
 };
 
 settingsSchema.methods.toDTO = function (includePrivate = false) {
@@ -343,6 +389,7 @@ settingsSchema.methods.toDTO = function (includePrivate = false) {
     festivalActive: this.festivalActive,
     festivalTitle: this.festivalTitle,
     festivalSubtitle: this.festivalSubtitle,
+    festivalUntil: this.festivalUntil ?? "",
     discountsBoxActive: this.discountsBoxActive === "1" ? "1" : "",
     discountsBoxTitle: this.discountsBoxTitle ?? "",
     discountsBoxSubtitle: this.discountsBoxSubtitle ?? "",
@@ -356,6 +403,17 @@ settingsSchema.methods.toDTO = function (includePrivate = false) {
     tomanPerPoint: String(this.tomanPerPoint ?? DEFAULT_SETTINGS.tomanPerPoint),
     tierGoldSpend: String(this.tierGoldSpend ?? DEFAULT_SETTINGS.tierGoldSpend),
     tierDiamondSpend: String(this.tierDiamondSpend ?? DEFAULT_SETTINGS.tierDiamondSpend),
+    starsConfigJson: this.starsConfigJson ?? "",
+    // زیرمجموعه‌گیری (v43)
+    referralEnabled: this.referralEnabled ?? DEFAULT_SETTINGS.referralEnabled,
+    referrerType: this.referrerType ?? DEFAULT_SETTINGS.referrerType,
+    referrerValue: this.referrerValue ?? DEFAULT_SETTINGS.referrerValue,
+    referrerDays: this.referrerDays ?? DEFAULT_SETTINGS.referrerDays,
+    refereeType: this.refereeType ?? DEFAULT_SETTINGS.refereeType,
+    refereeValue: this.refereeValue ?? DEFAULT_SETTINGS.refereeValue,
+    refereeDays: this.refereeDays ?? DEFAULT_SETTINGS.refereeDays,
+    referralPoints: this.referralPoints ?? DEFAULT_SETTINGS.referralPoints,
+    referralSmsTemplate: this.referralSmsTemplate ?? DEFAULT_SETTINGS.referralSmsTemplate,
     shippingFreeThreshold: String(
       this.shippingFreeThreshold ?? DEFAULT_SETTINGS.shippingFreeThreshold
     ),

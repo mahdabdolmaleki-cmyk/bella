@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, Fragment, type ReactNode } from "react";
+import { pathToNode, type CategoryNode } from "@/lib/categories";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -277,16 +278,12 @@ const SORTS: Array<{ key: string; label: string }> = [
   { key: "bestseller", label: "پرفروش‌ترین" },
 ];
 
-/** دسته‌های پیش‌فرض — اگر ادمین در تنظیمات چیزی نساخته باشد. */
-const FALLBACK_CATEGORIES = ["زنانه", "مردانه", "یونیسکس"];
-
-export function ProductsSection({
-  heading = true,
-  categories,
-}: { heading?: boolean; categories?: string[] } = {}) {
+export function ProductsSection({ heading = true }: { heading?: boolean } = {}) {
   const [rows, setRows] = useState<ProductDTO[] | null>(null);
   const [error, setError] = useState(false);
-  const [filter, setFilter] = useState("همه");
+  // فیلتر دسته اکنون با «شناسهٔ گرهٔ درخت» کار می‌کند (null = همه).
+  const [filterId, setFilterId] = useState<number | null>(null);
+  const [catTree, setCatTree] = useState<CategoryNode[]>([]);
   const [q, setQ] = useState("");
   const { add } = useCart();
 
@@ -306,18 +303,28 @@ export function ProductsSection({
   const [panelOpen, setPanelOpen] = useState(false);
   // «فقط تخفیف‌دارها» — از لینک کارت تخفیف صفحهٔ اصلی (?discount=1) روشن می‌شود.
   const [discountOnly, setDiscountOnly] = useState(false);
+  // «فقط جشنواره» — از لینک بنر جشنواره (?festival=1) روشن می‌شود.
+  const [festivalOnly, setFestivalOnly] = useState(false);
 
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search);
       if (p.get("discount") === "1") setDiscountOnly(true);
+      if (p.get("festival") === "1") setFestivalOnly(true);
     } catch {}
   }, []);
 
-  const cats = useMemo(
-    () => ["همه", ...(categories?.length ? categories : FALLBACK_CATEGORIES)],
-    [categories],
-  );
+  // دسته‌های درختی از سرور می‌آیند (ادمین در پنل می‌سازدشان).
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((d) => alive && setCatTree(d.categories || []))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -335,6 +342,41 @@ export function ProductsSection({
     list: string[],
     setList: (next: string[]) => void,
   ) => setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+
+  // ── دسته‌بندی درختی ─────────────────────────────────
+  const chipCls = (active: boolean) =>
+    `rounded-full px-5 py-2 text-xs font-bold transition-all duration-300 ${
+      active
+        ? "bg-gold text-[#241a05] shadow-[0_4px_18px_rgba(212,175,55,0.4)]"
+        : "border border-gold/30 text-gold-soft hover:bg-gold/10"
+    }`;
+  // اجداد گرهٔ انتخاب‌شده + خود آن؛ تا با انتخاب زیرشاخه، والد‌ها هم هایلایت شوند
+  // و فقط شاخهٔ انتخابی باز بماند.
+  const activeIds = new Set(pathToNode(catTree, filterId));
+  const selectCat = (n: CategoryNode) => {
+    setFilterId(n.id);
+  };
+  // هر سطح در یک ردیفِ پیچیده؛ فرزندانِ بازشده زیر والدشان با تورفتگی می‌آیند.
+  const renderCatLevel = (nodes: CategoryNode[], depth: number) => (
+    <div className="mt-2" style={{ paddingInlineStart: `${depth * 18}px` }}>
+      <div className="flex flex-wrap justify-center gap-2">
+        {nodes.map((n) => (
+          <Fragment key={n.id}>
+            <div className="flex items-center gap-1">
+              <button onClick={() => selectCat(n)} className={chipCls(activeIds.has(n.id))}>
+                {n.name}
+              </button>
+            </div>
+          </Fragment>
+        ))}
+      </div>
+      {nodes.map((n) =>
+        n.children && n.children.length > 0 && activeIds.has(n.id)
+          ? renderCatLevel(n.children, depth + 1)
+          : null,
+      )}
+    </div>
+  );
 
   const activeCount =
     brands.length +
@@ -369,7 +411,7 @@ export function ProductsSection({
       const params = new URLSearchParams();
       const term = q.trim();
       if (term) params.set("search", term);
-      if (filter !== "همه") params.set("category", filter);
+      if (filterId != null) params.set("category", String(filterId));
       brands.forEach((v) => params.append("brand", v));
       scents.forEach((v) => params.append("scent", v));
       concentrations.forEach((v) => params.append("concentration", v));
@@ -379,6 +421,7 @@ export function ProductsSection({
       if (priceMax) params.set("priceMax", priceMax);
       if (inStock) params.set("inStock", "1");
       if (discountOnly) params.set("discount", "1");
+      if (festivalOnly) params.set("festival", "1");
       if (sort !== "newest") params.set("sort", sort);
       const qs = params.toString();
       fetch(`/api/products${qs ? `?${qs}` : ""}`, { signal })
@@ -390,7 +433,7 @@ export function ProductsSection({
     },
     [
       q,
-      filter,
+      filterId,
       brands,
       scents,
       concentrations,
@@ -400,6 +443,7 @@ export function ProductsSection({
       priceMax,
       inStock,
       discountOnly,
+      festivalOnly,
       sort,
     ],
   );
@@ -427,20 +471,13 @@ export function ProductsSection({
           />
         )}
 
-        <Reveal delay={0.1} className="mt-10 flex flex-wrap justify-center gap-2">
-          {cats.map((c) => (
-            <button
-              key={c}
-              onClick={() => setFilter(c)}
-              className={`rounded-full px-5 py-2 text-xs font-bold transition-all duration-300 ${
-                filter === c
-                  ? "bg-gold text-[#241a05] shadow-[0_4px_18px_rgba(212,175,55,0.4)]"
-                  : "border border-gold/30 text-gold-soft hover:bg-gold/10"
-              }`}
-            >
-              {c}
+        <Reveal delay={0.1} className="mt-10">
+          <div className="flex flex-wrap justify-center gap-2">
+            <button onClick={() => setFilterId(null)} className={chipCls(filterId === null)}>
+              همه
             </button>
-          ))}
+          </div>
+          {catTree.length > 0 && renderCatLevel(catTree, 0)}
         </Reveal>
 
         <Reveal delay={0.15} className="mx-auto mt-5 max-w-md">
@@ -496,6 +533,15 @@ export function ProductsSection({
                 className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/50 bg-emerald-300/10 px-4 py-2 text-[11px] font-bold text-emerald-200 transition-colors hover:bg-emerald-300/20"
               >
                 <X size={12} /> فقط تخفیف‌دارها
+              </button>
+            )}
+
+            {festivalOnly && (
+              <button
+                onClick={() => setFestivalOnly(false)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-rose-300/50 bg-rose-300/10 px-4 py-2 text-[11px] font-bold text-rose-200 transition-colors hover:bg-rose-300/20"
+              >
+                <X size={12} /> فقط جشنواره
               </button>
             )}
 
@@ -688,7 +734,27 @@ export function ProductsSection({
 
                   <div className="mt-5 flex items-end justify-between gap-3 border-t border-gold/10 pt-4">
                     <div>
-                      {pr.oldPrice && (
+                      {pr.festival && (
+                        <span className="mb-1 me-1 inline-flex items-center rounded-full border border-rose-300/40 bg-rose-300/10 px-2 py-0.5 text-[10px] font-black text-rose-300">
+                          {pr.badge || "جشنواره"}
+                        </span>
+                      )}
+                      {pr.discount && pr.discountType === "percent" && pr.discountValue != null && (
+                        <span className="mb-1 inline-flex items-center rounded-full border border-emerald-300/40 bg-emerald-300/10 px-2 py-0.5 text-[10px] font-black text-emerald-300">
+                          {toFa(pr.discountValue)}٪ تخفیف
+                        </span>
+                      )}
+                      {pr.discount && pr.discountType === "amount" && pr.discountValue != null && (
+                        <span className="mb-1 inline-flex items-center rounded-full border border-emerald-300/40 bg-emerald-300/10 px-2 py-0.5 text-[10px] font-black text-emerald-300">
+                          {formatToman(pr.discountValue)} تخفیف
+                        </span>
+                      )}
+                      {pr.discount && !pr.discountType && pr.oldPrice != null && pr.oldPrice > pr.price && (
+                        <span className="mb-1 inline-flex items-center rounded-full border border-emerald-300/40 bg-emerald-300/10 px-2 py-0.5 text-[10px] font-black text-emerald-300">
+                          {toFa(Math.round((1 - pr.price / pr.oldPrice) * 100))}٪ تخفیف
+                        </span>
+                      )}
+                      {pr.oldPrice != null && pr.oldPrice > pr.price && (
                         <p className="text-[11px] text-sage/60 line-through">{formatToman(pr.oldPrice)}</p>
                       )}
                       <p className="text-base font-black text-gold-soft">{formatToman(pr.price)}</p>
@@ -696,7 +762,7 @@ export function ProductsSection({
                     <button
                       disabled={pr.inStock === false}
                       onClick={() =>
-                        add({ id: pr.id, name: pr.name, price: pr.price, glass: pr.glass, liquid: pr.liquid, sizeMl: pr.sizeMl, image: pr.image })
+                        add({ id: pr.id, name: pr.name, price: pr.price, glass: pr.glass, liquid: pr.liquid, sizeMl: pr.sizeMl, image: pr.image, oldPrice: pr.oldPrice, festival: pr.festival, discount: pr.discount, discountType: pr.discountType, discountValue: pr.discountValue })
                       }
                       className="btn-add flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-black transition-all hover:scale-105 active:scale-90 disabled:cursor-not-allowed disabled:bg-sage/30 disabled:text-sage disabled:hover:scale-100"
                     >
