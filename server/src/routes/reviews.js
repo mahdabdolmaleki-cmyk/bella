@@ -68,8 +68,8 @@ router.get(
 
 /**
  * POST /api/reviews/:productId
- * Anyone may submit; nothing is published until an admin approves it.
- * Signed-in customers get their purchase verified automatically.
+ * نظرات بدون نیاز به تأیید ادمین، بلافاصله منتشر می‌شوند (status="approved").
+ * ادمین تنها می‌تواند حذف یا پاسخ دهد. خریدِ تأییدشده به‌طور خودکار علامت می‌خورد.
  */
 router.post(
   "/:productId",

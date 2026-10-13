@@ -42,7 +42,7 @@ export function ItemCampaignTags({
       ? "rounded-full border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-black text-emerald-700"
       : "rounded-full border border-emerald-300/40 bg-emerald-300/10 px-1.5 py-0.5 text-[9px] font-black text-emerald-300";
   const meta =
-    tone === "light" ? "text-[9px] text-[#3d2f38]/70" : "text-[9px] text-sage/70";
+    tone === "light" ? "text-[9px] text-[#3d2f38]/70" : "text-[9px] text-sage/90";
 
   const hasOld = item.oldPrice != null && item.oldPrice > item.price;
   return (

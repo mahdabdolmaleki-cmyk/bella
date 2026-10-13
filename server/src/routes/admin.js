@@ -1,6 +1,7 @@
 import { Router } from "express";
 import path from "path";
 import Product, {
+  PRODUCT_ATTRIBUTE_MAX,
   PRODUCT_DESCRIPTION_BLOCK_TYPES,
   PRODUCT_HIGHLIGHT_MAX,
 } from "../models/Product.js";
@@ -43,6 +44,8 @@ import { requestedLoginMethods } from "../utils/loginMethods.js";
 import { notifySms, sendOtpWithTemplate, sendEventSms, getSmsCredit, getLastSmsError } from "../utils/sms.js";
 import { notifyEmail } from "../utils/emailNotify.js";
 import { isPhone } from "../utils/validate.js";
+import { createXlsxBuffer } from "../utils/xlsx.js";
+import { captureFestivalSnapshot, festivalFieldsToRestore, syncNonFestivalEdits } from "../utils/festival.js";
 
 const router = Router();
 
@@ -173,15 +176,29 @@ router.post(
     // تگ جشنواره: هنگام افزودن به جشنواره، تگ فعلی محصول بازنویسی می‌شود.
     const festBadge = str(req.body?.badge ?? "جشنواره", { max: 40 }) || "جشنواره";
 
-    const docs = await Product.find(all ? { active: true } : { id: { $in: ids } });
+    const docs = await Product.find(all ? { active: true } : { id: { $in: ids } }).select("+festivalSnapshot");
     let count = 0;
     for (const p of docs) {
+      const removingFestival = req.body?.festival !== undefined && !festivalOn;
       if (req.body?.festival !== undefined) {
-        p.festival = festivalOn;
-        // افزودن به جشنواره ⇒ تگ محصول (اگر دارد) به تگ جشنواره تغییر می‌کند.
-        if (festivalOn) p.badge = festBadge;
+        if (festivalOn) {
+          if (!p.festival) captureFestivalSnapshot(p);
+          p.festival = true;
+          // افزودن به جشنواره ⇒ تگ محصول (اگر دارد) به تگ جشنواره تغییر می‌کند.
+          p.badge = festBadge;
+        } else if (p.festival || p.festivalSnapshot) {
+          // حذف دستی از جشنواره نیز همان بازگردانی امنِ پایان تایمر را انجام می‌دهد.
+          Object.assign(p, festivalFieldsToRestore(p.festivalSnapshot));
+          p.festival = false;
+          p.festivalSnapshot = undefined;
+        } else {
+          p.festival = false;
+        }
       }
-      if (req.body?.discount !== undefined) {
+
+      // در درخواست حذف جشنواره، «discount:false» همراهش فقط نشان‌دهندهٔ حذف
+      // جشنواره است؛ snapshot باید تخفیف قبلیِ احتمالی را برگرداند.
+      if (req.body?.discount !== undefined && !removingFestival) {
         p.discount = discountOn;
         if (discountOn) {
           // ذخیرهٔ نوع و مقدار تخفیف تا در کارت/صفحهٔ محصول درست نمایش داده شود.
@@ -201,6 +218,11 @@ router.post(
       }
       // اگر فقط تگ (بدون تغییر جشنواره) فرستاده شد، همان اعمال می‌شود.
       if (hasBadge && req.body?.festival === undefined) p.badge = str(req.body.badge, { max: 40 }) || null;
+      // تغییر مستقلِ تگ/تخفیف حین جشنواره، پس از پایان به‌عنوان وضعیتِ غیرجشنواره
+      // حفظ می‌شود؛ فقط مقادیر قبل از جشنواره یا ویرایش مستقلِ جدید برمی‌گردند.
+      if (req.body?.festival === undefined && (req.body?.discount !== undefined || hasBadge)) {
+        syncNonFestivalEdits(p);
+      }
       await p.save();
       count++;
     }
@@ -373,7 +395,20 @@ router.get(
 // ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------
-function customerDTO(user, stats, starLevel = 0) {
+function referralContactDTO(user) {
+  if (!user) return null;
+  const deleted = Boolean(user.deletedAt);
+  return {
+    id: String(user._id),
+    name: user.name || "کاربر",
+    email: deleted ? "" : user.email || "",
+    phone: deleted ? "" : user.phone || "",
+    createdAt: user.createdAt,
+    deleted,
+  };
+}
+
+function customerDTO(user, stats, starLevel = 0, referralSummary = {}) {
   return {
     id: String(user._id),
     name: user.name,
@@ -387,6 +422,8 @@ function customerDTO(user, stats, starLevel = 0) {
     points: user.points ?? 0,
     vip: user.vip === true,
     star: starLevel,
+    referredBy: referralContactDTO(referralSummary.referrer),
+    referralCount: Number(referralSummary.referralCount) || 0,
   };
 }
 
@@ -409,11 +446,27 @@ router.get(
 
     const users = await User.find(filter).sort({ createdAt: -1 }).limit(500);
     const ids = users.map((u) => u._id);
-    const agg = await Order.aggregate([
-      { $match: { user: { $in: ids } } },
-      { $group: { _id: "$user", count: { $sum: 1 }, total: { $sum: "$total" } } },
+    const referredByIds = [...new Set(users.map((u) => u.referredBy ? String(u.referredBy) : "").filter(Boolean))];
+    const [agg, referralAgg, referrers] = await Promise.all([
+      Order.aggregate([
+        { $match: { user: { $in: ids } } },
+        { $group: { _id: "$user", count: { $sum: 1 }, total: { $sum: "$total" } } },
+      ]),
+      ids.length
+        ? User.aggregate([
+            { $match: { referredBy: { $in: ids }, deletedAt: null } },
+            { $group: { _id: "$referredBy", count: { $sum: 1 } } },
+          ])
+        : Promise.resolve([]),
+      referredByIds.length
+        ? User.find({ _id: { $in: referredByIds } })
+            .select("_id name email phone createdAt deletedAt")
+            .lean()
+        : Promise.resolve([]),
     ]);
     const statsById = new Map(agg.map((a) => [String(a._id), a]));
+    const referralCountById = new Map(referralAgg.map((a) => [String(a._id), Number(a.count) || 0]));
+    const referrerById = new Map(referrers.map((u) => [String(u._id), u]));
     const starsCfg = parseStarsConfig((await Settings.getSingleton()).starsConfigJson);
     const levelOf = (u) => starLevelFor(u.points ?? 0, starsCfg);
 
@@ -421,8 +474,150 @@ router.get(
     if (starFilter !== null) list = list.filter((u) => levelOf(u) === starFilter);
 
     res.json({
-      users: list.map((u) => customerDTO(u, statsById.get(String(u._id)), levelOf(u))),
+      users: list.map((u) => customerDTO(u, statsById.get(String(u._id)), levelOf(u), {
+        referrer: u.referredBy ? referrerById.get(String(u.referredBy)) : null,
+        referralCount: referralCountById.get(String(u._id)) || 0,
+      })),
+      // تعداد سطح‌های ستاره از پیکربندیِ «تنظیمات» — تا پنلِ مشتریان همان
+      // تعداد را نشان دهد و فیلترها، نه عددِ سخت‌کدشدهٔ ۵.
+      starsCount: starsCfg.length,
     });
+  })
+);
+
+// GET /api/admin/users/export.xlsx — همهٔ مشتریان فعالِ منطبق با فیلترهای فعلی.
+// خروجی واقعی OOXML است؛ برخلاف فهرست نمایشی، به ۵۰۰ ردیف محدود نمی‌شود.
+router.get(
+  "/users/export.xlsx",
+  ah(async (req, res) => {
+    const search = str(req.query?.search, { max: 80 });
+    const filter = { deletedAt: null };
+    if (search) {
+      const safe = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(safe, "i");
+      filter.$or = [{ name: re }, { email: re }, { phone: re }];
+    }
+
+    const starFilter = int(req.query?.star, { min: 0, max: 9, fallback: null });
+    const vipOnly = str(req.query?.vip, { max: 2 }) === "1";
+    if (vipOnly) filter.vip = true;
+
+    // Excel permits at most 1,048,576 rows per sheet, including its header.
+    const maxCustomers = 1_048_575;
+    const [users, settings] = await Promise.all([
+      User.find(filter)
+        .select("_id name email emailVerified phone phoneVerified province city postalCode address favorites points vip referralCode referredBy createdAt updatedAt")
+        .sort({ createdAt: -1 })
+        .limit(maxCustomers + 1)
+        .lean(),
+      Settings.getSingleton(),
+    ]);
+    if (users.length > maxCustomers) {
+      return res.status(413).json({ error: "تعداد مشتریان از ظرفیت یک برگهٔ Excel بیشتر است؛ لطفاً فیلترها را محدودتر کنید." });
+    }
+
+    const starsCfg = parseStarsConfig(settings.starsConfigJson);
+    const levelOf = (user) => starLevelFor(user.points ?? 0, starsCfg);
+    const customers = starFilter === null ? users : users.filter((user) => levelOf(user) === starFilter);
+    const customerIds = customers.map((user) => user._id);
+    const orderCountById = new Map();
+    const referralCountById = new Map();
+
+    // Batch the $in lists so the endpoint remains below MongoDB's BSON command
+    // limit even for a large customer base. Only counts are exported; no order
+    // totals are included (the customer-facing «جمع خرید» stays hidden).
+    for (let offset = 0; offset < customerIds.length; offset += 4000) {
+      const batch = customerIds.slice(offset, offset + 4000);
+      const [orderCounts, referralCounts] = await Promise.all([
+        Order.aggregate([
+          { $match: { user: { $in: batch } } },
+          { $group: { _id: "$user", count: { $sum: 1 } } },
+        ]),
+        User.aggregate([
+          { $match: { referredBy: { $in: batch }, deletedAt: null } },
+          { $group: { _id: "$referredBy", count: { $sum: 1 } } },
+        ]),
+      ]);
+      for (const row of orderCounts) orderCountById.set(String(row._id), Number(row.count) || 0);
+      for (const row of referralCounts) referralCountById.set(String(row._id), Number(row.count) || 0);
+    }
+
+    const referrerIds = [...new Set(customers.map((user) => user.referredBy ? String(user.referredBy) : "").filter(Boolean))];
+    const referrers = [];
+    for (let offset = 0; offset < referrerIds.length; offset += 4000) {
+      const batch = referrerIds.slice(offset, offset + 4000);
+      referrers.push(
+        ...await User.find({ _id: { $in: batch } })
+          .select("_id name email phone deletedAt")
+          .lean()
+      );
+    }
+    const referrerById = new Map(referrers.map((user) => [String(user._id), user]));
+
+    const columns = [
+      { header: "شناسه حساب", width: 28 },
+      { header: "نام مشتری", width: 24 },
+      { header: "شماره تلفن", width: 19 },
+      { header: "تأیید تلفن", width: 13 },
+      { header: "ایمیل", width: 30 },
+      { header: "تأیید ایمیل", width: 13 },
+      { header: "استان", width: 18 },
+      { header: "شهر", width: 18 },
+      { header: "کد پستی", width: 14 },
+      { header: "نشانی", width: 46 },
+      { header: "تاریخ عضویت", width: 21, type: "date" },
+      { header: "آخرین ویرایش", width: 21, type: "date" },
+      { header: "امتیاز باشگاه", width: 15 },
+      { header: "ستاره", width: 10 },
+      { header: "وضعیت VIP", width: 13 },
+      { header: "کد معرفی", width: 18 },
+      { header: "نام معرف", width: 22 },
+      { header: "تلفن معرف", width: 19 },
+      { header: "ایمیل معرف", width: 30 },
+      { header: "تعداد زیرمجموعه", width: 17 },
+      { header: "تعداد سفارش", width: 14 },
+      { header: "شناسه کالاهای موردعلاقه", width: 34 },
+    ];
+    const rows = customers.map((user) => {
+      const referrer = user.referredBy ? referrerById.get(String(user.referredBy)) : null;
+      const referrerDeleted = Boolean(referrer?.deletedAt);
+      return [
+        String(user._id),
+        user.name || "",
+        user.phone || "",
+        user.phoneVerified ? "بله" : "خیر",
+        user.email || "",
+        user.emailVerified ? "بله" : "خیر",
+        user.province || "",
+        user.city || "",
+        user.postalCode || "",
+        user.address || "",
+        user.createdAt || null,
+        user.updatedAt || null,
+        Number(user.points) || 0,
+        levelOf(user),
+        user.vip === true ? "بله" : "خیر",
+        user.referralCode || "",
+        referrer ? (referrerDeleted ? "حساب حذف‌شده" : referrer.name || "") : "",
+        referrerDeleted ? "" : referrer?.phone || "",
+        referrerDeleted ? "" : referrer?.email || "",
+        referralCountById.get(String(user._id)) || 0,
+        orderCountById.get(String(user._id)) || 0,
+        Array.isArray(user.favorites) ? user.favorites.map(String).join(", ") : "",
+      ];
+    });
+
+    const workbook = createXlsxBuffer({ sheetName: "مشتریان", columns, rows });
+    const date = new Date().toISOString().slice(0, 10);
+    logActivity(req, { action: "customer.export", target: `${customers.length} customers`, status: 200, meta: "xlsx" });
+    res.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="bella-customers-${date}.xlsx"`,
+      "Content-Length": String(workbook.length),
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    });
+    res.send(workbook);
   })
 );
 
@@ -450,6 +645,42 @@ router.get(
       meta: `count=${orders.length}`,
     });
     res.json({ orders: orders.map((o) => o.toDTO()) });
+  })
+);
+
+// GET /api/admin/users/:id/referrals — معرف مستقیم و زیرمجموعه‌های مستقیم
+// (فقط حساب‌های فعال در فهرست فرزندان؛ اطلاعات حساب حذف‌شده پنهان می‌ماند).
+router.get(
+  "/users/:id/referrals",
+  ah(async (req, res) => {
+    const user = await User.findById(req.params.id)
+      .select("_id name email phone referralCode referredBy createdAt deletedAt");
+    if (!user) return res.status(404).json({ error: "کاربر یافت نشد." });
+
+    const [referrer, count, referrals] = await Promise.all([
+      user.referredBy
+        ? User.findById(user.referredBy).select("_id name email phone createdAt deletedAt").lean()
+        : Promise.resolve(null),
+      User.countDocuments({ referredBy: user._id, deletedAt: null }),
+      User.find({ referredBy: user._id, deletedAt: null })
+        .select("_id name email phone createdAt deletedAt")
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean(),
+    ]);
+
+    logActivity(req, {
+      action: "customer.referrals",
+      target: String(user._id),
+      status: 200,
+      meta: `count=${count}`,
+    });
+    res.json({
+      referrer: referralContactDTO(referrer),
+      referralCount: count,
+      truncated: count > referrals.length,
+      referrals: referrals.map(referralContactDTO),
+    });
   })
 );
 
@@ -590,6 +821,9 @@ router.put(
       referralPoints: 8,
       referralSmsTemplate: 12,
       footerAbout: 1000,
+      // Home-page introduction shown above «چرا بلا؟».
+      homeIntroTitle: 160,
+      homeIntroBody: 2000,
       // Home-page scroll story (JSON) + bottle colours.
       journeyStages: 4000,
       journeyBottleGlass: 9,
@@ -625,7 +859,9 @@ router.put(
       discountsBoxTitle: 80,
       discountsBoxSubtitle: 160,
       firstPurchaseDiscountEnabled: 4,
+      firstPurchaseDiscountType: 8,
       firstPurchasePercent: 4,
+      firstPurchaseAmount: 13,
       // کدهای تخفیف (v40)
       couponEnabled: 4,
       couponCodesJson: 8000,
@@ -682,6 +918,14 @@ router.put(
     for (const [key, max] of Object.entries(limits)) {
       if (req.body?.[key] !== undefined) doc[key] = str(req.body[key], { max });
     }
+    if (
+      req.body?.firstPurchaseDiscountType !== undefined &&
+      !["percent", "amount"].includes(doc.firstPurchaseDiscountType)
+    ) {
+      return res.status(400).json({ error: "نوع تخفیف خرید اول معتبر نیست." });
+    }
+    // Legacy documents have no type field; normalize them to the old percent behavior.
+    doc.firstPurchaseDiscountType = doc.firstPurchaseDiscountType === "amount" ? "amount" : "percent";
     // روش‌های ارسال: فقط "1" یا "" ذخیره می‌شود و حداقل یک روش باید فعال بماند،
     // وگرنه مشتری هیچ راهی برای ثبت سفارش ندارد.
     const SHIPPING_TOGGLES = [
@@ -1026,6 +1270,8 @@ function sanitizeProduct(body, partial = false) {
     sillage: 60,
     category: 40,
     badge: 40,
+    // زیرنوعِ محصولاتِ «سایر» (خوشبوکننده، اسپری و…).
+    subType: 60,
     // Specification sheet shown in the "ویژگی‌های محصول" tab.
     brand: 80,
     manufacturer: 80,
@@ -1079,6 +1325,18 @@ function sanitizeProduct(body, partial = false) {
       })
       .filter((h) => h.text.trim().length > 0);
   }
+  // ویژگی‌های دلخواه (برچسب + مقدار) که ادمین در فرم محصول اضافه/حذف می‌کند.
+  // فقط ردیف‌های کامل (هر دو طرف پر) ذخیره می‌شوند تا جدول صفحهٔ محصول تمیز بماند.
+  if (!partial || body.attributes !== undefined) {
+    const rawAttributes = Array.isArray(body.attributes) ? body.attributes : [];
+    out.attributes = rawAttributes
+      .slice(0, PRODUCT_ATTRIBUTE_MAX)
+      .map((a) => ({
+        label: str(a?.label, { max: 60 }),
+        value: str(a?.value, { max: 200 }),
+      }))
+      .filter((a) => a.label.trim().length > 0 && a.value.trim().length > 0);
+  }
   // گالری محصول: عکس‌های اضافه‌ای که ادمین در فرم محصول آپلود می‌کند و در
   // صفحهٔ فروشگاه به‌صورت گالری نمایش داده می‌شوند (حداکثر ۱۰ عکس).
   if (!partial || body.gallery !== undefined) {
@@ -1092,6 +1350,8 @@ function sanitizeProduct(body, partial = false) {
   if (!partial || body.points !== undefined)
     out.points = int(body.points, { min: 0, max: 100000, fallback: 1 }) ?? 1;
   if (!partial || body.active !== undefined) out.active = bool(body.active);
+  // محصولِ قابلِ انتخاب به‌عنوان هدیهٔ وفاداری.
+  if (!partial || body.gift !== undefined) out.gift = bool(body.gift);
   return out;
 }
 

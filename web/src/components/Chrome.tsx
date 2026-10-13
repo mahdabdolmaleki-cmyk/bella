@@ -63,7 +63,7 @@ export function Header() {
           transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
         >
           <Link href="/" className="flex min-w-0 flex-col items-center gap-0.5 text-center">
-            <CrestImg className="w-8 shrink-0 sm:w-10 md:w-11" />
+            <CrestImg className="h-auto w-8 shrink-0 sm:w-10 md:w-11" priority />
             <motion.span
               initial={{ opacity: 0, scale: 0.15, filter: "blur(6px)" }}
               animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
@@ -441,7 +441,7 @@ export function Footer({
     <footer className="relative border-t border-gold/15 bg-night pb-24">
       <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <LogoImg className="w-32" />
+          <LogoImg className="h-auto w-32" />
           <motion.p
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -556,7 +556,7 @@ export function Footer({
       </div>
 
       <div className="hairline mx-auto h-px max-w-6xl" />
-      <p className="mt-6 text-center text-[11px] text-sage/70">
+      <p className="mt-6 text-center text-[11px] text-sage/90">
         © {new Date().toLocaleDateString("fa-IR", { year: "numeric" })} بلا پرفیوم — تمامی حقوق محفوظ است.
       </p>
     </footer>

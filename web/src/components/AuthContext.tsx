@@ -19,6 +19,7 @@ type ProfileInput = Partial<
   currentIdentityTicket?: string;
   phoneTicket?: string;
   emailTicket?: string;
+  channel?: OtpChannel;
 };
 
 type LoginInput = {
@@ -49,12 +50,14 @@ type AuthCtx = {
     value: string;
     stage: "current" | "destination";
     currentTicket?: string;
+    channel?: OtpChannel;
   }) => Promise<{ retryAfter: number; devCode?: string; sentTo: string; channel: OtpChannel }>;
   verifyIdentityOtp: (opts: {
     field: IdentityField;
     value: string;
     stage: "current" | "destination";
     code: string;
+    channel?: OtpChannel;
   }) => Promise<string>;
 };
 
@@ -158,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value: string;
       stage: "current" | "destination";
       currentTicket?: string;
+      channel?: OtpChannel;
     }) => {
       const data = await jsonFetch("/api/auth/me/identity/request-otp", {
         method: "POST",
@@ -179,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value: string;
       stage: "current" | "destination";
       code: string;
+      channel?: OtpChannel;
     }) => {
       const data = await jsonFetch("/api/auth/me/identity/verify-otp", {
         method: "POST",

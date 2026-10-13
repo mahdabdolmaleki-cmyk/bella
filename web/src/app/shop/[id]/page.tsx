@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ProductClient from "./ProductClient";
 import { abs } from "@/lib/seo";
+import { getSSRProduct } from "@/lib/serverData";
 
 // پایهٔ داخلی بک‌اند (همان الگوی lib/settings.ts) برای واکشی متادیتا در سرور.
 const API_BASE =
@@ -44,7 +45,7 @@ export async function generateMetadata({
   if (!p || !p.name) {
     return { title: "محصول پیدا نشد", robots: { index: false, follow: true } };
   }
-  const title = `خرید عطر ${p.name}`;
+  const title = p.name.startsWith("عطر") ? `خرید ${p.name}` : `خرید عطر ${p.name}`;
   const description = (
     (typeof p.description === "string" && p.description) ||
     `عطر ${p.name} از بلا پرفیوم — عطر اورینتال با بسته‌بندی لوکس و ضمانت اصالت.`
@@ -67,6 +68,51 @@ export async function generateMetadata({
   };
 }
 
-export default async function Page() {
-  return <ProductClient />;
+// SEO: دادهٔ ساختاریافتهٔ Product + BreadcrumbList تا گوگل قیمت، موجودی و
+// مسیر صفحه را بفهمد (ریچ‌اسنیپت محصول در نتایج جست‌وجو).
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const p = await getProduct(Number(id));
+  // SSR: محصول کامل به کلاینت پاس می‌شود تا در HTML اولیه رندر شود.
+  const initial = await getSSRProduct(Number(id));
+  const ld = p?.name
+    ? {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Product",
+            name: p.name,
+            description: (p.description || `عطر ${p.name} از بلا پرفیوم`).slice(0, 500),
+            ...(p.image ? { image: abs(p.image) } : {}),
+            brand: { "@type": "Brand", name: p.category || "بلا پرفیوم" },
+            offers: {
+              "@type": "Offer",
+              price: p.price ?? 0,
+              priceCurrency: "IRR",
+              availability: "https://schema.org/InStock",
+              url: abs(`/shop/${id}`),
+            },
+          },
+          {
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "خانه", item: abs("/") },
+              { "@type": "ListItem", position: 2, name: "فروشگاه", item: abs("/shop") },
+              { "@type": "ListItem", position: 3, name: p.name, item: abs(`/shop/${id}`) },
+            ],
+          },
+        ],
+      }
+    : null;
+  return (
+    <>
+      {ld && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }}
+        />
+      )}
+      <ProductClient initial={initial} />
+    </>
+  );
 }

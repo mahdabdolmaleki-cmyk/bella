@@ -9,6 +9,8 @@ import { parseStarsConfig, starLevelFor, starPerks, starPerkSources } from "../u
 import { ah } from "../utils/asyncHandler.js";
 import { int, bool, isPhone } from "../utils/validate.js";
 import { parseCouponList, findCoupon, couponAmount } from "../utils/coupon.js";
+import { findOwnedReferralCoupon, referralCouponError } from "../utils/referralCoupon.js";
+import { hasPreviousFirstPurchaseOrder } from "../utils/firstPurchaseDiscount.js";
 import {
   PROVINCES,
   SHIPPING_METHODS,
@@ -139,6 +141,9 @@ router.post(
       price: p.price,
       sizeMl: p.sizeMl,
     }));
+    // Product.price is the active selling price (including any festival
+    // price). The first-purchase/coupon/loyalty discount is calculated later,
+    // so it cannot overwrite the product-level festival saving.
     const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
 
     const settings = await Settings.getSingleton();
@@ -159,45 +164,67 @@ router.post(
     // مشتریِ قبلی خودبه‌خود حذف می‌شود (quote دوباره گرفته می‌شود).
     let firstPurchaseDiscount = null;
     if (settings.firstPurchaseDiscountEnabled === "1") {
+      const firstType = settings.firstPurchaseDiscountType === "amount" ? "amount" : "percent";
       const pct = Math.min(
         90,
         Math.max(0, Math.round(Number(settings.firstPurchasePercent) || 0))
       );
-      if (pct > 0) {
+      const fixed = Math.min(subtotal, Math.max(0, Math.round(Number(settings.firstPurchaseAmount) || 0)));
+      const amount = firstType === "amount" ? fixed : Math.min(subtotal, Math.round((subtotal * pct) / 100));
+      if (amount > 0) {
         firstPurchaseDiscount = {
-          percent: pct,
-          amount: Math.min(subtotal, Math.round((subtotal * pct) / 100)),
+          percent: firstType === "percent" ? pct : 0,
+          amount,
+          fixed: firstType === "amount" ? amount : 0,
         };
         const phone = isPhone(req.body?.phone) || (req.user?.phone ?? "");
-        if (phone) {
-          const ident = { $or: [{ phone }] };
-          if (req.user) ident.$or.push({ user: req.user._id });
-          const previous = await Order.exists(ident).catch(() => null);
-          if (previous) firstPurchaseDiscount = null;
-        }
+        const previous = await hasPreviousFirstPurchaseOrder(phone, req.user?._id).catch(() => true);
+        if (previous) firstPurchaseDiscount = null;
       }
     }
 
-    // پیش‌نمایش کد تخفیف — اعتبارسنجی نهایی در POST /api/orders است.
+    // پیش‌نمایش کد تخفیف — همان مالکیت، مصرف یک‌باره، انقضا و حداقل خریدِ
+    // مسیر نهایی POST /api/orders؛ referral code با کوپن عمومی فرق دارد و
+    // مستقل از روشن/خاموش‌بودن کوپن‌های عمومی بررسی می‌شود.
     const couponInput = String(req.body?.couponCode ?? "").trim().toUpperCase();
     let coupon = null;
     if (couponInput) {
       coupon = { input: couponInput, applied: null, error: "" };
-      if (settings.couponEnabled !== "1") {
-        coupon.error = "کدهای تخفیف فعلاً غیرفعال هستند.";
-      } else {
-        const found = findCoupon(parseCouponList(settings.couponCodesJson), couponInput);
-        if (found.reason === "notfound") coupon.error = "چنین کد تخفیفی وجود ندارد.";
-        else if (found.reason === "expired") coupon.error = "تاریخ انقضای این کد گذشته است.";
-        else {
-          // v45: پیش‌نمایش سبد هم دقیقاً قانون سرور را می‌گوید: سوخته = خریدِ
-          // پرداخت‌شده؛ قفلِ موقت = سفارشِ بازِ پرداخت‌نشده با همان کد.
+      const couponsEnabled = settings.couponEnabled === "1";
+      const found = couponsEnabled
+        ? findCoupon(parseCouponList(settings.couponCodesJson), couponInput)
+        : { reason: "notfound" };
+      let resolvedCoupon = found.coupon || null;
+      let referralUsedId = null;
+
+      if (!resolvedCoupon && found.reason === "expired") {
+        coupon.error = "تاریخ انقضای این کد تخفیف گذشته است.";
+      }
+      if (!resolvedCoupon && !coupon.error) {
+        const referral = await findOwnedReferralCoupon(couponInput, req.user?._id);
+        if (referral.coupon) {
+          resolvedCoupon = referral.coupon;
+          referralUsedId = referral.referralId;
+        } else {
+          coupon.error = referralCouponError(referral.reason);
+          if (!coupon.error) {
+            coupon.error = couponsEnabled
+              ? "چنین کد تخفیفی وجود ندارد."
+              : "کدهای تخفیف فعلاً غیرفعال هستند.";
+          }
+        }
+      }
+
+      if (resolvedCoupon && !coupon.error) {
+        // کوپن عمومی فقط در صورت خریدِ پرداخت‌شده می‌سوزد و سفارشِ باز موقتاً
+        // آن را قفل می‌کند؛ referral یک‌بارمصرف با flag اختصاصی‌اش کنترل می‌شود.
+        if (!referralUsedId) {
           const usedOr = [];
           const couponPhone = isPhone(req.body?.phone) || (req.user?.phone ?? "");
           if (couponPhone) usedOr.push({ phone: couponPhone });
           if (req.user) usedOr.push({ user: req.user._id });
           if (usedOr.length) {
-            const base = { couponCode: found.coupon.code, $or: usedOr };
+            const base = { couponCode: resolvedCoupon.code, $or: usedOr };
             const CANCELLED = ORDER_STATUSES[ORDER_STATUSES.length - 1];
             const burned = await Order.exists({
               ...base,
@@ -215,14 +242,18 @@ router.post(
             }
           }
         }
-        if (!coupon.error && found.reason === undefined)
+        if (!coupon.error && resolvedCoupon.minOrder && subtotal < resolvedCoupon.minOrder) {
+          coupon.error = `این کد تخفیف فقط برای خریدهای بالای ${Number(resolvedCoupon.minOrder).toLocaleString("fa-IR")} تومان معتبر است.`;
+        }
+        if (!coupon.error) {
           coupon.applied = {
-            code: found.coupon.code,
-            percent: found.coupon.percent,
-            amount: couponAmount(subtotal, found.coupon),
-            fixed: found.coupon.amount > 0 ? found.coupon.amount : 0,
-            until: found.coupon.until,
+            code: resolvedCoupon.code,
+            percent: resolvedCoupon.percent,
+            amount: couponAmount(subtotal, resolvedCoupon),
+            fixed: resolvedCoupon.amount > 0 ? resolvedCoupon.amount : 0,
+            until: resolvedCoupon.until,
           };
+        }
       }
     }
 
@@ -253,7 +284,7 @@ router.post(
     // تخفیف‌ها روی هم جمع نمی‌شوند؛ بزرگ‌تر اعمال می‌شود.
     const candidates = [];
     if (firstPurchaseDiscount)
-      candidates.push({ source: "first", percent: firstPurchaseDiscount.percent, amount: firstPurchaseDiscount.amount, fixed: 0, code: "" });
+      candidates.push({ source: "first", percent: firstPurchaseDiscount.percent, amount: firstPurchaseDiscount.amount, fixed: firstPurchaseDiscount.fixed ?? 0, code: "" });
     if (coupon?.applied)
       candidates.push({ source: "coupon", percent: coupon.applied.percent, amount: coupon.applied.amount, fixed: coupon.applied.fixed, code: coupon.applied.code });
     if (starDiscount)

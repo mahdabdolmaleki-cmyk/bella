@@ -21,7 +21,7 @@ export default function PageHero({
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         className="relative mx-auto max-w-2xl px-5 text-center"
       >
-        <CrestImg className="mx-auto w-32 rounded-xl sm:w-40" />
+        <CrestImg className="mx-auto h-auto w-32 rounded-xl sm:w-40" />
         <p className="font-display mt-1 text-[10px] font-semibold tracking-[0.4em] text-gold">
           {eyebrow}
         </p>

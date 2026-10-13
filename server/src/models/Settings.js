@@ -40,6 +40,9 @@ export const DEFAULT_SETTINGS = {
   shippingPishtazEnabled: "1",
   shippingChaparEnabled: "1",
   shippingPeykEnabled: "1",
+  // Editable SEO introduction immediately above «چرا بلا؟» on the home page.
+  homeIntroTitle: "خرید عطر اورجینال و ادکلن لوکس از مزون بلا پرفیوم",
+  homeIntroBody: "بلا پرفیوم مزون تخصصی عطرهای اورینتال و فرانسوی است؛ کلکسیونی از ادکلن اورجینال، اسانس عطر و دکنت‌های لوکس با ضمانت اصالت، بسته‌بندی مخملی و ارسال سریع به سراسر ایران. برای انتخاب دقیق‌تر رایحه، آموزش‌های آکادمی بلا را بخوانید و تازه‌های کلکسیون را در فروشگاه عطر بلا ببینید.",
   // Home-page scroll story. Empty string = use the built-in default text, so
   // the site looks exactly the same until an admin decides to change it.
   journeyStages: "",
@@ -92,7 +95,10 @@ export const DEFAULT_SETTINGS = {
   discountsBoxSubtitle: "ادکلن‌های مشمول تخفیف را ببینید",
   // ---- تخفیف خرید اول مشتری ----
   firstPurchaseDiscountEnabled: "",
+  // «percent» keeps every pre-existing installation's behavior unchanged.
+  firstPurchaseDiscountType: "percent",
   firstPurchasePercent: "25",
+  firstPurchaseAmount: "0",
   // v40 — کدهای تخفیف
   couponEnabled: "",
   couponCodesJson: "[]",
@@ -169,6 +175,7 @@ export const NUMERIC_SETTINGS = {
   // v35 — تخفیف خرید اول (۰ تا ۹۰ درصد) و هزینهٔ باکس VIP (۰ تا ۱۰ میلیون تومان)
   // به‌صورت بازه‌ای اعتبارسنجی می‌شوند، نه فقط طول رشته.
   firstPurchasePercent: { min: 0, max: 90, clamp: false },
+  firstPurchaseAmount: { min: 0, max: 1000000000000, clamp: false },
   vipBoxFee: { min: 0, max: 10000000, clamp: false },
   abandonedCartFirstHours: { min: 1, max: 168, clamp: false },
   abandonedCartSecondHours: { min: 1, max: 720, clamp: false },
@@ -198,7 +205,9 @@ const settingsSchema = new mongoose.Schema({
     default: DEFAULT_SETTINGS.firstPurchaseDiscountEnabled,
     maxlength: 4,
   },
+  firstPurchaseDiscountType: { type: String, default: DEFAULT_SETTINGS.firstPurchaseDiscountType, maxlength: 8 },
   firstPurchasePercent: { type: String, default: DEFAULT_SETTINGS.firstPurchasePercent, maxlength: 4 },
+  firstPurchaseAmount: { type: String, default: DEFAULT_SETTINGS.firstPurchaseAmount, maxlength: 13 },
   couponEnabled: { type: String, default: "", maxlength: 4 },
   couponCodesJson: { type: String, default: "[]", maxlength: 8000 },
   vipBoxEnabled: { type: String, default: DEFAULT_SETTINGS.vipBoxEnabled, maxlength: 4 },
@@ -254,6 +263,9 @@ const settingsSchema = new mongoose.Schema({
   shippingPishtazEnabled: { type: String, default: DEFAULT_SETTINGS.shippingPishtazEnabled, maxlength: 1 },
   shippingChaparEnabled: { type: String, default: DEFAULT_SETTINGS.shippingChaparEnabled, maxlength: 1 },
   shippingPeykEnabled: { type: String, default: DEFAULT_SETTINGS.shippingPeykEnabled, maxlength: 1 },
+  // SEO introduction above the «چرا بلا؟» home-page section.
+  homeIntroTitle: { type: String, default: DEFAULT_SETTINGS.homeIntroTitle, maxlength: 160 },
+  homeIntroBody: { type: String, default: DEFAULT_SETTINGS.homeIntroBody, maxlength: 2000 },
   // JSON array of { t, d } objects — stored as text so the admin panel can edit
   // it without a schema migration every time a stage is added.
   journeyStages: { type: String, default: DEFAULT_SETTINGS.journeyStages, maxlength: 4000 },
@@ -394,7 +406,9 @@ settingsSchema.methods.toDTO = function (includePrivate = false) {
     discountsBoxTitle: this.discountsBoxTitle ?? "",
     discountsBoxSubtitle: this.discountsBoxSubtitle ?? "",
     firstPurchaseDiscountEnabled: this.firstPurchaseDiscountEnabled === "1" ? "1" : "",
+    firstPurchaseDiscountType: this.firstPurchaseDiscountType === "amount" ? "amount" : "percent",
     firstPurchasePercent: this.firstPurchasePercent ?? "25",
+    firstPurchaseAmount: String(this.firstPurchaseAmount ?? DEFAULT_SETTINGS.firstPurchaseAmount),
     vipBoxEnabled: this.vipBoxEnabled === "1" ? "1" : "",
     vipBoxTitle: this.vipBoxTitle ?? "",
     vipBoxDesc: this.vipBoxDesc ?? "",
@@ -426,6 +440,8 @@ settingsSchema.methods.toDTO = function (includePrivate = false) {
     shippingPishtazEnabled: this.shippingPishtazEnabled === "" ? "" : "1",
     shippingChaparEnabled: this.shippingChaparEnabled === "" ? "" : "1",
     shippingPeykEnabled: this.shippingPeykEnabled === "" ? "" : "1",
+    homeIntroTitle: this.homeIntroTitle ?? DEFAULT_SETTINGS.homeIntroTitle,
+    homeIntroBody: this.homeIntroBody ?? DEFAULT_SETTINGS.homeIntroBody,
     journeyStages: this.journeyStages || "",
     journeyBottleGlass: this.journeyBottleGlass || DEFAULT_SETTINGS.journeyBottleGlass,
     journeyBottleLiquid: this.journeyBottleLiquid || DEFAULT_SETTINGS.journeyBottleLiquid,

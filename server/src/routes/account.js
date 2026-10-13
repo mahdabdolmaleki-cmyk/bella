@@ -5,6 +5,7 @@ import { parseStarsConfig, starLevelFor, starPerks } from "../utils/stars.js";
 import { ensureReferralCode } from "../utils/referral.js";
 import Message from "../models/Message.js";
 import Product from "../models/Product.js";
+import ReferralCode from "../models/ReferralCode.js";
 import Settings from "../models/Settings.js";
 import { requireUser } from "../middleware/authMiddleware.js";
 import { notifySms } from "../utils/sms.js";
@@ -56,11 +57,12 @@ router.get(
     const points = me?.points ?? 0;
     const star = starLevelFor(points, cfg);
 
+    // «جمع خرید» به درخواست مشتری دیگر در API سطحِ مشتری برگردانده نمی‌شود؛
+    // فقط تعداد سفارش‌های settled برای نمایش «سفارش‌ها» محاسبه می‌شود.
     const rows = await Order.aggregate([
       { $match: { user: req.user._id, ...SETTLED_MATCH } },
-      { $group: { _id: null, totalSpent: { $sum: "$total" }, orders: { $sum: 1 } } },
+      { $group: { _id: null, orders: { $sum: 1 } } },
     ]);
-    const totalSpent = rows[0]?.totalSpent || 0;
     const orders = rows[0]?.orders || 0;
 
     // تعداد زیرمجموعه‌هایی که با کدِ این مشتری ثبت‌نام کرده‌اند.
@@ -82,7 +84,6 @@ router.get(
       vip: me?.vip === true,
       referralCode,
       referralCount,
-      totalSpent,
       orders,
       next: nextStar
         ? {
@@ -95,6 +96,36 @@ router.get(
                 : 0,
           }
         : null,
+    });
+  })
+);
+
+// ---------------------------------------------------------------------------
+// کدهای تخفیفِ متعلق به کاربر (پاداشِ زیرمجموعه‌گیری و…)
+// ---------------------------------------------------------------------------
+router.get(
+  "/coupons",
+  ah(async (req, res) => {
+    const codes = await ReferralCode.find({ owner: req.user._id })
+      .sort({ used: 1, expiresAt: -1 })
+      .limit(50)
+      .lean();
+    const now = Date.now();
+    res.json({
+      coupons: codes.map((c) => {
+        const expired = new Date(c.expiresAt).getTime() < now;
+        return {
+          code: c.code,
+          kind: c.kind,
+          percent: c.percent || 0,
+          amount: c.amount || 0,
+          used: c.used === true,
+          expired,
+          // وضعیت نمایشی: فعال / استفاده‌شده / منقضی
+          status: c.used ? "used" : expired ? "expired" : "active",
+          expiresAt: c.expiresAt,
+        };
+      }),
     });
   })
 );

@@ -20,6 +20,7 @@ type PaymentInfo = {
   status: string;
   discountAmount?: number;
   discountPercent?: number;
+  discountFixed?: number;
   couponCode?: string;
   couponFixed?: number;
   vipBox?: boolean;

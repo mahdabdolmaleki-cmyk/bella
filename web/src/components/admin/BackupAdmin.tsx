@@ -217,7 +217,7 @@ export default function BackupAdmin() {
                   >
                     <span className="text-cream/90">
                       {LABELS[collection.name] ?? collection.name}
-                      <span dir="ltr" className="ms-2 font-mono text-[9px] text-sage/50">
+                      <span dir="ltr" className="ms-2 font-mono text-[9px] text-sage/90">
                         {collection.name}
                       </span>
                     </span>

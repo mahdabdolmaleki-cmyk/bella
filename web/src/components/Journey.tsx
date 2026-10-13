@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import { PerfumeBottle, CrestImg, GoldDust } from "./art";
 import { useCart } from "./Cart";
 import {
@@ -355,7 +356,7 @@ export default function Journey({
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("keydown", onKey);
     };
-  }, [i, last, go, done, release]);
+  }, [i, last, go, done, release, cartOpen]);
 
   const stage = i > 0 ? stages[i - 1] : null;
   const inBag = i === last;
@@ -453,9 +454,9 @@ export default function Journey({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             >
-              <CrestImg className="w-32 rounded-xl sm:w-48 md:w-56" />
+              <CrestImg className="h-auto w-32 rounded-xl sm:w-48 md:w-56" />
             </motion.div>
-            <motion.h1
+            <motion.div
               initial={{ opacity: 0, y: -140, scale: 0.12, filter: "blur(10px)" }}
               animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
               transition={{ duration: 1.4, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
@@ -463,7 +464,7 @@ export default function Journey({
               style={{ fontSize: "clamp(2.75rem, 13vw, 5.25rem)" }}
             >
               Bella Perfume
-            </motion.h1>
+            </motion.div>
             {/* درخواست مدیر: فونت این زیرنویس کوچکتر شود */}
             <p className="mt-3 max-w-xs text-[11px] leading-5 text-cream/90 sm:max-w-md sm:text-[13px]">
               افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده
@@ -661,12 +662,17 @@ export default function Journey({
         />
         {bottleImage ? (
           // A photo uploaded in the admin panel wins over the drawn bottle.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={bottleImage}
-            alt="عطر بلا"
-            className="animate-bob relative w-36 object-contain drop-shadow-[0_22px_45px_rgba(0,0,0,0.7)] sm:w-48"
-          />
+          // next/image + priority: عکس hero همان ابتدای HTML preload می‌شود.
+          <span className="animate-bob relative block aspect-[3/4] w-36 sm:w-48">
+            <Image
+              src={bottleImage}
+              alt="عطر بلا"
+              fill
+              priority
+              sizes="(max-width: 640px) 144px, 192px"
+              className="object-contain drop-shadow-[0_22px_45px_rgba(0,0,0,0.7)]"
+            />
+          </span>
         ) : (
           <PerfumeBottle
             className="animate-bob relative w-36 drop-shadow-[0_22px_45px_rgba(0,0,0,0.7)] sm:w-48"

@@ -44,6 +44,7 @@ import {
 } from "@/lib/socials";
 import SocialGlyph from "@/components/SocialGlyph";
 import {
+  DEFAULT_SETTINGS,
   parseBrands,
   parseJourneyStages,
   parseEnamadSeal,
@@ -107,6 +108,11 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
 
   const set = (key: keyof SiteSettingsMap, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const resetHomeIntro = () => {
+    set("homeIntroTitle", DEFAULT_SETTINGS.homeIntroTitle);
+    set("homeIntroBody", DEFAULT_SETTINGS.homeIntroBody);
+  };
 
   /* ---------------- پیامک‌ها: ارسال تست و بررسی اعتبار ---------------- */
   const [smsTestPhone, setSmsTestPhone] = useState("");
@@ -421,7 +427,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
       ) : dirty ? (
         <p className="text-[11px] font-bold text-amber-300">تغییرات ذخیره‌نشده دارید</p>
       ) : (
-        <p className="text-[11px] text-sage/70">همهٔ تغییرات ذخیره شده است.</p>
+        <p className="text-[11px] text-sage/90">همهٔ تغییرات ذخیره شده است.</p>
       )}
     </div>
   );
@@ -457,6 +463,52 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
       {/* ================= صفحهٔ اصلی ================= */}
       {tab === "home" && (
         <div className="space-y-4">
+          {/* ---------- متن معرفی بالای «چرا بلا؟» ---------- */}
+          <section className="gold-ring rounded-2xl glass-panel p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-gold">
+                <ScrollText size={16} />
+                <h2 className="text-sm font-black">متن معرفی بالای «چرا بلا؟»</h2>
+              </div>
+              <button
+                type="button"
+                onClick={resetHomeIntro}
+                className="btn-ghost rounded-full px-3.5 py-1.5 text-[11px] font-bold"
+              >
+                بازگرداندن متن پیش‌فرض
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] leading-6 text-sage">
+              عنوان و متن این بخش در صفحهٔ اصلی، درست پیش از «چرا بلا؟» نمایش داده می‌شود.
+              اگر متن شامل «آموزش‌های آکادمی بلا» یا «فروشگاه عطر بلا» باشد، عبارت به صفحهٔ مربوط لینک می‌شود.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-sage">عنوان اصلی صفحه (H1)</label>
+                <input
+                  value={form.homeIntroTitle}
+                  maxLength={160}
+                  onChange={(e) => set("homeIntroTitle", e.target.value)}
+                  placeholder="عنوان صفحهٔ اصلی"
+                  className={inputCls}
+                />
+                <p className="mt-1 text-[10px] text-sage/80">برای حفظ ساختار سئو، اگر عنوان خالی بماند عنوان پیش‌فرض نمایش داده می‌شود.</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-sage">متن توضیح</label>
+                <textarea
+                  rows={5}
+                  value={form.homeIntroBody}
+                  maxLength={2000}
+                  onChange={(e) => set("homeIntroBody", e.target.value)}
+                  placeholder="متن معرفی صفحهٔ اصلی"
+                  className={inputCls}
+                />
+                <p className="mt-1 text-left text-[10px] text-sage/80">{form.homeIntroBody.length.toLocaleString("fa-IR")} / ۲٬۰۰۰ نویسه</p>
+              </div>
+            </div>
+          </section>
+
           {/* ---------- متن مراحل صفحه اصلی ---------- */}
           <section className="gold-ring rounded-2xl glass-panel p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -949,7 +1001,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                           referrerPolicy="origin"
                         />
                       ) : (
-                        <span className="absolute inset-0 flex items-center justify-center px-1 text-center text-[9px] text-night/60">
+                        <span className="absolute inset-0 flex items-center justify-center px-1 text-center text-[9px] text-night/80">
                           بدون تصویر
                         </span>
                       )}
@@ -1048,9 +1100,9 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
         <section className="gold-ring mt-2 rounded-2xl glass-panel p-5">
           <div className="flex items-center gap-2 text-gold">
             <Gem size={16} />
-            <h2 className="text-sm font-black">ستاره‌های وفاداری</h2>
+            <h2 className="text-base font-black">ستاره‌های وفاداری</h2>
           </div>
-          <p className="mt-1 text-[11px] leading-6 text-sage">
+          <p className="mt-1 text-[13px] leading-7 font-medium text-sage">
             هر محصول امتیاز دارد؛ با خرید، امتیاز مشتری جمع می‌شود و هر ستاره در آستانهٔ
             امتیاز خودش باز می‌شود. مزایای هر ستاره تجمعی است و همهٔ اعداد قابل تغییرند.
           </p>
@@ -1088,35 +1140,35 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                 {list.map((s, i) => {
                   const dtype = s.discountType ?? (s.discountAmount ? "amount" : "percent");
                   return (
-                    <div key={i} className="rounded-xl border border-gold/15 glass-soft p-3">
+                    <div key={i} className="rounded-xl border border-gold/15 glass-soft p-4">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[11px] font-black text-gold-soft">ستارهٔ {i + 1}</span>
+                        <span className="text-[13px] font-black text-gold-soft">ستارهٔ {i + 1}</span>
                         <button
                           type="button"
                           onClick={() => removeStar(i)}
-                          className="rounded-full border border-red-400/40 px-2.5 py-0.5 text-[10px] font-bold text-red-300 hover:bg-red-400/10"
+                          className="rounded-full border border-red-400/40 px-3 py-1 text-xs font-bold text-red-300 hover:bg-red-400/10"
                         >
                           حذف
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                         <label className="block">
-                          <span className="mb-1 block text-[10.5px] font-bold text-sage">آستانه امتیاز</span>
+                          <span className="mb-1 block text-[13px] font-bold text-sage">آستانه امتیاز</span>
                           <input type="number" min={0} value={s.points ?? 0} onChange={(e) => edit(i, { points: Math.max(0, Number(e.target.value) || 0) })} className={inputCls} dir="ltr" />
                         </label>
                         <label className="block">
-                          <span className="mb-1 block text-[10.5px] font-bold text-sage">عنوان</span>
+                          <span className="mb-1 block text-[13px] font-bold text-sage">عنوان</span>
                           <input value={s.title ?? ""} onChange={(e) => edit(i, { title: e.target.value })} className={inputCls} />
                         </label>
                         <label className="col-span-2 block">
-                          <span className="mb-1 block text-[10.5px] font-bold text-sage">توضیح</span>
+                          <span className="mb-1 block text-[13px] font-bold text-sage">توضیح</span>
                           <input value={s.desc ?? ""} onChange={(e) => edit(i, { desc: e.target.value })} className={inputCls} />
                         </label>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
                         {PERKS.map(([key, label]) => (
-                          <label key={key} className="flex items-center gap-1.5 text-[11px] font-bold text-sage">
-                            <input type="checkbox" checked={(s.perks || []).includes(key)} onChange={() => togglePerk(i, key)} className="h-3.5 w-3.5 accent-[#d4af7c]" />
+                          <label key={key} className="flex items-center gap-1.5 text-[13px] font-bold text-sage">
+                            <input type="checkbox" checked={(s.perks || []).includes(key)} onChange={() => togglePerk(i, key)} className="h-4 w-4 accent-[#d4af7c]" />
                             {label}
                           </label>
                         ))}
@@ -1124,7 +1176,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                       {(s.perks || []).includes("discount") && (
                         <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-gold/10 bg-night/20 p-2">
                           <label className="block">
-                            <span className="mb-1 block text-[10.5px] font-bold text-sage">نوع تخفیف</span>
+                            <span className="mb-1 block text-[13px] font-bold text-sage">نوع تخفیف</span>
                             <select
                               value={dtype}
                               onChange={(e) => {
@@ -1140,13 +1192,32 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                           </label>
                           {dtype === "percent" ? (
                             <label className="block">
-                              <span className="mb-1 block text-[10.5px] font-bold text-sage">درصد</span>
-                              <input type="number" min={0} max={90} value={s.discountPercent ?? 7} onChange={(e) => edit(i, { discountPercent: Math.min(90, Number(e.target.value) || 0) })} className={`${inputCls} w-24`} dir="ltr" />
+                              <span className="mb-1 block text-[13px] font-bold text-sage">درصد</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={90}
+                                value={s.discountPercent ?? 7}
+                                onChange={(e) => edit(i, { discountPercent: Math.min(90, Number(e.target.value) || 0) })}
+                                className={`${inputCls} loyalty-discount-value w-24`}
+                                style={{ color: "#241a22", WebkitTextFillColor: "#241a22", caretColor: "#6b2c4e" }}
+                                dir="ltr"
+                                aria-label={`درصد تخفیف ستارهٔ ${i + 1}`}
+                              />
                             </label>
                           ) : (
                             <label className="block">
-                              <span className="mb-1 block text-[10.5px] font-bold text-sage">مبلغ (تومان)</span>
-                              <input type="number" min={0} value={s.discountAmount ?? 0} onChange={(e) => edit(i, { discountAmount: Math.max(0, Number(e.target.value) || 0) })} className={`${inputCls} w-32`} dir="ltr" />
+                              <span className="mb-1 block text-[13px] font-bold text-sage">مبلغ (تومان)</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={s.discountAmount ?? 0}
+                                onChange={(e) => edit(i, { discountAmount: Math.max(0, Number(e.target.value) || 0) })}
+                                className={`${inputCls} loyalty-discount-value w-32`}
+                                style={{ color: "#241a22", WebkitTextFillColor: "#241a22", caretColor: "#6b2c4e" }}
+                                dir="ltr"
+                                aria-label={`مبلغ تخفیف ستارهٔ ${i + 1} به تومان`}
+                              />
                             </label>
                           )}
                         </div>
@@ -1157,7 +1228,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                 <button
                   type="button"
                   onClick={addStar}
-                  className="w-full rounded-xl border border-dashed border-gold/40 py-2.5 text-[11px] font-black text-gold-soft hover:bg-gold/10"
+                  className="w-full rounded-xl border border-dashed border-gold/40 py-2.5 text-[13px] font-black text-gold-soft hover:bg-gold/10"
                 >
                   + افزودن ستارهٔ جدید
                 </button>
@@ -1258,7 +1329,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                 dir="ltr"
                 placeholder="مثلاً 123456"
               />
-              <span className="mt-1 block text-[10px] text-sage/70">
+              <span className="mt-1 block text-[10px] text-sage/90">
                 پارامترهای قالب: CODE (کد تخفیف)، DAYS (مهلت)، NAME (نام). خالی = پیامک ارسال نشود.
               </span>
             </label>
@@ -1293,7 +1364,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                   onChange={(event) => set("shippingFreeThreshold", event.target.value)}
                   className={inputCls}
                 />
-                <span className="mt-1.5 block text-[10px] leading-5 text-sage/70">
+                <span className="mt-1.5 block text-[10px] leading-5 text-sage/90">
                   عدد صفر یعنی تمام روش‌های واجدشرایط از هر مبلغی رایگان باشند.
                 </span>
               </label>
@@ -1347,7 +1418,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                         <span className="flex-1">
                           <span className="block text-xs font-bold text-cream">{m.label}</span>
                           <span className="mt-0.5 block text-[10.5px] leading-5 text-sage/80">{m.desc}</span>
-                          <span className={`mt-1 block text-[10px] font-bold ${on ? "text-emerald-300" : "text-sage/60"}`}>
+                          <span className={`mt-1 block text-[10px] font-bold ${on ? "text-emerald-300" : "text-sage/90"}`}>
                             {on ? "✓ به مشتری نمایش داده می‌شود" : "✕ مخفی"}
                           </span>
                         </span>
@@ -1411,7 +1482,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                     className={inputCls}
                     placeholder="7 یا 5 تا 7"
                   />
-                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                  <span className="mt-1.5 block text-[10px] text-sage/90">
                     پیش‌فرض: ۷ روز کاری (مثلاً: 7 یا 5 تا 7)
                   </span>
                 </label>
@@ -1427,7 +1498,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                     className={inputCls}
                     placeholder="2 یا 1 تا 2"
                   />
-                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                  <span className="mt-1.5 block text-[10px] text-sage/90">
                     پیش‌فرض: ۲ روز کاری (مثلاً: 2 یا 1 تا 2)
                   </span>
                 </label>
@@ -1443,7 +1514,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                     className={inputCls}
                     placeholder="2 یا 1 تا 2"
                   />
-                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                  <span className="mt-1.5 block text-[10px] text-sage/90">
                     پیش‌فرض: ۲ روز کاری
                   </span>
                 </label>
@@ -1459,7 +1530,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                     className={inputCls}
                     placeholder="1"
                   />
-                  <span className="mt-1.5 block text-[10px] text-sage/70">
+                  <span className="mt-1.5 block text-[10px] text-sage/90">
                     پیش‌فرض: ۱ روز کاری
                   </span>
                 </label>
@@ -1591,7 +1662,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
                     />
                     <Link2
                       size={13}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sage/60"
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sage/90"
                     />
                   </div>
                   <select
@@ -2050,7 +2121,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
           {/* ---------- گزارش لغو سفارش به ادمین ---------- */}
           <div className="mt-4 rounded-xl border border-red-300/25 bg-red-500/[0.06] p-3.5">
             <p className="text-xs font-black text-red-200">🚨 گزارش لغو سفارش — اطلاع به مدیر (کد، نام، تلفن، مبلغ)</p>
-            <p className="mt-1 text-[10.5px] leading-5 text-red-200/70">وقتی مشتری از حساب کاربری درخواست لغو می‌دهد، این اطلاع‌رسانی با جزئیات کامل برای مدیر ارسال می‌شود.</p>
+            <p className="mt-1 text-[10.5px] leading-5 text-red-200/90">وقتی مشتری از حساب کاربری درخواست لغو می‌دهد، این اطلاع‌رسانی با جزئیات کامل برای مدیر ارسال می‌شود.</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <button type="button" onClick={() => set("smsCancelAdminEnabled", form.smsCancelAdminEnabled === "1" ? "" : "1")} className={`flex items-center gap-2 rounded-xl border p-3 text-right transition ${form.smsCancelAdminEnabled === "1" ? "border-red-300/40 bg-red-300/10" : "border-gold/20"}`}>
                 <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${form.smsCancelAdminEnabled === "1" ? "border-red-300 bg-red-300 text-[#241a05]" : "border-gold/40"}`}>{form.smsCancelAdminEnabled === "1" && <Check size={12} />}</span>
@@ -2217,7 +2288,7 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
           </div>
 
           {form.zarinpalAutoVerify === "1" ? (
-            <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-orange-300/50 bg-orange-300/10 p-3 text-[10.5px] leading-5 text-[#7a4a12]">
+            <p className="mt-2 flex items-start gap-1.5 rounded-xl border border-orange-300/50 bg-orange-300/10 p-3 text-[10.5px] leading-5 text-[#f5d7a3]">
               <AlertCircle size={13} className="mt-0.5 shrink-0" />
               در حالت خودکار، اگر مشتری پس از پرداخت به سایت بازنگردد مبلغ تا پایان روز برداشت می‌شود؛
               عودت چنین تراکنش‌هایی (مثلاً سفارش منقضی‌شده) دستی و از پنل زرین‌پال انجام می‌شود.
@@ -2301,4 +2372,4 @@ export default function SettingsAdmin({ initialSettings }: { initialSettings: Si
 }
 
 const inputCls =
-  "w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/40 focus:border-gold focus:outline-none";
+  "w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/75 focus:border-gold focus:outline-none";

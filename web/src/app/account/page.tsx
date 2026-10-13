@@ -35,6 +35,7 @@ import {
   Hash,
   Crown,
   UserPlus,
+  Ticket,
 } from "lucide-react";
 import { Field, SelectField, TextField } from "@/components/Field";
 import {
@@ -344,7 +345,7 @@ function AuthForms() {
               />
             )}
 
-            <p className="text-[10px] leading-5 text-sage/70">
+            <p className="text-[10px] leading-5 text-sage/90">
               {byEmail
                 ? "کد ۶ رقمی به این ایمیل فرستاده می‌شود. اگر عضو نباشید، نام اولیه از بخش اول ایمیل ساخته می‌شود."
                 : "کد ۶ رقمی پیامکی به این شماره فرستاده می‌شود و در صورت نیاز حساب تازه می‌سازد."}
@@ -448,6 +449,9 @@ function Profile() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [loyalty, setLoyalty] = useState<LoyaltyInfo | null>(null);
   const [favorites, setFavorites] = useState<ProductDTO[] | null>(null);
+  const [coupons, setCoupons] = useState<
+    { code: string; percent: number; amount: number; status: string; expiresAt: string }[] | null
+  >(null);
 
   const loadFavorites = useCallback(() => {
     fetch("/api/account/favorites")
@@ -467,6 +471,7 @@ function Profile() {
     setOrders(null);
     setLoyalty(null);
     setFavorites(null);
+    setCoupons(null);
     if (!identity) return;
 
     let alive = true;
@@ -482,6 +487,10 @@ function Profile() {
       .then((r) => (r.ok ? r.json() : { products: [] }))
       .then((d) => alive && setFavorites(d.products ?? []))
       .catch(() => alive && setFavorites([]));
+    fetch("/api/account/coupons")
+      .then((r) => (r.ok ? r.json() : { coupons: [] }))
+      .then((d) => alive && setCoupons(Array.isArray(d?.coupons) ? d.coupons : []))
+      .catch(() => alive && setCoupons([]));
 
     return () => {
       alive = false;
@@ -562,7 +571,7 @@ function Profile() {
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
               {section === "overview" && (
-                <Overview loyalty={loyalty} orders={orders} favorites={favorites} />
+                <Overview loyalty={loyalty} orders={orders} favorites={favorites} coupons={coupons} />
               )}
               {section === "orders" && <OrdersList orders={orders} />}
               {section === "favorites" && (
@@ -582,12 +591,48 @@ function Overview({
   loyalty,
   orders,
   favorites,
+  coupons,
 }: {
   loyalty: LoyaltyInfo | null;
   orders: Order[] | null;
   favorites: ProductDTO[] | null;
+  coupons:
+    | { code: string; percent: number; amount: number; status: string; expiresAt: string }[]
+    | null;
 }) {
+  const [copiedCode, setCopiedCode] = useState("");
+  const [inviteCopyStatus, setInviteCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const starCfg = loyalty?.stars?.[Math.max(0, loyalty.star - 1)];
+  const copyInviteLink = async (referralCode: string) => {
+    const url = new URL("/account", window.location.origin);
+    url.searchParams.set("ref", referralCode);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url.toString());
+      } else {
+        // Fallback for older browsers and non-secure local previews.
+        const field = document.createElement("textarea");
+        field.value = url.toString();
+        field.setAttribute("readonly", "");
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.appendChild(field);
+        let copied = false;
+        try {
+          field.select();
+          copied = document.execCommand("copy");
+        } finally {
+          field.remove();
+        }
+        if (!copied) throw new Error("clipboard unavailable");
+      }
+      setInviteCopyStatus("copied");
+      window.setTimeout(() => setInviteCopyStatus("idle"), 2200);
+    } catch {
+      setInviteCopyStatus("error");
+      window.setTimeout(() => setInviteCopyStatus("idle"), 2600);
+    }
+  };
   const perkLabel = (k: string) => {
     if (k === "vipbox") return "باکس VIP رایگان";
     if (k === "freeship") return "ارسال رایگان";
@@ -637,7 +682,7 @@ function Overview({
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div>
             <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.2em] text-sage">
-              <Gem size={13} /> باشگاه ستارهٔ بلا
+              <Gem size={13} /> باشگاه مشتریان
             </p>
             <p className="font-display mt-2 text-3xl leading-none text-cream sm:text-4xl">
               {loyalty ? toFa(loyalty.points) : "—"}
@@ -677,16 +722,12 @@ function Overview({
         )}
 
         {/* آمار داخل بنر */}
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-gold/10 pt-4 text-center">
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-gold/10 pt-4 text-center">
           <div>
-            <p className="text-[10px] font-bold text-sage">جمع خرید</p>
-            <p className="mt-0.5 text-xs font-black text-gold-soft">{loyalty ? formatToman(loyalty.totalSpent) : "…"}</p>
-          </div>
-          <div className="border-x border-gold/10">
             <p className="text-[10px] font-bold text-sage">سفارش‌ها</p>
             <p className="mt-0.5 text-xs font-black text-gold-soft">{loyalty ? toFa(loyalty.orders) : "…"}</p>
           </div>
-          <div>
+          <div className="border-s border-gold/10">
             <p className="text-[10px] font-bold text-sage">زیرمجموعه‌ها</p>
             <p className="mt-0.5 text-xs font-black text-gold-soft">{loyalty ? toFa(loyalty.referralCount) : "…"}</p>
           </div>
@@ -715,6 +756,63 @@ function Overview({
         ) : null}
       </div>
 
+      {/* ---------- کدهای تخفیف من ---------- */}
+      <div className="gold-ring relative overflow-hidden rounded-3xl border border-gold/25 glass-soft p-4 sm:p-6">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-[0.2em] text-sage">
+          <Ticket size={13} /> کدهای تخفیف من
+        </p>
+        {coupons === null ? (
+          <p className="mt-3 text-xs text-sage">در حال بارگذاری…</p>
+        ) : coupons.length === 0 ? (
+          <p className="mt-3 text-xs leading-6 text-sage">
+            هنوز کد تخفیفی ندارید؛ با معرفی دوستان‌تان به بلا، کد تخفیف بگیرید.
+          </p>
+        ) : (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {coupons.map((c) => (
+              <div
+                key={c.code}
+                className={`flex items-center justify-between gap-2 rounded-xl border p-3 ${
+                  c.status === "active" ? "border-gold/30 bg-gold/[0.06]" : "border-sage/20 opacity-60"
+                }`}
+              >
+                <div className="min-w-0">
+                  <p dir="ltr" className="text-left font-mono text-sm font-black tracking-widest text-cream">
+                    {c.code}
+                  </p>
+                  <p className="mt-1 text-[10px] text-sage">
+                    {c.percent > 0
+                      ? `${toFa(c.percent)}٪ تخفیف`
+                      : c.amount > 0
+                        ? `${formatToman(c.amount)} تخفیف`
+                        : "تخفیف"}
+                    {" · "}
+                    {c.status === "used"
+                      ? "استفاده شده"
+                      : c.status === "expired"
+                        ? "منقضی شده"
+                        : `اعتبار تا ${new Date(c.expiresAt).toLocaleDateString("fa-IR")}`}
+                  </p>
+                </div>
+                {c.status === "active" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(c.code).catch(() => {});
+                      setCopiedCode(c.code);
+                      window.setTimeout(() => setCopiedCode(""), 1500);
+                    }}
+                    className="flex shrink-0 items-center gap-1 rounded-lg border border-gold/30 px-2 py-1.5 text-[10px] font-bold text-gold-soft hover:bg-gold/10"
+                  >
+                    {copiedCode === c.code ? <Check size={12} /> : <Copy size={12} />}
+                    کپی
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {/* زیرمجموعه‌گیری — کد معرف + تعداد زیرمجموعه‌ها */}
       {loyalty && (
         <div className="rounded-3xl border border-gold/20 glass-panel p-4 sm:p-5">
@@ -736,28 +834,63 @@ function Overview({
               <code className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-black tracking-widest text-gold-soft" dir="ltr">
                 {loyalty.referralCode}
               </code>
-              <button
+              <motion.button
                 type="button"
-                onClick={() => {
-                  const link = `${typeof window !== "undefined" ? window.location.origin : ""}/?ref=${loyalty.referralCode}`;
-                  navigator.clipboard?.writeText(link).catch(() => {});
-                }}
-                className="rounded-full border border-gold/30 px-4 py-2 text-[11px] font-bold text-gold-soft hover:bg-gold/10"
+                onClick={() => void copyInviteLink(loyalty.referralCode)}
+                whileTap={{ scale: 0.96 }}
+                animate={inviteCopyStatus === "copied" ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+                transition={{ duration: 0.32 }}
+                aria-live="polite"
+                className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[11px] font-bold transition-colors ${
+                  inviteCopyStatus === "copied"
+                    ? "border-emerald-400/50 bg-emerald-400/10 text-emerald-200"
+                    : inviteCopyStatus === "error"
+                      ? "border-red-400/45 bg-red-400/10 text-red-200"
+                      : "border-gold/30 text-gold-soft hover:bg-gold/10"
+                }`}
               >
-                کپی لینک دعوت
-              </button>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={inviteCopyStatus + "-icon"}
+                    initial={{ opacity: 0, scale: 0.65, rotate: -12 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    exit={{ opacity: 0, scale: 0.7, rotate: 10 }}
+                    transition={{ duration: 0.16 }}
+                    className="flex"
+                  >
+                    {inviteCopyStatus === "copied" ? (
+                      <Check size={14} />
+                    ) : inviteCopyStatus === "error" ? (
+                      <XCircle size={14} />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </motion.span>
+                </AnimatePresence>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={inviteCopyStatus + "-label"}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16 }}
+                  >
+                    {inviteCopyStatus === "copied"
+                      ? "لینک کپی شد!"
+                      : inviteCopyStatus === "error"
+                        ? "کپی نشد؛ دوباره تلاش کنید"
+                        : "کپی لینک دعوت"}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
             </div>
           )}
         </div>
       )}
 
       {/* quick numbers */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         <StatCard label="سفارش‌ها" value={orders ? toFa(orders.length) : "…"} />
-        <StatCard
-          label="جمع خرید"
-          value={loyalty ? formatToman(loyalty.totalSpent) : "…"}
-        />
         <StatCard
           label="علاقه‌مندی‌ها"
           value={favorites ? toFa(favorites.length) : "…"}
@@ -794,7 +927,7 @@ const ORDER_STEPS = [
     /*v26*/
     glow: "shadow-md shadow-[#6b2c4e]/30",
     ring: "border-[#6b2c4e]",
-    text: "text-[#241a22]",
+    text: "text-[#f6dbe3]",
     soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
   {
@@ -805,7 +938,7 @@ const ORDER_STEPS = [
     /*v26*/
     glow: "shadow-md shadow-[#6b2c4e]/30",
     ring: "border-[#6b2c4e]",
-    text: "text-[#241a22]",
+    text: "text-[#f6dbe3]",
     soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
   {
@@ -816,7 +949,7 @@ const ORDER_STEPS = [
     /*v26*/
     glow: "shadow-md shadow-[#6b2c4e]/30",
     ring: "border-[#6b2c4e]",
-    text: "text-[#241a22]",
+    text: "text-[#f6dbe3]",
     soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
   {
@@ -827,7 +960,7 @@ const ORDER_STEPS = [
     /*v26*/
     glow: "shadow-md shadow-[#6b2c4e]/30",
     ring: "border-[#6b2c4e]",
-    text: "text-[#241a22]",
+    text: "text-[#f6dbe3]",
     soft: "border-[#d4af7c]/60 bg-[#ffe3ea] text-[#241a22]",
   },
 ] as const;
@@ -910,7 +1043,7 @@ function OrderTracker({ order }: { order: Order }) {
                 className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
                   done
                     ? `${step.done} ${step.glow} text-[#f6ecd9]`
-                    : "glass-soft border-gold/20 text-sage/60"
+                    : "glass-soft border-gold/20 text-sage/90"
                 }`}
               >
                 <Icon size={17} />
@@ -926,12 +1059,12 @@ function OrderTracker({ order }: { order: Order }) {
               </motion.span>
               <span
                 className={`mt-2 text-[10px] leading-tight ${
-                  done ? `font-bold ${step.text}` : "text-sage/60"
+                  done ? `font-bold ${step.text}` : "text-sage/90"
                 }`}
               >
                 {step.status}
               </span>
-              {at && <span className="mt-0.5 text-[9px] text-sage/50">{faDate(at)}</span>}
+              {at && <span className="mt-0.5 text-[9px] text-sage/90">{faDate(at)}</span>}
             </li>
           );
         })}
@@ -1038,7 +1171,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
             {order.code}
           </button>
           {order.createdAt && (
-            <span className="text-[10px] text-sage/70">{faDate(order.createdAt)}</span>
+            <span className="text-[10px] text-sage/90">{faDate(order.createdAt)}</span>
           )}
         </div>
       </div>
@@ -1052,7 +1185,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
           <button
             type="button"
             onClick={() => setCancelBox((v) => !v)}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[#c53546]/45 px-4 py-2 text-[11px] font-bold text-[#b3233a] transition-colors hover:bg-[#c53546]/10"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[#c53546]/45 px-4 py-2 text-[11px] font-bold text-[#f19aa6] transition-colors hover:bg-[#c53546]/10"
           >
             <XCircle size={13} /> درخواست لغو سفارش
           </button>
@@ -1067,7 +1200,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
         {/* باکس تأیید درخواست لغو */}
         {cancelBox && (
           <div className="mt-3 rounded-2xl border border-[#c53546]/35 bg-[#c53546]/5 p-4">
-            <p className="text-xs font-bold text-[#b3233a]">درخواست لغو این سفارش را ثبت می‌کنید؟</p>
+            <p className="text-xs font-bold text-[#f19aa6]">درخواست لغو این سفارش را ثبت می‌کنید؟</p>
             <p className="mt-1.5 text-[11px] leading-5 text-sage">
               بعد از ثبت، درخواست شما برای مدیر فروشگاه ارسال می‌شود. برای هماهنگی سریع‌تر می‌توانید
               مستقیم هم تماس بگیرید.
@@ -1101,7 +1234,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
                 : "border-red-400/30 bg-red-500/5"
             }`}
           >
-            <p className={`text-xs font-bold ${cancelDone.ok ? "text-[#241a22]" : "text-[#b3233a]"}`}>
+            <p className={`text-xs font-bold ${cancelDone.ok ? "text-[#ffe9c2]" : "text-[#f19aa6]"}`}>
               {cancelDone.ok
                 ? "درخواست لغو شما ثبت شد و به مدیر فروشگاه ارسال شد."
                 : "در این مرحله، لغو فقط از طریق پشتیبانی امکان‌پذیر است."}
@@ -1426,8 +1559,11 @@ function AccountSettings() {
   } | null>(null);
   const [identityCode, setIdentityCode] = useState("");
   const [identityNotice, setIdentityNotice] = useState("");
-  const [identityDevCode, setIdentityDevCode] = useState("");
-  const [identityCooldown, setIdentityCooldown] = useState(0);
+    const [identityDevCode, setIdentityDevCode] = useState("");
+    const [identityCooldown, setIdentityCooldown] = useState(0);
+    // Which single channel proves the change. "" = auto (same channel as the
+    // destination, so the whole flow uses one method, never SMS + e-mail).
+    const [channel, setChannel] = useState<OtpChannel | "">("");
 
   // Reload the form whenever the signed-in identity changes, so a different
   // account never inherits the previous one's values.
@@ -1511,7 +1647,13 @@ function AccountSettings() {
     setSaved(false);
     setError("");
     try {
-      const result = await requestIdentityOtp({ field, value, stage, currentTicket });
+      const result = await requestIdentityOtp({
+        field,
+        value,
+        stage,
+        currentTicket,
+        channel: channel || undefined,
+      });
       setPendingIdentity({
         field,
         value,
@@ -1596,6 +1738,7 @@ function AccountSettings() {
         value: pendingIdentity.value,
         stage: pendingIdentity.stage,
         code: toLatinDigits(identityCode).trim(),
+        channel: channel || undefined,
       });
 
       if (pendingIdentity.stage === "current") {
@@ -1605,6 +1748,7 @@ function AccountSettings() {
           await updateProfile({
             ...profilePayload(),
             currentIdentityTicket: ticket,
+            channel: channel || undefined,
           });
         } else {
           await requestChangeCode(
@@ -1652,7 +1796,7 @@ function AccountSettings() {
     >
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-black text-gold">اطلاعات حساب</h2>
-        <span className="text-[10px] text-sage/70">این اطلاعات هنگام پرداخت خودکار پر می‌شود</span>
+        <span className="text-[10px] text-sage/90">این اطلاعات هنگام پرداخت خودکار پر می‌شود</span>
       </div>
 
       <Field
@@ -1689,12 +1833,40 @@ function AccountSettings() {
           icon={<Mail size={15} />}
           disabled={Boolean(pendingIdentity)}
           hint={
-            user?.phone
-              ? "تغییر ایمیل پس از تأیید شماره فعلی و سپس ایمیل جدید انجام می‌شود."
-              : "تغییر ایمیل پس از تأیید ایمیل فعلی و سپس ایمیل جدید انجام می‌شود."
+            user?.email
+              ? "تغییر ایمیل فقط با ایمیل تأیید می‌شود (ایمیل فعلی و سپس ایمیل جدید)."
+              : "افزودن ایمیل پس از تأیید شماره فعلی و سپس ایمیل جدید انجام می‌شود."
           }
         />
       </div>
+
+      {!pendingIdentity && user?.phone && user?.email && (
+        <div className="rounded-2xl border border-white/6 bg-white/[0.03] p-3">
+          <p className="text-[11px] font-bold text-gold-soft">
+            برای تغییر شماره یا ایمیل، کد تأیید را از کدام طریق دریافت کنم؟ (فقط یک روش)
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {([
+              { id: "", label: "خودکار (هم‌مسیرِ تغییر)" },
+              { id: "sms", label: "پیامک" },
+              { id: "email", label: "ایمیل" },
+            ] as const).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setChannel(option.id)}
+                className={`rounded-full border px-3 py-1.5 text-[11px] ${
+                  channel === option.id
+                    ? "border-gold bg-gold/10 text-gold-soft"
+                    : "border-white/10 text-sage"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {pendingIdentity && (
         <div className="rounded-2xl border border-gold/25 bg-gold/[0.06] p-4">

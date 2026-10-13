@@ -142,7 +142,7 @@ export function identityChangeFor(user, fieldInput, valueInput) {
   };
 }
 
-export function identityOtpStepFor(user, change, stageInput) {
+export function identityOtpStepFor(user, change, stageInput, channelInput) {
   const stage = stageInput === "destination" ? "destination" : "current";
   if (stage === "destination") {
     if (change.field === "email" && !change.value) {
@@ -156,7 +156,18 @@ export function identityOtpStepFor(user, change, stageInput) {
   if (!currentPhone && !currentEmail) {
     return { ok: false, status: 400, error: "شناسه فعلی حساب برای تأیید معتبر نیست." };
   }
-  const channel = currentPhone ? "sms" : "email";
+  // Use ONE verification channel for the whole change instead of mixing SMS and
+  // e-mail: prefer the same channel as the destination, and honour an explicit
+  // channel choice from the caller (sms/e-mail) when that contact exists.
+  const canSms = Boolean(currentPhone);
+  const canEmail = Boolean(currentEmail);
+  const requested = channelInput === "email" ? "email" : channelInput === "sms" ? "sms" : "";
+  const preferred = change.field === "email" ? "email" : "sms";
+  const usable = (ch) => (ch === "sms" && canSms) || (ch === "email" && canEmail);
+  const channel =
+    (requested && usable(requested) ? requested : "") ||
+    (usable(preferred) ? preferred : "") ||
+    (canSms ? "sms" : "email");
   return {
     ok: true,
     stage,
@@ -404,14 +415,14 @@ router.post(
       });
     }
 
-    const step = identityOtpStepFor(req.user, change, req.body?.stage);
+    const step = identityOtpStepFor(req.user, change, req.body?.stage, req.body?.channel);
     if (!step.ok) return res.status(step.status).json({ error: step.error });
 
     // Before sending a code to the proposed destination, prove control of the
     // account's current identifier (phone, or e-mail for e-mail-only accounts).
     // Consuming that ticket here means the destination ticket represents both.
     if (step.stage === "destination") {
-      const currentStep = identityOtpStepFor(req.user, change, "current");
+      const currentStep = identityOtpStepFor(req.user, change, "current", req.body?.channel);
       const currentTicket = str(req.body?.currentTicket, { max: 100 });
       const currentVerified = await consumeTicket(
         currentStep.otpPhone,
@@ -464,7 +475,7 @@ router.post(
       });
     }
 
-    const step = identityOtpStepFor(req.user, change, req.body?.stage);
+    const step = identityOtpStepFor(req.user, change, req.body?.stage, req.body?.channel);
     if (!step.ok) return res.status(step.status).json({ error: step.error });
 
     const out = await verifyOtp(
@@ -585,7 +596,8 @@ router.patch(
       const proofStep = identityOtpStepFor(
         user,
         identityChange,
-        isEmailRemoval ? "current" : "destination"
+        isEmailRemoval ? "current" : "destination",
+        req.body?.channel
       );
       const ticketField = isEmailRemoval
         ? "currentIdentityTicket"

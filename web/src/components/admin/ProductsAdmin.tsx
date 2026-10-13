@@ -17,13 +17,16 @@ import {
   Film,
   ArrowUp,
   ArrowDown,
+  SprayCan,
+  Droplets,
+  Gift,
 } from "lucide-react";
 import { formatToman, toFa, type ProductDescriptionBlock } from "@/lib/data";
 import { prepareImageForUpload, uploadForm } from "@/lib/prepareUpload";
 import { ProductVisual } from "@/components/art";
 import SiteIcon from "@/components/SiteIcon";
 import { ICON_NAMES, ICON_LABELS, type IconName } from "@/lib/icons";
-import type { Product, ProductHighlight } from "@/lib/types";
+import type { Product, ProductAttribute, ProductHighlight } from "@/lib/types";
 import { flattenTree, categoryPathName, type CategoryNode } from "@/lib/categories";
 
 // دسته‌بندی‌های پیش‌فرض فقط زمانی استفاده می‌شوند که ادمین هنوز دستهٔ خودش را
@@ -32,6 +35,8 @@ const DEFAULT_CATEGORIES = ["زنانه", "مردانه", "یونیسکس"];
 
 const EMPTY_FORM = {
   productType: "perfume" as "perfume" | "general",
+  // زیرنوعِ محصولاتِ «سایر» (خوشبوکننده، اسپری و…).
+  subType: "",
   name: "",
   nameEn: "",
   tagline: "",
@@ -55,6 +60,7 @@ const EMPTY_FORM = {
   badge: "",
   bestseller: false,
   active: true,
+  gift: false,
   image: "",
   // گالری: عکس‌های اضافهٔ محصول (تا ۱۰ عکس) که در فروشگاه به‌صورت بندانگشتی
   // زیر/کنار عکس اصلی نمایش داده می‌شوند.
@@ -62,6 +68,8 @@ const EMPTY_FORM = {
   // نمادها و متن‌های ویژه: آیکن + متن کوتاه که در صفحهٔ محصول کنار دکمهٔ
   // خرید نمایش داده می‌شوند (مثل «ارسال فوری»، «ضمانت اصالت»).
   highlights: [] as ProductHighlight[],
+  // ویژگی‌های دلخواه (برچسب + مقدار) — ادمین خودش این ردیف‌ها را اضافه/حذف می‌کند.
+  attributes: [] as ProductAttribute[],
   // ---- جدول "ویژگی‌های محصول" ----
   brand: "",
   manufacturer: "",
@@ -94,6 +102,7 @@ function productDescriptionBlocks(p: Product): ProductDescriptionBlock[] {
 function productToForm(p: Product): FormState {
   return {
     productType: p.productType === "general" ? "general" : "perfume",
+    subType: p.subType || "",
     name: p.name,
     nameEn: p.nameEn,
     tagline: p.tagline,
@@ -116,9 +125,11 @@ function productToForm(p: Product): FormState {
     badge: p.badge || "",
     bestseller: p.bestseller,
     active: p.active,
+    gift: p.gift === true,
     image: p.image || "",
     gallery: [...(p.gallery || [])],
     highlights: (p.highlights || []).map((h) => ({ icon: h.icon || "sparkles", text: h.text || "" })),
+    attributes: (p.attributes || []).map((a) => ({ label: a.label || "", value: a.value || "" })),
     brand: p.brand || "",
     manufacturer: p.manufacturer || "",
     suitableFor: p.suitableFor || "",
@@ -153,15 +164,19 @@ export default function ProductsAdmin({
   const [items, setItems] = useState<Product[]>(initialProducts);
   // تفکیک لیست محصولات بر اساس دسته (همه / هر دسته).
   const [catFilter, setCatFilter] = useState<number | null | "all">("all");
+  // فیلتر «فقط محصولات هدیه»: لیست را به محصولاتی که gift=true دارند محدود می‌کند.
+  const [giftOnly, setGiftOnly] = useState(false);
   // گروه‌بندی بر اساس «شناسهٔ» دسته (نه نام) تا نام کامل مسیر دیده شود.
   const catList = useMemo(
     () => [...new Set(items.map((p) => (p.categoryId as number | null) ?? null))],
     [items],
   );
-  const visible =
+  const visibleBase =
     catFilter === "all"
       ? items
       : items.filter((p) => ((p.categoryId as number | null) ?? null) === catFilter);
+  const giftCount = items.filter((p) => p.gift === true).length;
+  const visible = giftOnly ? visibleBase.filter((p) => p.gift === true) : visibleBase;
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -318,6 +333,34 @@ export default function ProductsAdmin({
       return { ...f, highlights };
     });
   };
+
+  /* ---------- ویژگی‌های دلخواه (افزودن/حذف فیلد توسط ادمین) ---------- */
+
+  const ATTRIBUTE_MAX = 30;
+
+  const setAttribute = (index: number, patch: Partial<ProductAttribute>) =>
+    setForm((f) => ({
+      ...f,
+      attributes: f.attributes.map((a, i) => (i === index ? { ...a, ...patch } : a)),
+    }));
+
+  const addAttribute = () => {
+    if (form.attributes.length >= ATTRIBUTE_MAX) {
+      setError(`حداکثر ${toFa(ATTRIBUTE_MAX)} ویژگی دلخواه مجاز است.`);
+      return;
+    }
+    setError("");
+    setForm((f) => ({
+      ...f,
+      attributes: [...f.attributes, { label: "", value: "" }],
+    }));
+  };
+
+  const removeAttribute = (index: number) =>
+    setForm((f) => ({
+      ...f,
+      attributes: f.attributes.filter((_, i) => i !== index),
+    }));
 
   const setDescriptionBlock = (
     index: number,
@@ -526,7 +569,23 @@ export default function ProductsAdmin({
             {toFa(items.filter((p) => ((p.categoryId as number | null) ?? null) === cid).length)})
           </button>
         ))}
+        {/* فیلترِ محصولاتِ انتخاب‌شده به‌عنوان هدیهٔ وفاداری */}
+        <button
+          onClick={() => setGiftOnly((v) => !v)}
+          title="نمایش فقط محصولاتی که به‌عنوان هدیهٔ وفاداری انتخاب شده‌اند"
+          className={`flex items-center gap-1 rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+            giftOnly ? "bg-gold text-[#241a05]" : "border border-emerald-400/30 text-emerald-300 hover:bg-emerald-400/10"
+          }`}
+        >
+          <Gift size={12} /> هدایا ({toFa(giftCount)})
+        </button>
       </div>
+
+      {giftOnly && visible.length === 0 && (
+        <p className="mt-4 rounded-xl border border-gold/15 bg-gold/5 p-3 text-xs leading-6 text-sage">
+          هنوز محصولی به‌عنوان هدیه انتخاب نشده است. در فرمِ هر محصول، تیکِ «قابل انتخاب به‌عنوان هدیهٔ وفاداری» را بزنید.
+        </p>
+      )}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((p) => (
@@ -575,6 +634,11 @@ export default function ProductsAdmin({
                   <Star size={10} /> پرفروش
                 </span>
               )}
+              {p.gift === true && (
+                <span className="flex items-center gap-0.5 rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                  <Gift size={10} /> هدیه
+                </span>
+              )}
               {!p.active && (
                 <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400">
                   مخفی
@@ -621,33 +685,42 @@ export default function ProductsAdmin({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
-              {/* ---------- نوع محصول ---------- */}
+              {/* ---------- مرحلهٔ ۱: نوع محصول ---------- */}
               <div className="mb-4 rounded-2xl border border-gold/15 glass-panel p-3.5">
-                <p className="mb-2 text-xs font-black text-gold-soft">نوع محصول</p>
+                <p className="mb-2 text-xs font-black text-gold-soft">
+                  مرحلهٔ ۱ — نوع محصول را انتخاب کنید
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {(
                     [
-                      ["perfume", "ادکلن / عطر", "با نُتِ رایحه، ماندگاری، پخش بو و ویژوالِ شیشه"],
-                      ["general", "سایر محصولات", "خوشبوکننده، اسپری و… — فرم و صفحهٔ ساده‌تر"],
+                      ["perfume", Droplets, "ادکلن / عطر", "با نُتِ رایحه، ماندگاری، پخش بو و ویژوالِ شیشه"],
+                      ["general", SprayCan, "سایر محصولات", "خوشبوکننده، اسپری و… — فرم و صفحهٔ ساده‌تر"],
                     ] as const
-                  ).map(([val, title, desc]) => (
+                  ).map(([val, Icon, title, desc]) => (
                     <button
                       key={val}
                       type="button"
                       onClick={() => set("productType", val)}
-                      className={`flex-1 rounded-xl border px-3 py-2 text-right transition ${
+                      className={`flex flex-1 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-right transition ${
                         form.productType === val
                           ? "border-gold bg-gold/10"
                           : "border-sage/25 hover:border-gold/40"
                       }`}
                     >
-                      <span className="block text-xs font-black text-cream">{title}</span>
-                      <span className="block text-[10px] text-sage">{desc}</span>
+                      <Icon
+                        size={20}
+                        className={`mt-0.5 shrink-0 ${form.productType === val ? "text-gold" : "text-sage"}`}
+                      />
+                      <span>
+                        <span className="block text-xs font-black text-cream">{title}</span>
+                        <span className="block text-[10px] text-sage">{desc}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
 
+              {/* ---------- فرمِ مخصوصِ محصولاتِ «سایر» ---------- */}
               <div className="flex items-start gap-4">
                 <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-pine/30 to-night">
                   <ProductVisual
@@ -731,7 +804,7 @@ export default function ProductsAdmin({
                 <div className="flex flex-wrap items-start gap-2">
                   <div className="ml-auto">
                     <p className="text-xs font-black text-gold-soft">گالری تصاویر محصول</p>
-                    <p className="mt-1 text-[10px] leading-5 text-sage/70">
+                    <p className="mt-1 text-[10px] leading-5 text-sage/90">
                       تا ۱۰ عکس اضافه — در صفحهٔ فروشگاه به‌صورت بندانگشتی کنار عکس اصلی نمایش داده می‌شود.
                     </p>
                   </div>
@@ -831,7 +904,7 @@ export default function ProductsAdmin({
                 <div className="flex flex-wrap items-start gap-2">
                   <div className="ml-auto">
                     <p className="text-xs font-black text-gold-soft">نمادها و متن‌های ویژه</p>
-                    <p className="mt-1 text-[10px] leading-5 text-sage/70">
+                    <p className="mt-1 text-[10px] leading-5 text-sage/90">
                       آیکن + متن دلخواه (تا ۸ مورد) که در صفحهٔ محصول زیر دکمهٔ خرید نمایش داده می‌شود.
                     </p>
                   </div>
@@ -881,7 +954,7 @@ export default function ProductsAdmin({
                           onChange={(e) => setHighlight(index, { text: e.target.value })}
                           placeholder="متن نماد — مثلاً ارسال فوری تهران"
                           maxLength={90}
-                          className="min-w-[140px] flex-1 rounded-lg border border-gold/20 bg-night px-3 py-2 text-[12px] text-cream placeholder:text-sage/40 focus:border-gold/50 focus:outline-none"
+                          className="min-w-[140px] flex-1 rounded-lg border border-gold/20 bg-night px-3 py-2 text-[12px] text-cream placeholder:text-sage/75 focus:border-gold/50 focus:outline-none"
                         />
 
                         <div className="mr-auto flex items-center gap-1">
@@ -948,7 +1021,7 @@ export default function ProductsAdmin({
                 <div className="flex flex-wrap items-start gap-2">
                   <div className="ml-auto">
                     <p className="text-xs font-black text-gold-soft">محتوای تب توضیحات</p>
-                    <p className="mt-1 text-[10px] leading-5 text-sage/70">
+                    <p className="mt-1 text-[10px] leading-5 text-sage/90">
                       متن، عکس و ویدئو را به ترتیب دلخواه اضافه و با فلش‌ها جابه‌جا کنید.
                     </p>
                   </div>
@@ -1096,7 +1169,7 @@ export default function ProductsAdmin({
                                     ? "تعویض ویدئو"
                                     : "آپلود ویدئو"}
                               </button>
-                              <p className="mt-1 text-[9.5px] text-sage/60">
+                              <p className="mt-1 text-[9.5px] text-sage/90">
                                 mp4، webm یا mov — حداکثر ۱۰۰ مگابایت
                               </p>
                             </div>
@@ -1214,7 +1287,7 @@ export default function ProductsAdmin({
                     onChange={(e) => set("stock", e.target.value)}
                     className={inputCls}
                   />
-                  <p className="mt-1 text-[10px] text-sage/70">
+                  <p className="mt-1 text-[10px] text-sage/90">
                     فقط در پنل دیده می‌شود؛ مشتری فقط «موجود / ناموجود» را می‌بیند.
                   </p>
                 </Field>
@@ -1240,7 +1313,7 @@ export default function ProductsAdmin({
                     onChange={(e) => set("points", e.target.value)}
                     className={inputCls}
                   />
-                  <p className="mt-1 text-[10px] text-sage/70">
+                  <p className="mt-1 text-[10px] text-sage/90">
                     با هر خریدِ نشسته، مجموع امتیاز اقلام به ستارهٔ مشتری اضافه می‌شود.
                   </p>
                 </Field>
@@ -1303,7 +1376,7 @@ export default function ProductsAdmin({
               {/* ---------- جدول ویژگی‌های محصول ---------- */}
               <div className="mt-5 rounded-xl glass-panel p-3.5">
                 <p className="text-[11.5px] font-bold text-gold-soft">ویژگی‌های محصول</p>
-                <p className="mt-0.5 text-[10px] text-sage/70">
+                <p className="mt-0.5 text-[10px] text-sage/90">
                   هر فیلد خالی در جدول صفحه محصول نمایش داده نمی‌شود.
                 </p>
 
@@ -1377,6 +1450,52 @@ export default function ProductsAdmin({
                     </>
                   )}
                 </div>
+
+                {/* ---------- ویژگی‌های دلخواه: افزودن/حذف فیلد توسط ادمین ---------- */}
+                <div className="mt-4 border-t border-gold/10 pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold text-gold-soft">فیلدهای دلخواه (اختیاری)</p>
+                    <button
+                      type="button"
+                      onClick={addAttribute}
+                      disabled={form.attributes.length >= ATTRIBUTE_MAX}
+                      className="rounded-lg border border-gold/30 bg-gold/10 px-2.5 py-1 text-[10.5px] font-bold text-gold-soft transition-colors hover:bg-gold/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      + افزودن فیلد جدید
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[10px] text-sage/90">
+                    هر ردیف، یک سطر به جدول «ویژگی‌های محصول» در صفحهٔ محصول اضافه می‌کند؛ ردیفِ بدونِ عنوان یا مقدار هنگامِ ذخیره حذف می‌شود.
+                  </p>
+                  {form.attributes.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {form.attributes.map((a, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            value={a.label}
+                            onChange={(e) => setAttribute(index, { label: e.target.value })}
+                            placeholder="عنوان ویژگی (مثلاً: جنس)"
+                            className={inputCls + " flex-1"}
+                          />
+                          <input
+                            value={a.value}
+                            onChange={(e) => setAttribute(index, { value: e.target.value })}
+                            placeholder="مقدار (مثلاً: استیل)"
+                            className={inputCls + " flex-1"}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeAttribute(index)}
+                            title="حذف این فیلد"
+                            className="shrink-0 rounded-lg border border-red-400/30 bg-red-400/10 px-2 py-1 text-[10.5px] font-bold text-red-300 transition-colors hover:bg-red-400/20"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-5">
@@ -1397,6 +1516,15 @@ export default function ProductsAdmin({
                     className="h-4 w-4 accent-[#d4af7c]"
                   />
                   نمایش در فروشگاه (فعال)
+                </label>
+                <label className="flex items-center gap-2 text-xs font-bold text-sage">
+                  <input
+                    type="checkbox"
+                    checked={form.gift}
+                    onChange={(e) => set("gift", e.target.checked)}
+                    className="h-4 w-4 accent-[#d4af7c]"
+                  />
+                  قابل انتخاب به‌عنوان هدیهٔ وفاداری
                 </label>
               </div>
 
@@ -1432,7 +1560,7 @@ export default function ProductsAdmin({
 }
 
 const inputCls =
-  "w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/40 focus:border-gold focus:outline-none";
+  "w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/75 focus:border-gold focus:outline-none";
 
 function Field({
   label,

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Vazirmatn, Cormorant_Garamond, Alex_Brush } from "next/font/google";
 import Shell from "@/components/Shell";
@@ -36,22 +36,32 @@ const alexBrush = Alex_Brush({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "بلا پرفیوم | مزون عطرهای لوکس",
+    // SEO: عنوان پیش‌فرض با کلیدواژه‌های اصلی خرید عطر.
+    default: "بلا پرفیوم | خرید عطر اورجینال و ادکلن لوکس",
     template: "%s | بلا پرفیوم",
   },
   description:
     "بلا پرفیوم — افسونگری لوکس در قالب یک شیشه کریستال تراش‌خورده. کلکسیون عطرهای اورینتال با بسته‌بندی مخملی و دوخت طلایی.",
   other: { enamad: "2217815" },
   robots: { index: true, follow: true },
-  themeColor: "#0e3b26",
   alternates: { canonical: abs("/") },
   openGraph: {
     locale: "fa_IR",
     siteName: "بلا پرفیوم",
     type: "website",
     url: abs("/"),
+    images: [abs("/crest.webp")],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "بلا پرفیوم | خرید عطر اورجینال و ادکلن لوکس",
+    description:
+      "کلکسیون عطرهای اورینتال با بسته‌بندی مخملی و ضمانت اصالت.",
   },
 };
+
+// NEXT: themeColor باید در viewport باشد، نه metadata.
+export const viewport: Viewport = { themeColor: "#0e3b26" };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const settings = await getSiteSettings();

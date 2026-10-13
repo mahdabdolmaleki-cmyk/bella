@@ -152,7 +152,7 @@ function Avatar({ big }: { big?: boolean }) {
   return (
     <span className={big ? "bchat-av" : "bchat-mini"}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.webp" alt="" />
+      <img src="/logo.webp" alt="" loading="lazy" decoding="async" />
       {big && <i />}
     </span>
   );

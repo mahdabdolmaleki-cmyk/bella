@@ -54,10 +54,15 @@ export function bool(value) {
   return false;
 }
 
-const EMAIL_RE = /^[^\s@]{1,64}@[^\s@.]+(\.[^\s@.]+)+$/;
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
 export function isEmail(value) {
   const s = str(value, { max: 254 });
-  return EMAIL_RE.test(s) ? s.toLowerCase() : null;
+  if (!EMAIL_RE.test(s)) return null;
+  // Reject leading/trailing/consecutive dots in the local part (RFC-invalid but
+  // allowed by the character class above).
+  const local = s.slice(0, s.indexOf("@"));
+  if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return null;
+  return s.toLowerCase();
 }
 
 // Iranian mobile / landline, quite permissive but bounded.

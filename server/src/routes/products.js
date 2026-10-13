@@ -3,9 +3,9 @@ import Product from "../models/Product.js";
 import Category, { buildTree, descendantIds } from "../models/Category.js";
 import Settings from "../models/Settings.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { cacheResponse } from "../utils/cache.js";
 import { ah } from "../utils/asyncHandler.js";
 import { str, int } from "../utils/validate.js";
+import { giftPoolProducts } from "../utils/gifts.js";
 
 const router = Router();
 // فهرست ثابت حذف شد: دسته‌بندی‌ها را ادمین در تنظیمات سایت می‌سازد، پس
@@ -27,7 +27,6 @@ function escapeRegex(value) {
 router.get(
   "/",
   rateLimit({ name: "products-list", windowMs: 60 * 1000, max: 120 }),
-  cacheResponse(5000, (req) => "products:" + req.originalUrl),
   ah(async (req, res) => {
     // BUG FIX: `?search=a&search=b` made req.query.search an array and
     // `.trim()` threw a 500. str() coerces safely and caps the length.
@@ -141,6 +140,9 @@ router.get(
     const sort = SORTS[sortKey] || { id: 1 };
 
     const products = await Product.find(filter).sort(sort).limit(limit);
+    // Product prices and festival tags are time-sensitive; do not let a browser,
+    // proxy or CDN serve an old campaign response after the expiry job restores it.
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.json({ products: products.map((p) => p.toDTO()) });
   })
 );
@@ -206,6 +208,26 @@ router.get(
       sizes: sizes.filter((s) => Number.isFinite(s)).sort((a, b) => a - b),
       priceMin: range[0]?.min ?? 0,
       priceMax: range[0]?.max ?? 0,
+    });
+  })
+);
+
+// استخرِ محصولاتِ هدیه: فقط محصولاتِ فعالِ gift=true — برای انتخابِ هدیه هنگامِ پرداخت.
+router.get(
+  "/gifts",
+  rateLimit({ name: "products-gifts", windowMs: 60 * 1000, max: 120 }),
+  ah(async (_req, res) => {
+    // استخرِ هدیه + هدیهٔ دیفالت (اگر ادمین هدیه‌ای علامت نزده باشد) تا انتخاب
+    // هدیه برای مشتریِ مشمول هرگز خالی نماند.
+    const products = await giftPoolProducts();
+    res.json({
+      gifts: products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        image: p.image ?? null,
+        subType: (p.subType || "").trim(),
+        inStock: p.allowBackorder || p.stock > 0,
+      })),
     });
   })
 );

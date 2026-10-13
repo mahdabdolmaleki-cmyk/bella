@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PageHero from "@/components/PageHero";
 import TutorialList from "@/components/TutorialList";
+import { getSSRTutorials } from "@/lib/serverData";
 
 export const metadata: Metadata = {
   title: "آموزش | بلا پرفیوم",
@@ -8,7 +9,9 @@ export const metadata: Metadata = {
     "آموزش انتخاب، نگهداری و استفادهٔ درست از عطر.",
 };
 
-export default function LearnPage() {
+// SSR (v45): فهرست آموزش‌ها سمت سرور رندر می‌شود.
+export default async function LearnPage() {
+  const { tutorials, categories } = await getSSRTutorials();
   return (
     <>
       <PageHero
@@ -16,7 +19,7 @@ export default function LearnPage() {
         title="آموزش"
         sub="هر آنچه دربارهٔ عطر باید بدانید — از شناخت رایحه تا نگهداری درست شیشه"
       />
-      <TutorialList />
+      <TutorialList initialTutorials={tutorials} initialCategories={categories} />
     </>
   );
 }

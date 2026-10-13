@@ -12,6 +12,7 @@ import {
   Mail,
   History,
   Crown,
+  Phone,
 } from "lucide-react";
 import { toFa } from "@/lib/data";
 
@@ -39,7 +40,7 @@ type Campaign = {
 };
 
 const inputCls =
-  "glass-input w-full rounded-xl px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/40 focus:outline-none";
+  "glass-input w-full rounded-xl px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/75 focus:outline-none";
 
 export default function NotificationsAdmin() {
   const [audience, setAudience] = useState<"all" | "vip" | "selected">("all");
@@ -271,7 +272,7 @@ export default function NotificationsAdmin() {
             <div className="relative">
               <Search
                 size={14}
-                className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sage/60"
+                className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sage/90"
               />
               <input
                 value={search}
@@ -317,8 +318,14 @@ export default function NotificationsAdmin() {
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-bold text-cream">{p.name || "—"}</span>
-                        <span dir="ltr" className="block truncate text-[10.5px] text-sage">
-                          {p.email}
+                        <span dir="ltr" className="block truncate text-left text-[10.5px] text-sage">
+                          {p.email || "بدون ایمیل"}
+                        </span>
+                        <span className="mt-0.5 flex items-center gap-1 text-[10.5px] text-gold-soft">
+                          <Phone size={11} aria-hidden="true" />
+                          <bdi dir="ltr" className="truncate font-mono" aria-label="شماره تلفن مشتری">
+                            {p.phone || "ثبت نشده"}
+                          </bdi>
                         </span>
                       </span>
                     </label>
@@ -354,7 +361,7 @@ export default function NotificationsAdmin() {
               placeholder={"سلام…\n\nهر خط خالی یک پاراگراف تازه می‌سازد."}
               className={`${inputCls} resize-none leading-7`}
             />
-            <p className="mt-1 text-[10px] text-sage/70">
+            <p className="mt-1 text-[10px] text-sage/90">
               نام مشتری به‌صورت خودکار در ابتدای ایمیل نوشته می‌شود.
             </p>
           </div>

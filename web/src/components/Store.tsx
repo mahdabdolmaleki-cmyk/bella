@@ -23,6 +23,8 @@ import {
   Tag,
   Coins,
   X,
+  SprayCan,
+  Ruler,
 } from "lucide-react";
 import ClampLine from "./ClampLine";
 import { ProductVisual } from "./art";
@@ -190,7 +192,7 @@ export function BenefitsSection() {
                   i % 2 === 1 ? "md:flex-row-reverse md:text-left" : ""
                 }`}
               >
-                <span className="font-display text-4xl font-bold text-gold/25 transition-colors duration-500 group-hover:text-gold/60 md:text-6xl">
+                <span className="font-display text-4xl font-bold text-gold/25 transition-colors duration-500 group-hover:text-gold/90 md:text-6xl">
                   {toFa(String(i + 1).padStart(2, "0"))}
                 </span>
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-gold/35 bg-gold/10 text-gold transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6">
@@ -278,8 +280,17 @@ const SORTS: Array<{ key: string; label: string }> = [
   { key: "bestseller", label: "پرفروش‌ترین" },
 ];
 
-export function ProductsSection({ heading = true }: { heading?: boolean } = {}) {
-  const [rows, setRows] = useState<ProductDTO[] | null>(null);
+// SSR (v45): کاتالوگ برای HTML اولیه از سرور می‌آید؛ کلاینت هم در بدو ورود و
+// به‌صورت دوره‌ای وضعیت زندهٔ قیمت/تخفیف/جشنواره را از API تازه می‌کند.
+export function ProductsSection({
+  heading = true,
+  initialProducts = null,
+}: {
+  heading?: boolean;
+  initialProducts?: ProductDTO[] | null;
+} = {}) {
+  const [rows, setRows] = useState<ProductDTO[] | null>(initialProducts);
+  const hasFestivalProducts = Boolean(rows?.some((product) => product.festival));
   const [error, setError] = useState(false);
   // فیلتر دسته اکنون با «شناسهٔ گرهٔ درخت» کار می‌کند (null = همه).
   const [filterId, setFilterId] = useState<number | null>(null);
@@ -424,7 +435,7 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
       if (festivalOnly) params.set("festival", "1");
       if (sort !== "newest") params.set("sort", sort);
       const qs = params.toString();
-      fetch(`/api/products${qs ? `?${qs}` : ""}`, { signal })
+      fetch(`/api/products${qs ? `?${qs}` : ""}`, { signal, cache: "no-store" })
         .then((r) => r.json())
         .then((d) => setRows(d.products ?? []))
         .catch((err) => {
@@ -457,6 +468,27 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
     };
   }, [load, q]);
 
+  // اگر فروشگاه هنگام پایان جشنواره باز باشد، دادهٔ SSR/کش‌شدهٔ اولیه کافی نیست؛
+  // تا وقتی محصول جشنواره در فهرست است، قیمت و برچسب را دوره‌ای تازه می‌کنیم.
+  useEffect(() => {
+    let activeRequest: AbortController | null = null;
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      activeRequest?.abort();
+      activeRequest = new AbortController();
+      load(activeRequest.signal);
+    };
+    const timer = hasFestivalProducts ? window.setInterval(refresh, 15_000) : null;
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      if (timer !== null) window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      activeRequest?.abort();
+    };
+  }, [load, hasFestivalProducts]);
+
   // فیلتر دوبارهٔ سمت مرورگر حذف شد: حالا سرور دقیقاً همان چیزی را برمی‌گرداند
   // که باید نمایش داده شود؛ نگه داشتنش فقط نتیجهٔ فیلترهای تازه را دوباره قیچی می‌کرد.
 
@@ -482,12 +514,12 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
 
         <Reveal delay={0.15} className="mx-auto mt-5 max-w-md">
           <div className="flex items-center gap-2 rounded-full glass-panel px-4 py-2.5 transition-colors focus-within:border-gold/60">
-            <Search size={15} className="text-gold/70" />
+            <Search size={15} className="text-gold/90" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="جستجو در نام، رایحه یا نُت‌ها…"
-              className="w-full bg-transparent text-sm text-cream placeholder:text-sage/40 focus:outline-none"
+              className="w-full bg-transparent text-sm text-cream placeholder:text-sage/75 focus:outline-none"
             />
           </div>
         </Reveal>
@@ -629,7 +661,7 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
                         value={priceMin}
                         onChange={(e) => setPriceMin(e.target.value)}
                         placeholder="از قیمت"
-                        className="w-full rounded-xl glass-input px-3 py-2 text-left text-xs text-cream placeholder:text-sage/40 focus:outline-none"
+                        className="w-full rounded-xl glass-input px-3 py-2 text-left text-xs text-cream placeholder:text-sage/75 focus:outline-none"
                       />
                       <input
                         type="number"
@@ -638,7 +670,7 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
                         value={priceMax}
                         onChange={(e) => setPriceMax(e.target.value)}
                         placeholder="تا قیمت"
-                        className="w-full rounded-xl glass-input px-3 py-2 text-left text-xs text-cream placeholder:text-sage/40 focus:outline-none"
+                        className="w-full rounded-xl glass-input px-3 py-2 text-left text-xs text-cream placeholder:text-sage/75 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -693,7 +725,7 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
                       glass={pr.glass}
                       liquid={pr.liquid}
                       alt={pr.name}
-                      className="relative w-24 drop-shadow-[0_18px_30px_rgba(0,0,0,0.6)] transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-2"
+                      className="relative h-40 w-auto max-w-full drop-shadow-[0_18px_30px_rgba(0,0,0,0.6)] transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-2"
                     />
                   </Link>
 
@@ -710,27 +742,65 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
                   </div>
                   <p className="mt-1 text-xs text-sage">{pr.tagline}</p>
 
-                  <div className="mt-4 space-y-1.5 border-t border-gold/10 pt-4 text-[11px] text-sage">
-                    {[
-                      { Icon: Droplets, label: "آغاز", value: pr.topNotes },
-                      { Icon: Heart, label: "قلب", value: pr.heartNotes },
-                      { Icon: Flame, label: "پایه", value: pr.baseNotes },
-                    ].map(({ Icon, label, value }) => (
-                      <p key={label} className="flex items-start gap-2">
-                        <Icon size={12} className="mt-0.5 shrink-0 text-gold" />
-                        <span className="flex min-w-0 flex-1 items-baseline gap-1">
-                          <span className="shrink-0 font-bold">{label}: </span>
-                          {value ? <ClampLine text={value} /> : "—"}
-                        </span>
-                      </p>
-                    ))}
-                  </div>
+                  {pr.productType === "general" ? (
+                    /* ---------- کارتِ محصولاتِ «سایر»: بدون نُتِ ادکلن ---------- */
+                    <div className="mt-4 space-y-1.5 border-t border-gold/10 pt-4 text-[11px] text-sage">
+                      {/* برچسبِ «محصولِ غیرِ ادکلن» به درخواست مشتری حذف شد — فقط زیرنوعِ
+                          واردشده توسط ادمین (در صورت وجود) نمایش داده می‌شود. */}
+                      {pr.subType?.trim() && (
+                        <p className="flex items-center gap-2">
+                          <SprayCan size={12} className="mt-0.5 shrink-0 text-gold" />
+                          <span className="font-bold">{pr.subType.trim()}</span>
+                        </p>
+                      )}
+                      {pr.brand?.trim() && (
+                        <p className="flex items-center gap-2">
+                          <Tag size={12} className="mt-0.5 shrink-0 text-gold" />
+                          <span>برند: {pr.brand}</span>
+                        </p>
+                      )}
+                      {pr.sizeMl ? (
+                        <p className="flex items-center gap-2">
+                          <Ruler size={12} className="mt-0.5 shrink-0 text-gold" />
+                          <span>حجم: {toFa(pr.sizeMl)} میلی‌لیتر</span>
+                        </p>
+                      ) : null}
+                      {!pr.brand?.trim() && !pr.sizeMl && (
+                        <p className="text-sage/80">جزئیات در صفحهٔ محصول.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-4 space-y-1.5 border-t border-gold/10 pt-4 text-[11px] text-sage">
+                        {[
+                          { Icon: Droplets, label: "آغاز", value: pr.topNotes },
+                          { Icon: Heart, label: "قلب", value: pr.heartNotes },
+                          { Icon: Flame, label: "پایه", value: pr.baseNotes },
+                        ].map(({ Icon, label, value }) => (
+                          <p key={label} className="flex items-start gap-2">
+                            <Icon size={12} className="mt-0.5 shrink-0 text-gold" />
+                            <span className="flex min-w-0 flex-1 items-baseline gap-1">
+                              <span className="shrink-0 font-bold">{label}: </span>
+                              {value ? <ClampLine text={value} /> : "—"}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
 
-                  <div className="mt-3 flex items-center gap-4 text-[11px] text-sage">
-                    <span className="flex items-center gap-1.5"><Clock size={12} className="text-gold" /> {pr.longevity}</span>
-                    <span className="h-3 w-px bg-gold/25" />
-                    <span className="flex items-center gap-1.5"><Wind size={12} className="text-gold" /> {pr.sillage}</span>
-                  </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gold/10 pt-3 text-[11px] text-sage">
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <Clock size={12} className="shrink-0 text-gold" />
+                          <span className="shrink-0 font-bold text-[#241a22]">ماندگاری:</span>
+                          <span className="min-w-0 truncate">{pr.longevity || "—"}</span>
+                        </span>
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <Wind size={12} className="shrink-0 text-gold" />
+                          <span className="shrink-0 font-bold text-[#241a22]">پخش بو:</span>
+                          <span className="min-w-0 truncate">{pr.sillage || "—"}</span>
+                        </span>
+                      </div>
+                    </>
+                  )}
 
                   <div className="mt-5 flex items-end justify-between gap-3 border-t border-gold/10 pt-4">
                     <div>
@@ -755,7 +825,7 @@ export function ProductsSection({ heading = true }: { heading?: boolean } = {}) 
                         </span>
                       )}
                       {pr.oldPrice != null && pr.oldPrice > pr.price && (
-                        <p className="text-[11px] text-sage/60 line-through">{formatToman(pr.oldPrice)}</p>
+                        <p className="text-[11px] text-sage/90 line-through">{formatToman(pr.oldPrice)}</p>
                       )}
                       <p className="text-base font-black text-gold-soft">{formatToman(pr.price)}</p>
                     </div>

@@ -1542,6 +1542,14 @@ select.field-input option {
   background: rgba(11, 36, 23, 0.08) !important;
   color: #6b5f4c !important;
 }
+/* عکس‌های محصول در فروشگاه بدون قاب، پس‌زمینه یا سایهٔ جعبه‌ای نمایش داده شوند. */
+.prod-card img {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
 
 /* ---- باکس‌های متن بخش‌های «سفر رایحه» (Journey) — کرم، هم‌جنس حباب چت ---- */
 .journey-tile {
@@ -2617,4 +2625,20 @@ button.bg-gold, .shop-pill-on {
 :is(.glass-panel, .glass-card, .glass-soft, .cream-box) :is(.text-sage\/70, .text-sage\/60) {
   color: #4f3d48 !important;
   opacity: 1 !important;
+}
+
+/* v42 — اعدادِ درصد/مبلغِ تخفیف ستاره باید روی فرم روشن و پُرکنتراست بمانند. */
+.glass-panel .glass-input.loyalty-discount-value,
+.glass-soft .glass-input.loyalty-discount-value {
+  background-color: #fffaf0 !important;
+  color: #241a22 !important;
+  -webkit-text-fill-color: #241a22 !important;
+  caret-color: #6b2c4e !important;
+  font-variant-numeric: tabular-nums;
+}
+.glass-panel .glass-input.loyalty-discount-value:focus,
+.glass-soft .glass-input.loyalty-discount-value:focus {
+  background-color: #fffef9 !important;
+  color: #241a22 !important;
+  -webkit-text-fill-color: #241a22 !important;
 }

@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 import { bootstrapCategories } from "./utils/categories.js";
 import { startStaleOrderSweeper } from "./jobs/staleOrders.js";
 import { startAbandonedCartSweeper } from "./jobs/abandonedCarts.js";
+import { startFestivalExpirySweeper } from "./jobs/festivalExpiry.js";
 import { startLogRetention } from "./utils/fileLog.js";
 import { securityHeaders, sanitizeRequest, originGuard } from "./middleware/security.js";
 import { rateLimit } from "./middleware/rateLimit.js";
@@ -245,6 +246,8 @@ async function start() {
   startStaleOrderSweeper();
   // Sends 2h / 12h abandoned-cart reminders (v36)
   startAbandonedCartSweeper();
+  // Restore festival products and stop the banner when its timer expires.
+  startFestivalExpirySweeper();
   // Deletes activity log files older than LOG_RETENTION_DAYS (default 30).
   startLogRetention();
 

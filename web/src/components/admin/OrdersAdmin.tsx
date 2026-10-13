@@ -23,11 +23,12 @@ const STATUSES = [
 ];
 
 const STATUS_COLOR: Record<string, string> = {
-  "در انتظار تأیید": "text-amber-300 border-amber-300/30 bg-amber-300/10",
-  "در حال آماده‌سازی": "text-sky-300 border-sky-300/30 bg-sky-300/10",
-  "ارسال شد": "text-violet-300 border-violet-300/30 bg-violet-300/10",
-  "تحویل داده شد": "text-emerald-300 border-emerald-300/30 bg-emerald-300/10",
-  "لغو شد": "text-red-400 border-red-400/30 bg-red-400/10",
+  // سفارش‌ها روی کارت کرم‌اند؛ هر وضعیت رنگ متنِ تیره و مرز مستقل دارد.
+  "در انتظار تأیید": "text-[#65470c] border-[#a27b34] bg-[#f3e7d3]",
+  "در حال آماده‌سازی": "text-[#214c65] border-[#376f8b] bg-[#e5f0f4]",
+  "ارسال شد": "text-[#4d2d68] border-[#755291] bg-[#eee7f3]",
+  "تحویل داده شد": "text-[#16563a] border-[#3c805e] bg-[#e3f0e8]",
+  "لغو شد": "text-[#8c2f3f] border-[#a84b5b] bg-[#f5e5e7]",
 };
 
 function fmtDate(d: string | Date) {
@@ -221,6 +222,16 @@ export default function OrdersAdmin({
             <p className="text-sm text-sage">سفارشی با این وضعیت نیست.</p>
           )}
           {visibleOrders.map((o) => {
+            const fixedDiscount = Number(o.discountFixed ?? (o.couponCode ? o.couponFixed ?? 0 : 0));
+            const discountDetail =
+              fixedDiscount > 0 && !(o.discountPercent ?? 0)
+                ? `${toFa(fixedDiscount)} تومان`
+                : `${toFa(o.discountPercent ?? 0)}٪`;
+            const discountBadge = o.couponCode
+              ? `کد تخفیف ${o.couponCode} (${discountDetail})`
+              : o.discountSource === "star"
+                ? `تخفیف وفاداری (${discountDetail})`
+                : `تخفیف خرید اول (${discountDetail})`;
             const items = Array.isArray(o.items)
               ? (o.items as {
                   id: number;
@@ -241,46 +252,42 @@ export default function OrdersAdmin({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-gold-soft">{o.code}</span>
+                      <span className="font-mono text-sm font-semibold text-gold-soft">{o.code}</span>
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_COLOR[o.status] || "text-sage border-gold/20"}`}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-extrabold ${STATUS_COLOR[o.status] || "text-[#4f3d48] border-[#8b7380]"}`}
                       >
                         {o.status}
                       </span>
                       {o.cancelRequested && (
-                        <span className="animate-pulse rounded-full border border-amber-400/50 bg-amber-400/15 px-2 py-0.5 text-[10px] font-black text-amber-300">
+                        <span className="animate-pulse rounded-full border border-[#9a6b24] bg-[#f3e7d3] px-2.5 py-1 text-xs font-black text-[#65470c]">
                           درخواست لغو مشتری
                         </span>
                       )}
                       {o.vipBox && (
-                        <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-gold-soft">
+                        <span className="rounded-full border border-[#9c7440] bg-[#f3e7d3] px-2.5 py-1 text-xs font-bold text-[#65470c]">
                           باکس VIP
                         </span>
                       )}
                       {!!o.discountAmount && (
-                        <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                          {o.couponCode
-                            ? o.couponFixed
-                              ? `کد تخفیف ${o.couponCode} (${toFa(o.couponFixed)} تومان)`
-                              : `کد تخفیف ${o.couponCode} (${toFa(o.discountPercent ?? 0)}٪)`
-                            : `تخفیف خرید اول (${toFa(o.discountPercent ?? 0)}٪)`}
+                        <span className="rounded-full border border-[#2d7654] bg-[#e3f0e8] px-2.5 py-1 text-xs font-bold text-[#16563a]">
+                          {discountBadge}
                         </span>
                       )}
                       {o.shippingCod && (
-                        <span className="rounded-full border border-amber-300/40 bg-amber-300/10 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                        <span className="rounded-full border border-[#9a6b24] bg-[#f3e7d3] px-2.5 py-1 text-xs font-bold text-[#65470c]">
                           پس‌کرایه
                         </span>
                       )}
                       {o.excludeFromSales && (
-                        <span className="rounded-full border border-zinc-400/40 bg-zinc-400/10 px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                        <span className="rounded-full border border-[#81747a] bg-[#eee8eb] px-2.5 py-1 text-xs font-bold text-[#42363b]">
                           حذف از فروش
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 truncate text-sm font-bold text-cream">
+                    <p className="mt-1 truncate text-base font-extrabold text-cream">
                       {o.customerName} — {formatToman(o.total)}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-sage">{fmtDate(o.createdAt)}</p>
+                    <p className="mt-1 text-xs font-medium text-sage">{fmtDate(o.createdAt)}</p>
                   </div>
                   <ChevronDown size={16} className={`shrink-0 text-sage transition-transform ${open ? "rotate-180" : ""}`} />
                 </button>
@@ -305,31 +312,31 @@ export default function OrdersAdmin({
                         </button>
                       </div>
                     )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-sage">
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px] font-medium text-sage">
                       <span className="flex items-center gap-1.5">
-                        <Phone size={13} className="text-gold/70" /> {o.phone}
+                        <Phone size={13} className="text-gold/90" /> {o.phone}
                       </span>
                       {o.email && (
                         <span className="flex items-center gap-1.5">
-                          <Mail size={13} className="text-gold/70" />
+                          <Mail size={13} className="text-gold/90" />
                           <span dir="ltr">{o.email}</span>
                         </span>
                       )}
                       <span className="flex items-center gap-1.5">
-                        <MapPin size={13} className="text-gold/70" />
+                        <MapPin size={13} className="text-gold/90" />
                         {[o.province, o.city].filter(Boolean).join("، ")}
                         {o.province || o.city ? " — " : ""}
                         {o.address}
                       </span>
                       {o.postalCode && (
                         <span className="flex items-center gap-1.5">
-                          <Package size={13} className="text-gold/70" />
+                          <Package size={13} className="text-gold/90" />
                           کد پستی: <span className="font-mono">{o.postalCode}</span>
                         </span>
                       )}
                       {o.shippingLabel && (
                         <span className="flex items-center gap-1.5">
-                          <Truck size={13} className="text-gold/70" />
+                          <Truck size={13} className="text-gold/90" />
                           {o.shippingLabel}
                           {o.freeShipping ? " (رایگان)" : ` — ${formatToman(o.shippingCost ?? 0)}`}
                         </span>
@@ -338,7 +345,7 @@ export default function OrdersAdmin({
 
                     <div className="mt-3 space-y-1.5">
                       {items.map((it) => (
-                        <div key={it.id} className="flex items-center justify-between text-xs text-cream/90">
+                        <div key={it.id} className="flex items-center justify-between text-sm text-cream/90">
                           <span>
                             {it.name} × {it.qty.toLocaleString("fa-IR")}
                             <ItemCampaignTags item={it} tone="dark" />
@@ -361,7 +368,7 @@ export default function OrdersAdmin({
                         value={tracking[o.id] ?? o.trackingCode ?? ""}
                         onChange={(e) => setTracking((t) => ({ ...t, [o.id]: e.target.value }))}
                         placeholder="مثلاً 1234567890"
-                        className="w-48 rounded-lg glass-input px-3 py-1.5 text-xs text-cream placeholder:text-sage/40 focus:border-gold focus:outline-none"
+                        className="w-48 rounded-lg glass-input px-3 py-2 text-sm text-cream placeholder:text-sage/75 focus:border-gold focus:outline-none"
                       />
                       <button
                         onClick={() => saveTracking(o.id)}
@@ -379,7 +386,7 @@ export default function OrdersAdmin({
                         <select
                           value={o.status}
                           onChange={(e) => updateStatus(o.id, e.target.value)}
-                          className="rounded-lg glass-input px-3 py-1.5 text-xs text-cream focus:border-gold focus:outline-none"
+                          className="rounded-lg glass-input px-3 py-2 text-sm text-cream focus:border-gold focus:outline-none"
                         >
                           {STATUSES.map((s) => (
                             <option key={s} value={s}>
@@ -391,7 +398,7 @@ export default function OrdersAdmin({
                       <button
                         onClick={() => toggleExcludeFromSales(o.id)}
                         disabled={salesToggling === o.id}
-                        className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition ${o.excludeFromSales ? "border-zinc-400/40 bg-zinc-400/15 text-zinc-300" : "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"}`}
+                        className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition ${o.excludeFromSales ? "border-[#81747a] bg-[#eee8eb] text-[#42363b]" : "border-[#2d7654] bg-[#e3f0e8] text-[#16563a]"}`}
                       >
                         <BarChart3 size={13} />
                         {salesToggling === o.id ? "…" : o.excludeFromSales ? "بازگردانی به گزارش فروش" : "حذف از گزارش فروش"}

@@ -27,6 +27,8 @@ const orderItemSchema = new mongoose.Schema(
     discount: { type: Boolean, default: false },
     // امتیاز وفاداری این قلم در لحظهٔ خرید (برای اهدای ستاره پس از نشست).
     points: { type: Number, default: 0 },
+    // قلمِ هدیهٔ وفاداری (رایگان) — قیمتِ آن ۰ است و در فاکتور «هدیه» نشان داده می‌شود.
+    gift: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -173,10 +175,14 @@ orderSchema.methods.toDTO = function () {
       festival: i.festival === true,
       discount: i.discount === true,
       points: i.points ?? 0,
+      gift: i.gift === true,
     })),
     subtotal: this.subtotal ?? Math.max(0, this.total - (this.shippingCost || 0)),
     discountPercent: this.discountPercent ?? 0,
     discountAmount: this.discountAmount ?? 0,
+    // couponFixed is the legacy persisted field for any fixed discount source;
+    // expose a source-neutral alias for receipts and order management.
+    discountFixed: this.couponFixed ?? 0,
     couponCode: this.couponCode || "",
     paymentFailReason: this.paymentFailReason || "",
     couponPercent: this.couponCode ? this.discountPercent ?? 0 : 0,

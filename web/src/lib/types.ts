@@ -5,7 +5,7 @@ import type { ProductDTO } from "./data";
 export type Product = ProductDTO;
 
 // نمادها و متن‌های ویژهٔ صفحهٔ محصول (آیکن + متن کوتاه).
-export type { ProductHighlight } from "./data";
+export type { ProductHighlight, ProductAttribute } from "./data";
 
 // Admin-only view of a product: includes the inventory fields that are never
 // sent to customers.
@@ -45,6 +45,8 @@ export type Order = {
   /** تخفیف خرید اول (درصد و مبلغ). */
   discountPercent?: number;
   discountAmount?: number;
+  /** مبلغ ثابتِ تخفیف اعمال‌شده، فارغ از منبع تخفیف. */
+  discountFixed?: number;
   /** کد تخفیف اعمال‌شده روی همین سفارش (v40). */
   couponCode?: string;
   couponFixed?: number;
@@ -119,7 +121,7 @@ export type ShippingQuote = {
   province: string;
   subtotal: number;
   /** تخفیف خرید اول — فقط برای نمایش در فاکتور سبد. */
-  firstPurchaseDiscount?: { percent: number; amount: number } | null;
+  firstPurchaseDiscount?: { percent: number; amount: number; fixed?: number } | null;
   /** v40: تخفیف برتر (کد یا خرید اول) — همان چیزی که سرور اعمال می‌کند. */
   discount?: { source: "first" | "coupon" | "star"; percent: number; amount: number; fixed?: number; code: string; star?: number; title?: string } | null;
   coupon?: {

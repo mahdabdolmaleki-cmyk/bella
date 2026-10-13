@@ -17,6 +17,29 @@ const highlightSchema = new mongoose.Schema(
   { _id: false },
 );
 
+// فیلدهای ویژگیِ دلخواه که ادمین خودش در فرم محصول اضافه/حذف می‌کند
+// (مثلاً «جنس: استیل» یا «ابعاد: ۲۰×۳۰»). ردیفِ بدونِ برچسب یا مقدار ذخیره نمی‌شود.
+export const PRODUCT_ATTRIBUTE_MAX = 30;
+
+const attributeSchema = new mongoose.Schema(
+  {
+    label: { type: String, default: "", maxlength: 60 },
+    value: { type: String, default: "", maxlength: 200 },
+  },
+  { _id: false },
+);
+
+const festivalSnapshotSchema = new mongoose.Schema(
+  {
+    oldPrice: { type: Number, default: null },
+    badge: { type: String, default: null, maxlength: 40 },
+    discount: { type: Boolean, default: false },
+    discountType: { type: String, default: "", enum: ["", "percent", "amount"] },
+    discountValue: { type: Number, default: null },
+  },
+  { _id: false },
+);
+
 const descriptionBlockSchema = new mongoose.Schema(
   {
     type: {
@@ -42,6 +65,9 @@ const productSchema = new mongoose.Schema(
     // نوع محصول: «perfume» = ادکلن/عطر (با نُتِ رایحه، ماندگاری، ویژوالِ شیشه)؛
     // «general» = سایر محصولات (خوشبوکننده، اسپری و…) با فرم و صفحهٔ ساده‌تر.
     productType: { type: String, default: "perfume", enum: ["perfume", "general"], index: true },
+    // زیرنوعِ محصولاتِ «سایر» — مثلاً «خوشبوکننده»، «اسپری»، «خوشبوکنندهٔ خودرو».
+    // فقط وقتی productType="general" باشد در فرم و صفحهٔ محصول نشان داده می‌شود.
+    subType: { type: String, default: "", maxlength: 60 },
     tagline: { type: String, default: "", maxlength: 200 },
     description: { type: String, default: "", maxlength: 2000 },
     topNotes: { type: String, default: "", maxlength: 200 },
@@ -66,10 +92,16 @@ const productSchema = new mongoose.Schema(
     // علامت‌خوردهٔ خودشان را در فروشگاه فیلتر می‌کنند.
     festival: { type: Boolean, default: false, index: true },
     discount: { type: Boolean, default: false, index: true },
+    // محصولِ قابلِ انتخاب به‌عنوان «هدیهٔ وفاداری»: مشتریِ مشمول، هنگامِ پرداخت
+    // می‌تواند یکی از محصولاتِ gift=true را رایگان انتخاب کند.
+    gift: { type: Boolean, default: false, index: true },
     // نوع و مقدار تخفیفِ اعمال‌شده تا در کارت/صفحهٔ محصول درست نمایش داده شود:
     // discountType = "percent" | "amount" | "" ؛ discountValue = عدد (درصد یا تومان).
     discountType: { type: String, default: "", enum: ["", "percent", "amount"] },
     discountValue: { type: Number, default: null },
+    // A private snapshot lets timed festival cleanup restore the product's
+    // pre-festival label/discount state instead of blindly erasing other deals.
+    festivalSnapshot: { type: festivalSnapshotSchema, default: undefined, select: false },
     active: { type: Boolean, default: true },
     image: { type: String, default: null },
     // Inventory. Never exposed to customers — see toDTO() vs toAdminDTO().
@@ -109,6 +141,16 @@ const productSchema = new mongoose.Schema(
         message: "حداکثر ۸ نماد برای هر محصول مجاز است.",
       },
     },
+    // ویژگی‌های دلخواه (برچسب + مقدار) که ادمین در فرم محصول اضافه/حذف می‌کند و
+    // در تب «ویژگی‌های محصول» پس از ردیف‌های ثابت نمایش داده می‌شوند.
+    attributes: {
+      type: [attributeSchema],
+      default: [],
+      validate: {
+        validator: (arr) => arr.length <= PRODUCT_ATTRIBUTE_MAX,
+        message: `حداکثر ${PRODUCT_ATTRIBUTE_MAX} ویژگی دلخواه برای هر محصول مجاز است.`,
+      },
+    },
     // Legacy fields are retained only so existing MongoDB data remains readable
     // until that product is edited and migrated to descriptionBlocks.
     longDescription: { type: String, default: "", maxlength: 6000 },
@@ -139,6 +181,7 @@ productSchema.methods.toDTO = function () {
     name: clean(this.name),
     nameEn: clean(this.nameEn),
     productType: this.productType === "general" ? "general" : "perfume",
+    subType: clean(this.subType),
     tagline: clean(this.tagline),
     description: clean(this.description),
     topNotes: clean(this.topNotes),
@@ -158,6 +201,7 @@ productSchema.methods.toDTO = function () {
     points: this.points ?? 1,
     festival: this.festival === true,
     discount: this.discount === true,
+    gift: this.gift === true,
     discountType: this.discountType || "",
     discountValue: this.discountValue ?? null,
     active: this.active,
@@ -188,6 +232,12 @@ productSchema.methods.toDTO = function () {
       ? this.highlights
           .map((h) => ({ icon: h.icon || "sparkles", text: clean(h.text) }))
           .filter((h) => h.text)
+      : [],
+    // ویژگی‌های دلخواه — ردیفِ نیمه‌تمام (بدون برچسب یا مقدار) هرگز به مشتری نمی‌رسد.
+    attributes: Array.isArray(this.attributes)
+      ? this.attributes
+          .map((a) => ({ label: clean(a.label), value: clean(a.value) }))
+          .filter((a) => a.label && a.value)
       : [],
     longDescription: clean(this.longDescription),
     gallery: Array.isArray(this.gallery) ? this.gallery.filter(Boolean) : [],

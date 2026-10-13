@@ -9,7 +9,9 @@ import { AuthProvider } from "./AuthContext";
 import { GoldDust } from "./art";
 import VisitTracker from "./VisitTracker";
 import PwaRegister from "./PwaRegister";
-import BellaConsultation from "./BellaConsultation";
+import dynamic from "next/dynamic";
+// PERF: ویجت مشاوره در همهٔ صفحات بالای fold نیست؛ بعد از هیدریشن بارگیری می‌شود.
+const BellaConsultation = dynamic(() => import("./BellaConsultation"), { ssr: false });
 
 export default function Shell({
   children,

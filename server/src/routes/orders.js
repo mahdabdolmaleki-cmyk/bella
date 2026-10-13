@@ -8,9 +8,12 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { ah } from "../utils/asyncHandler.js";
 import { logActivity } from "../utils/activityLog.js";
 import { str, int, bool, isPhone, isEmail, isPostalCode, addressIssue } from "../utils/validate.js";
+import { giftPoolProducts, giftInStock, defaultGiftProduct } from "../utils/gifts.js";
 import { isZarinpalConfigured } from "../utils/zarinpal.js";
 import { parseCouponList, findCoupon, couponAmount } from "../utils/coupon.js";
 import ReferralCode from "../models/ReferralCode.js";
+import { findOwnedReferralCoupon, referralCouponError } from "../utils/referralCoupon.js";
+import { hasPreviousFirstPurchaseOrder } from "../utils/firstPurchaseDiscount.js";
 import { parseStarsConfig, starLevelFor, starPerks, starPerkSources } from "../utils/stars.js";
 import User from "../models/User.js";
 import { notifyOrderPlaced } from "../utils/orderNotify.js";
@@ -151,63 +154,63 @@ router.post(
         .json({ error: "برخی از محصولات سبد دیگر موجود نیستند. سبد خرید را به‌روز کنید." });
     }
 
+    // `Product.price` is the current selling price, including any festival
+    // price already applied to the product. Order-level discounts are calculated
+    // after this subtotal, so first-purchase discounts do not replace festival savings.
     const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
 
     // ---- تخفیف خرید اول + کد تخفیف (v40) ----
     // باگ v35 رفع شد: تخفیف خرید اول فقط به کاربر لاگین‌شده می‌رسید؛ حالا
     // «اول بودن» با خودِ شمارهٔ سفارش سنجیده می‌شود (و در صورت لاگین، شناسهٔ
     // حساب هم). مرجع نهایی همین‌جاست — سبد خرید فقط پیش‌نمایش می‌کند.
-    // کد تخفیف و تخفیف خرید اول روی هم جمع نمی‌شوند؛ هرکدام که بیشتر باشد.
+    // کد تخفیف و تخفیف خرید اول/وفاداری روی جمع سبد رقابت می‌کنند؛ جشنواره
+    // تخفیفِ محصول است و قبلاً در Product.price لحاظ شده، پس مستقل باقی می‌ماند.
     let discountPercent = 0;
     let discountAmount = 0;
     let discountSource = "none"; // none | first | coupon | star — برای نمایشِ دقیق در فاکتور
     let couponCodeUsed = "";
-    let couponFixedValue = 0; // v41 — کدِ مبلغی (تومان)
+    let discountFixedValue = 0; // مبلغِ ثابتِ تخفیف برنده (برای فاکتور)
     let referralUsedId = null; // v43 — کد رفرال یک‌بارمصرفی که باید پس از ثبت سفارش بسوزد
     let referralUsedCode = "";
     if (siteSettings.firstPurchaseDiscountEnabled === "1") {
+      const firstType = siteSettings.firstPurchaseDiscountType === "amount" ? "amount" : "percent";
       const pct = Math.min(90, Math.max(0, Math.round(Number(siteSettings.firstPurchasePercent) || 0)));
-      if (pct > 0) {
-        const ident = { $or: [{ phone }] };
-        if (req.user) ident.$or.push({ user: req.user._id });
-        // سفارشِ لغوشده یا ناموفق «خرید قبلی» حساب نمی‌شود (سازگار با بررسیِ کوپن).
-        const previous = await Order.exists({
-          ...ident,
-          status: { $ne: ORDER_STATUSES[ORDER_STATUSES.length - 1] },
-          paymentStatus: { $ne: "failed" },
-        }).catch(() => null);
+      const fixed = Math.min(subtotal, Math.max(0, Math.round(Number(siteSettings.firstPurchaseAmount) || 0)));
+      const firstDiscount = firstType === "amount" ? fixed : Math.min(subtotal, Math.round((subtotal * pct) / 100));
+      if (firstDiscount > 0) {
+        const previous = await hasPreviousFirstPurchaseOrder(phone, req.user?._id);
         if (!previous) {
-          discountPercent = pct;
-          discountAmount = Math.min(subtotal, Math.round((subtotal * pct) / 100));
+          discountPercent = firstType === "percent" ? pct : 0;
+          discountAmount = firstDiscount;
+          discountFixedValue = firstType === "amount" ? firstDiscount : 0;
           discountSource = "first";
         }
       }
     }
     const rawCoupon = str(req.body?.couponCode, { max: 24 });
     if (rawCoupon) {
-      if (siteSettings.couponEnabled !== "1") {
-        return res.status(400).json({ error: "کدهای تخفیف فعلاً غیرفعال هستند." });
-      }
-      const found = findCoupon(parseCouponList(siteSettings.couponCodesJson), rawCoupon);
+      // کدهای سراسری تابعِ فعال‌بودن کوپن‌های عمومی‌اند؛ کدهای referral
+      // مسیر اعتبارسنجی مستقل دارند و حتی با خاموش‌بودن آن تنظیم قابل‌مصرف‌اند.
+      const couponsEnabled = siteSettings.couponEnabled === "1";
+      const found = couponsEnabled
+        ? findCoupon(parseCouponList(siteSettings.couponCodesJson), rawCoupon)
+        : { reason: "notfound" };
       let coupon = found.coupon || null;
+      if (!coupon && found.reason === "expired") {
+        return res.status(400).json({ error: "تاریخ انقضای این کد تخفیف گذشته است." });
+      }
       if (!coupon) {
-        if (found.reason === "expired") {
-          return res.status(400).json({ error: "تاریخ انقضای این کد تخفیف گذشته است." });
-        }
-        // fallback (v43): کد تخفیف یک‌بارمصرفِ زیرمجموعه‌گیری، tied به حساب کاربر.
-        const up = rawCoupon.toUpperCase();
-        const rc = req.user ? await ReferralCode.findOne({ code: up, owner: req.user._id }) : null;
-        if (rc) {
-          if (rc.used) return res.status(400).json({ error: "این کد یک‌بارمصرف قبلاً استفاده شده است." });
-          if (rc.expiresAt && rc.expiresAt.getTime() < Date.now()) {
-            return res.status(400).json({ error: "مهلت این کد تخفیف تمام شده است." });
-          }
-          coupon = { code: rc.code, percent: rc.percent, amount: rc.amount, until: "" };
-          referralUsedId = rc._id;
-          referralUsedCode = rc.code;
+        const referral = await findOwnedReferralCoupon(rawCoupon, req.user?._id);
+        if (referral.coupon) {
+          coupon = referral.coupon;
+          referralUsedId = referral.referralId;
+          referralUsedCode = referral.referralCode;
         } else {
-          const other = await ReferralCode.findOne({ code: up }).select("_id").lean();
-          if (other) return res.status(400).json({ error: "این کد متعلق به حساب شما نیست." });
+          const referralError = referralCouponError(referral.reason);
+          if (referralError) return res.status(400).json({ error: referralError });
+          if (!couponsEnabled) {
+            return res.status(400).json({ error: "کدهای تخفیف فعلاً غیرفعال هستند." });
+          }
           return res.status(400).json({ error: "چنین کد تخفیفی وجود ندارد." });
         }
       }
@@ -241,10 +244,10 @@ router.post(
           coupon.percent > 0 ? Math.min(subtotal, Math.round((subtotal * coupon.percent) / 100)) : 0;
         if (byAmount >= byPercent) {
           discountPercent = 0;
-          couponFixedValue = byAmount; // مبلغِ واقعاً اعمال‌شده (سقف‌خورده)
+          discountFixedValue = byAmount; // مبلغِ واقعاً اعمال‌شده (سقف‌خورده)
         } else {
           discountPercent = coupon.percent;
-          couponFixedValue = 0;
+          discountFixedValue = 0;
         }
         discountAmount = amount;
         couponCodeUsed = coupon.code;
@@ -261,11 +264,11 @@ router.post(
       if (starAmount > 0 && starAmount > discountAmount) {
         if (starByAmount >= starByPercent) {
           discountPercent = 0;
-          couponFixedValue = starByAmount; // تخفیف مبلغیِ ستاره
+          discountFixedValue = starByAmount; // تخفیف مبلغیِ ستاره
           discountAmount = starByAmount;
         } else {
           discountPercent = starBen.discountPercent;
-          couponFixedValue = 0;
+          discountFixedValue = 0;
           discountAmount = starByPercent;
         }
         couponCodeUsed = "";
@@ -325,6 +328,37 @@ router.post(
     if (starBen.vipbox) pushPerk("vipbox");
     if (starBen.gift) pushPerk("gift");
     if (discountSource === "star") pushPerk("discount");
+
+    // ---- هدیهٔ وفاداری: انتخابِ خودِ مشتری از استخرِ هدیه ----
+    // فقط وقتی مشتری واقعاً مشمولِ هدیه باشد (starBen.gift) و یک محصولِ هدیهٔ
+    // معتبرِ فعال و موجود انتخاب کرده باشد، همان به‌صورت رایگان (price=0) به
+    // اقلام اضافه می‌شود تا هم موجودی‌اش رزرو شود و هم در فاکتور «هدیه» بیفتد.
+    if (starBen.gift) {
+      // استخرِ هدیه (+ هدیهٔ دیفالت وقتی ادمین هدیه‌ای علامت نزده) تا خریدِ
+      // مشتریِ مشمول هرگز بدون هدیه نماند: انتخابِ نامعتبر/ناموجود هم به اولین
+      // هدیهٔ موجودِ استخر برمی‌گردد.
+      const pool = await giftPoolProducts();
+      const requestedGiftId = int(req.body?.giftId, { min: 1, max: 1e9, clamp: false });
+      let gp = requestedGiftId !== null ? pool.find((p) => p.id === requestedGiftId) : null;
+      if (!giftInStock(gp)) gp = pool.find(giftInStock) || null;
+      // حتی اگر همهٔ هدیه‌های استخر ناموجود باشند، هدیهٔ دیفالت جایگزین می‌شود.
+      if (!gp) gp = await defaultGiftProduct();
+      if (gp) {
+        items.push({
+          id: gp.id,
+          name: gp.name,
+          price: 0,
+          qty: 1,
+          image: gp.image,
+          oldPrice: null,
+          festival: false,
+          discount: false,
+          points: 0,
+          sizeMl: gp.sizeMl,
+          gift: true,
+        });
+      }
+    }
 
     // Only the persisted fields go into the order document.
     const orderItems = items.map(({ sizeMl: _sizeMl, ...rest }) => rest);
@@ -387,7 +421,7 @@ router.post(
           discountPercent,
           discountAmount,
           couponCode: couponCodeUsed,
-          couponFixed: couponFixedValue,
+          couponFixed: discountFixedValue,
           couponUseKey: couponCodeUsed ? `${couponCodeUsed}:${phone}` : undefined,
           shippingCod: cod,
           vipBox,

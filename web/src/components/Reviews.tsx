@@ -216,7 +216,7 @@ export default function Reviews({ productId }: { productId: number }) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="مانند: مهدیه زمانی"
-                    className="w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/40 focus:border-gold"
+                    className="w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/75 focus:border-gold"
                   />
                 </div>
                 <div>
@@ -247,7 +247,7 @@ export default function Reviews({ productId }: { productId: number }) {
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="تجربه‌تان از رایحه، ماندگاری و بسته‌بندی را بنویسید…"
-                className="w-full rounded-xl glass-input px-3.5 py-2.5 text-sm leading-7 text-cream placeholder:text-sage/40 focus:border-gold"
+                className="w-full rounded-xl glass-input px-3.5 py-2.5 text-sm leading-7 text-cream placeholder:text-sage/75 focus:border-gold"
               />
 
               {formError && <p className="mt-2 text-xs text-red-400">{formError}</p>}

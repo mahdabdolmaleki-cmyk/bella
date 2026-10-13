@@ -18,7 +18,7 @@ export default function AdminLoginRedirect() {
   return (
     <div dir="rtl" className="flex min-h-screen items-center justify-center bg-[#08130d] px-5 text-cream">
       <div className="gold-ring w-full max-w-sm rounded-3xl border border-gold/25 bg-night p-8 text-center">
-        <CrestImg className="mx-auto w-16" />
+        <CrestImg className="mx-auto h-auto w-16" />
         <h1 className="font-brand mt-2 text-3xl text-gold">Bella Perfume</h1>
         <p className="mt-4 flex items-center justify-center gap-2 text-xs text-sage">
           <Loader2 size={14} className="animate-spin" />

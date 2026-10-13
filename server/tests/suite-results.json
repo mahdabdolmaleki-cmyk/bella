@@ -1,0 +1,83 @@
+{
+  "total": 9929,
+  "pass": 9929,
+  "fail": 0,
+  "byGroup": {
+    "auth": {
+      "pass": 129,
+      "fail": 0
+    },
+    "catalog": {
+      "pass": 375,
+      "fail": 0
+    },
+    "validation": {
+      "pass": 114,
+      "fail": 0
+    },
+    "security": {
+      "pass": 148,
+      "fail": 0
+    },
+    "rate limits": {
+      "pass": 3,
+      "fail": 0
+    },
+    "admin": {
+      "pass": 10,
+      "fail": 0
+    },
+    "orders": {
+      "pass": 11,
+      "fail": 0
+    },
+    "loyalty": {
+      "pass": 9,
+      "fail": 0
+    },
+    "account": {
+      "pass": 4,
+      "fail": 0
+    },
+    "referrals": {
+      "pass": 9,
+      "fail": 0
+    },
+    "identity": {
+      "pass": 4,
+      "fail": 0
+    },
+    "first-purchase-discount": {
+      "pass": 7,
+      "fail": 0
+    },
+    "customer export": {
+      "pass": 4,
+      "fail": 0
+    },
+    "soak.products": {
+      "pass": 6000,
+      "fail": 0
+    },
+    "soak.detail": {
+      "pass": 1000,
+      "fail": 0
+    },
+    "soak.quote": {
+      "pass": 800,
+      "fail": 0
+    },
+    "soak.static": {
+      "pass": 500,
+      "fail": 0
+    },
+    "soak.related": {
+      "pass": 800,
+      "fail": 0
+    },
+    "festival expiry": {
+      "pass": 2,
+      "fail": 0
+    }
+  }
+}

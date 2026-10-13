@@ -195,12 +195,12 @@ export default function LogsAdmin({ canPurge }: { canPurge: boolean }) {
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
-          <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-sage/60" />
+          <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-sage/90" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="جست‌وجو در رویداد، کاربر، آی‌پی یا مسیر"
-            className="w-full rounded-xl glass-input px-4 py-2.5 pr-9 text-sm text-cream placeholder:text-sage/50 focus:border-gold focus:outline-none"
+            className="w-full rounded-xl glass-input px-4 py-2.5 pr-9 text-sm text-cream placeholder:text-sage/75 focus:border-gold focus:outline-none"
           />
         </div>
         <select
@@ -298,7 +298,7 @@ export default function LogsAdmin({ canPurge }: { canPurge: boolean }) {
                   {l.meta ? ` (${l.meta})` : ""}
                 </p>
                 {l.userAgent && (
-                  <p className="mt-0.5 truncate text-[10px] text-sage/70">{l.userAgent}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-sage/90">{l.userAgent}</p>
                 )}
               </div>
             ))}

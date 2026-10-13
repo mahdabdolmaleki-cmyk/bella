@@ -130,7 +130,7 @@ export default function StatsCharts() {
   }, [load]);
 
   const active = METRICS.find((m) => m.key === metric) ?? METRICS[0];
-  const series = data?.series ?? [];
+  const series = useMemo(() => data?.series ?? [], [data]);
   const max = useMemo(
     () => Math.max(1, ...series.map((b) => Number(b[metric]) || 0)),
     [series, metric],
@@ -141,8 +141,8 @@ export default function StatsCharts() {
       {/* ---------- header: range + metric switches ---------- */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-black text-gold">نمودار فروش و بازدید</h2>
-          <p className="mt-0.5 text-[11px] text-sage">
+          <h2 className="text-base font-black text-gold">نمودار فروش و بازدید</h2>
+          <p className="mt-1 text-xs font-medium text-sage">
             {active.label} — {RANGES.find((r) => r.key === range)?.label}
           </p>
         </div>
@@ -153,7 +153,8 @@ export default function StatsCharts() {
               <button
                 key={r.key}
                 onClick={() => setRange(r.key)}
-                className={`relative rounded-full px-3.5 py-1.5 text-[11.5px] font-bold transition-colors ${
+                aria-pressed={range === r.key}
+                className={`relative rounded-full px-3.5 py-2 text-sm font-bold transition-colors ${
                   range === r.key ? "text-[#241a05]" : "text-sage hover:text-gold-soft"
                 }`}
               >
@@ -171,7 +172,8 @@ export default function StatsCharts() {
           <button
             onClick={() => load()}
             title="به‌روزرسانی"
-            className="rounded-full border border-gold/25 p-2 text-sage hover:bg-gold/10 hover:text-gold"
+            aria-label="به‌روزرسانی آمار"
+            className="rounded-full border border-gold/40 p-2.5 text-sage hover:bg-gold/10 hover:text-gold"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
@@ -192,17 +194,18 @@ export default function StatsCharts() {
             <button
               key={m.key}
               onClick={() => setMetric(m.key)}
-              className={`rounded-xl border p-3 text-right transition-colors ${
+              aria-pressed={metric === m.key}
+              className={`rounded-xl border p-3.5 text-right transition-colors ${
                 metric === m.key
                   ? "border-gold/50 bg-gold/10"
                   : "border-gold/15 glass-soft hover:border-gold/30"
               }`}
             >
               <Icon size={15} style={{ color: m.from }} />
-              <p className="mt-1.5 truncate text-[13px] font-black text-cream">
+              <p className="mt-2 truncate text-sm font-black text-cream sm:text-base">
                 {total === undefined ? "…" : m.format(total)}
               </p>
-              <p className="text-[10.5px] text-sage">{m.label}</p>
+              <p className="mt-0.5 text-xs font-semibold text-sage sm:text-[13px]">{m.label}</p>
             </button>
           );
         })}
@@ -218,7 +221,7 @@ export default function StatsCharts() {
       ) : (
         <div className="mt-5 overflow-x-auto pb-2">
           {series.every((b) => !Number(b[metric])) && (
-            <p className="mb-2 text-center text-[11px] text-sage">
+            <p className="mb-2 text-center text-xs font-medium text-sage">
               در این بازه داده‌ای برای «{active.label}» ثبت نشده است.
             </p>
           )}
@@ -243,7 +246,7 @@ export default function StatsCharts() {
                       (قبلاً فقط با hover دیده می‌شد). مقدار کامل در title هست. */}
                   <span
                     title={active.format(value)}
-                    className="text-[9.5px] font-bold whitespace-nowrap text-gold"
+                    className="text-[11px] font-bold whitespace-nowrap text-gold"
                   >
                     {metric === "revenue" ? shortFa(value) : toFa(value)}
                   </span>
@@ -273,7 +276,7 @@ export default function StatsCharts() {
                     />
                   </div>
 
-                  <span className="text-[9.5px] whitespace-nowrap text-sage">
+                  <span className="text-[11px] font-medium whitespace-nowrap text-sage">
                     {axisLabel(bucket.key, range)}
                   </span>
                 </div>
@@ -317,7 +320,7 @@ function StatusBars({ counts }: { counts: StatusCounts }) {
             const tint = STATUS_TINT[row.status] || "#d4af7c";
             return (
               <div key={row.status} className="flex items-center gap-3">
-                <span className="w-28 shrink-0 truncate text-[11px] font-bold text-sage sm:w-36">
+                <span className="w-28 shrink-0 truncate text-xs font-bold text-sage sm:w-36 sm:text-[13px]">
                   {row.status}
                 </span>
                 <div className="h-6 flex-1 overflow-hidden rounded-lg bg-night/60">
@@ -328,7 +331,7 @@ function StatusBars({ counts }: { counts: StatusCounts }) {
                     className="flex h-full items-center justify-end rounded-lg pl-2"
                     style={{ background: `linear-gradient(to left, ${tint}, ${tint}55)` }}
                   >
-                    <span className="text-[10.5px] font-black text-[#0b2417]">
+                    <span className="text-xs font-black text-[#0b2417]">
                       {toFa(row.count)}
                     </span>
                   </motion.div>

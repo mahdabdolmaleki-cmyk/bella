@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Star,
   SprayCan,
+  ZoomIn,
 } from "lucide-react";
 import { BasketIcon } from "@/components/BasketIcon";
 import { ProductVisual } from "@/components/art";
@@ -23,6 +24,7 @@ import { useCart } from "@/components/Cart";
 import { useAuth } from "@/components/AuthContext";
 import Reviews, { Stars } from "@/components/Reviews";
 import RelatedProducts from "@/components/RelatedProducts";
+import ImageZoom from "@/components/ImageZoom";
 import ClampLine from "@/components/ClampLine";
 import { formatToman, toFa } from "@/lib/data";
 import type { Product } from "@/lib/types";
@@ -35,10 +37,19 @@ type State =
 
 type TabKey = "description" | "specs" | "reviews";
 
-export default function ProductClient() {
+// SSR (v45): محصول از صفحهٔ سرور به HTML اولیه می‌آید؛ کلاینت فقط
+// برای به‌روزرسانی‌های بعدی (retry) دوباره واکشی می‌کند.
+export default function ProductClient({
+  initial = null,
+}: {
+  initial?: import("@/lib/data").ProductDTO | null;
+} = {}) {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
-  const [state, setState] = useState<State>({ kind: "loading" });
+  // SSR: با دادهٔ سرور، همان HTML اولیه شامل محصول کامل است.
+  const [state, setState] = useState<State>(
+    initial ? { kind: "ok", product: initial } : { kind: "loading" },
+  );
   const [tab, setTab] = useState<TabKey>("description");
   const [summary, setSummary] = useState<{
     average: number;
@@ -48,6 +59,12 @@ export default function ProductClient() {
 
   const load = useCallback(
     (signal?: AbortSignal) => {
+      // SSR: در mount (با signal) دادهٔ سرور را نشان بده؛ retry بدون signal
+      // همچنان واکشی واقعی انجام می‌دهد.
+      if (initial && signal) {
+        setState({ kind: "ok", product: initial });
+        return;
+      }
       setState({ kind: "loading" });
       fetch(`/api/products/${id}`, { signal })
         .then(async (res) => {
@@ -61,7 +78,7 @@ export default function ProductClient() {
             setState({ kind: "error" });
         });
     },
-    [id],
+    [id, initial],
   );
 
   useEffect(() => {
@@ -210,6 +227,8 @@ function Gallery({ product }: { product: Product }) {
   );
   const [active, setActive] = useState(0);
   const current = images[active];
+  // v46: زوم تمام‌صفحه با کلیک/تپ روی عکس.
+  const [zoomOpen, setZoomOpen] = useState(false);
   const count = images.length;
 
   const goTo = (index: number) => {
@@ -276,7 +295,8 @@ function Gallery({ product }: { product: Product }) {
                 if (info.offset.x < -60) next();
                 else if (info.offset.x > 60) prev();
               }}
-              className="relative h-full w-full cursor-grab active:cursor-grabbing"
+              onTap={() => setZoomOpen(true)}
+              className="relative h-full w-full cursor-zoom-in active:cursor-grabbing"
             >
               <Image
                 src={current}
@@ -289,7 +309,7 @@ function Gallery({ product }: { product: Product }) {
               />
             </motion.div>
           ) : product.productType === "general" ? (
-            <div className="flex h-4/5 w-4/5 flex-col items-center justify-center gap-2 text-sage/50 md:h-[82%] md:w-[82%]">
+            <div className="flex h-4/5 w-4/5 flex-col items-center justify-center gap-2 text-sage/90 md:h-[82%] md:w-[82%]">
               <SprayCan size={72} strokeWidth={1.25} />
               <span className="text-[11px] font-bold">تصویری ثبت نشده</span>
             </div>
@@ -301,6 +321,13 @@ function Gallery({ product }: { product: Product }) {
               alt={product.name}
               className="h-4/5 w-4/5 md:h-[82%] md:w-[82%]"
             />
+          )}
+
+          {current && (
+            <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-night/75 px-2.5 py-1 text-[10px] font-bold text-cream/90 backdrop-blur">
+              <ZoomIn size={12} />
+              زوم
+            </span>
           )}
 
           {product.badge && (
@@ -320,14 +347,14 @@ function Gallery({ product }: { product: Product }) {
               <button
                 onClick={prev}
                 aria-label="عکس قبلی"
-                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-cream/70 transition-colors hover:text-gold"
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-cream/90 transition-colors hover:text-gold"
               >
                 <ChevronRight size={22} />
               </button>
               <button
                 onClick={next}
                 aria-label="عکس بعدی"
-                className="absolute inset-y-0 left-0 flex w-10 items-center justify-center text-cream/70 transition-colors hover:text-gold"
+                className="absolute inset-y-0 left-0 flex w-10 items-center justify-center text-cream/90 transition-colors hover:text-gold"
               >
                 <ChevronLeft size={22} />
               </button>
@@ -348,6 +375,11 @@ function Gallery({ product }: { product: Product }) {
         <div className="mt-3 hidden max-h-[540px] flex-col gap-2 overflow-y-auto pl-1 md:mt-0 md:flex">
           {images.map((src, index) => thumb(src, index))}
         </div>
+      )}
+
+      {/* v46: لایت‌باکس زوم — pinch، دابل‌تپ، درگ و دکمه‌ها */}
+      {zoomOpen && current && (
+        <ImageZoom src={current} alt={product.name} onClose={() => setZoomOpen(false)} />
       )}
     </div>
   );
@@ -377,6 +409,14 @@ function Summary({
       <h1 className="mt-1 font-display text-3xl font-black text-cream sm:text-4xl">
         {product.name}
       </h1>
+      {/* برچسبِ «محصولِ غیرِ ادکلن» به درخواست مشتری حذف شد — بجای آن فقط
+          زیرنوعِ واردشده توسط ادمین (در صورت وجود) نمایش داده می‌شود. */}
+      {product.productType === "general" && product.subType?.trim() && (
+        <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-black text-gold-soft">
+          <SprayCan size={12} />
+          {product.subType.trim()}
+        </span>
+      )}
       <p className="mt-2 text-sm leading-7 text-sage">{product.tagline}</p>
 
       {summary && summary.count > 0 && (
@@ -735,6 +775,7 @@ function DescriptionTab({ product }: { product: Product }) {
 
 function SpecsTab({ product }: { product: Product }) {
   const rows: Array<[string, string | undefined]> = [
+    ["نوع محصول", product.subType],
     ["شرکت سازنده", product.manufacturer],
     ["برند سازنده", product.brand],
     ["مناسب برای", product.suitableFor],
@@ -752,6 +793,11 @@ function SpecsTab({ product }: { product: Product }) {
     ["پخش بو", product.sillage],
     ["دسته‌بندی", product.category],
   ];
+  // ویژگی‌های دلخواهی که ادمین در فرم محصول اضافه کرده — پس از ردیف‌های ثابت
+  // و برای هر دو نوع محصول (ادکلن و سایر) نمایش داده می‌شوند.
+  for (const a of product.attributes || []) {
+    if (a.label?.trim() && a.value?.trim()) rows.push([a.label.trim(), a.value.trim()]);
+  }
   // ردیف‌های مخصوصِ ادکلن که در محصولاتِ «سایر» نشان داده نمی‌شوند.
   const perfumeOnly = new Set([
     "نوع غلظت",
@@ -764,10 +810,15 @@ function SpecsTab({ product }: { product: Product }) {
     "ماندگاری",
     "پخش بو",
   ]);
+  // ردیفی که فقط در محصولاتِ «سایر» نشان داده می‌شود (زیرنوع).
+  const generalOnly = new Set(["نوع محصول"]);
   const isGeneral = product.productType === "general";
   const filled = rows.filter(
     ([label, value]) =>
-      value && String(value).trim().length > 0 && !(isGeneral && perfumeOnly.has(label)),
+      value &&
+      String(value).trim().length > 0 &&
+      !(isGeneral && perfumeOnly.has(label)) &&
+      !(!isGeneral && generalOnly.has(label)),
   );
 
   if (filled.length === 0) {
@@ -784,7 +835,7 @@ function SpecsTab({ product }: { product: Product }) {
         <tbody>
           {filled.map(([label, value], index) => (
             <motion.tr
-              key={label}
+              key={`${label}-${index}`}
               initial={{ opacity: 0, x: 12 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}

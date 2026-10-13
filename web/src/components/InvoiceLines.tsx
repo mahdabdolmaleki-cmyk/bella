@@ -21,6 +21,7 @@ export type InvoiceOrderLite = {
   freeShipping?: boolean;
   discountAmount?: number;
   discountPercent?: number;
+  discountFixed?: number;
   couponCode?: string;
   couponPercent?: number;
   couponFixed?: number;
@@ -52,7 +53,13 @@ export function InvoiceLines({
   const vipBoxFee = order.vipBoxFee ?? 0;
   const cod = Boolean(order.shippingCod);
   const online = order.onlinePaid ?? Math.max(0, order.total - (cod ? shippingCost : 0));
-  const fixedValue = order.couponCode ? order.couponFixed ?? 0 : 0;
+  const fixedValue = order.discountFixed ?? (order.couponCode ? order.couponFixed ?? 0 : 0);
+  const discountDescriptor =
+    fixedValue > 0 && !discountPercent
+      ? ` (${fa(fixedValue)} تومان)`
+      : discountPercent > 0
+        ? ` (${fa(discountPercent)}٪)`
+        : "";
 
   // مزایای ستارهٔ اعمال‌شده و منبع هرکدام (عنوان ستاره) — برای فاکتور.
   const perks = order.starPerksApplied ?? [];
@@ -61,6 +68,10 @@ export function InvoiceLines({
   const vipboxStar = perkTitle("vipbox");
   const discountStar = perkTitle("discount");
   const giftStar = perkTitle("gift");
+  // قلمِ هدیهٔ انتخابیِ مشتری (price=0) تا نامش در فاکتور بیاید.
+  const giftItem = (
+    (order as { items?: { gift?: boolean; name?: string }[] }).items || []
+  ).find((it) => it.gift);
   const vipFromStar = Boolean(vipboxStar) && order.vipBox === true && vipBoxFee === 0;
   const shipFromStar = Boolean(freeshipStar) && (order.freeShipping || shippingCost === 0);
   const discountFromStar = order.discountSource === "star" && discountAmount > 0;
@@ -68,7 +79,7 @@ export function InvoiceLines({
   const light = tone === "light";
   const k = light
     ? {
-        box: "space-y-1.5 rounded-xl border border-[#d4af7c]/35 bg-[#efe6d8] px-3 py-2.5 text-[11px]",
+        box: "space-y-1.5 rounded-xl border border-[#d4af7c]/35 bg-[#efe6d8] px-3 py-2.5 text-xs",
         row: "text-[#3d2f38]",
         val: "font-bold text-[#241a22]",
         disc: "text-[#4e1e39]",
@@ -77,7 +88,7 @@ export function InvoiceLines({
         codVal: "font-bold text-[#4e1e39]",
       }
     : {
-        box: "space-y-1.5 text-[11px]",
+        box: "space-y-1.5 text-xs",
         row: "text-sage",
         val: "text-cream",
         disc: "text-emerald-300",
@@ -114,16 +125,10 @@ export function InvoiceLines({
           valueCls={light ? "font-bold" : undefined}
           label={
             discountFromStar
-              ? `تخفیف وفاداری — از مزایای ${discountStar}${discountPercent ? ` (${fa(discountPercent)}٪)` : ""}`
+              ? `تخفیف وفاداری — از مزایای ${discountStar}${discountDescriptor}`
               : order.couponCode
-                ? `کد تخفیف ${order.couponCode}${
-                    fixedValue > 0 && !discountPercent
-                      ? ` (${fa(fixedValue)} تومان)`
-                      : discountPercent
-                        ? ` (${fa(discountPercent)}٪)`
-                        : ""
-                  }`
-                : `تخفیف خرید اول${discountPercent ? ` (${fa(discountPercent)}٪)` : ""}`
+                ? `کد تخفیف ${order.couponCode}${discountDescriptor}`
+                : `تخفیف خرید اول${discountDescriptor}`
           }
           value={`− ${formatToman(discountAmount)}`}
         />
@@ -156,7 +161,7 @@ export function InvoiceLines({
         <Row
           cls={k.disc}
           valueCls={light ? "font-bold" : undefined}
-          label={`هدیهٔ وفاداری — از مزایای ${giftStar}`}
+          label={`هدیهٔ وفاداری${giftItem?.name ? `: ${giftItem.name}` : ""} — از مزایای ${giftStar}`}
           value="رایگان"
         />
       )}

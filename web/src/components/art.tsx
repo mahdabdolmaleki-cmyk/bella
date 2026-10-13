@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useId, useState } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
 /* ================================================================== */
 /*  BELLA CREST — the maison's ornate golden monogram                  */
@@ -98,13 +99,47 @@ export function BellaCrest({
 }
 
 /* ---------------- raster logo files ---------------- */
-export function LogoImg({ className = "" }: { className?: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/logo.webp" alt="بلا پرفیوم" className={className} draggable={false} />;
+// PERF/SEO: next/image به‌جای <img> خام — به‌جای سروِ فایل کاملِ ۳۳KB،
+// سایزِ بهینهٔ webp متناسب با کلاس تولید می‌شود («Improve image delivery»)
+// و با priority، خودِ Next لینک preload را به head اضافه می‌کند تا لوگو
+// همان ابتدای HTML کشف شود («LCP request discovery»).
+export function LogoImg({
+  className = "",
+  priority = false,
+}: {
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <Image
+      src="/logo.webp"
+      width={440}
+      height={278}
+      alt="بلا پرفیوم"
+      className={className}
+      draggable={false}
+      priority={priority}
+    />
+  );
 }
-export function CrestImg({ className = "" }: { className?: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/crest.webp" alt="" className={className} draggable={false} />;
+export function CrestImg({
+  className = "",
+  priority = false,
+}: {
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <Image
+      src="/crest.webp"
+      width={440}
+      height={278}
+      alt=""
+      className={className}
+      draggable={false}
+      priority={priority}
+    />
+  );
 }
 
 /* ================================================================== */
@@ -127,7 +162,14 @@ export function ProductVisual({
   if (image) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={image} alt={alt} className={`object-contain ${className}`} draggable={false} />
+      <img
+        src={image}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        className={`object-contain ${className}`}
+        draggable={false}
+      />
     );
   }
   return <PerfumeBottle glass={glass} liquid={liquid} className={className} />;

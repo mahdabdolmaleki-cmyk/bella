@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import PageHero from "@/components/PageHero";
 import { getSiteSettings, DEFAULT_SETTINGS } from "@/lib/settings";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
+// SEO: canonical + OG هم اضافه شد تا صفحهٔ قوانین سیگنال تکراری نسازد.
+export const metadata: Metadata = pageMeta({
+  path: "/terms",
   title: "قوانین و مقررات | بلا پرفیوم",
   description:
     "قوانین و مقررات خرید از فروشگاه عطر بلا پرفیوم — اصالت کالا، ارسال، بازگشت و حریم خصوصی.",
-};
+});
 
 export const revalidate = 60;
 

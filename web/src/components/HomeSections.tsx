@@ -58,13 +58,13 @@ export function BrandsSection({
                     {b.en}
                   </span>
                   {b.year && (
-                    <span className="rounded-full border border-gold/25 px-2 py-0.5 text-[9px] text-gold/70">
+                    <span className="rounded-full border border-gold/25 px-2 py-0.5 text-[9px] text-gold/90">
                       {b.year}
                     </span>
                   )}
                 </div>
                 <p className="mt-1.5 text-[12px] font-black text-cream sm:text-sm">{b.fa}</p>
-                <p className="mt-0.5 text-[10px] text-gold/60">{b.country}</p>
+                <p className="mt-0.5 text-[10px] text-gold/90">{b.country}</p>
                 <div className="hairline my-2.5 h-px w-full opacity-60" />
                 <p className="text-[10.5px] leading-[1.8] text-sage sm:text-[11.5px]">{b.d}</p>
               </div>
@@ -77,16 +77,24 @@ export function BrandsSection({
 }
 
 /* ================= BESTSELLERS ================= */
-export function BestsellersSection({ icon }: { icon?: string }) {
-  const [rows, setRows] = useState<ProductDTO[] | null>(null);
+// SSR (v45): فهرست پرفروش‌ها از صفحهٔ سرور می‌آید تا داخل HTML اولیه باشد.
+export function BestsellersSection({
+  icon,
+  initial = null,
+}: {
+  icon?: string;
+  initial?: ProductDTO[] | null;
+}) {
+  const [rows, setRows] = useState<ProductDTO[] | null>(initial);
   const { add } = useCart();
 
   useEffect(() => {
+    if (initial) return; // دادهٔ رندرِ سرور کافی است
     fetch("/api/products")
       .then((r) => r.json())
       .then((d) => setRows(d.products ?? []))
       .catch(() => setRows([]));
-  }, []);
+  }, [initial]);
 
   const top = (rows ?? [])
     .slice()

@@ -149,7 +149,7 @@ export default function ReviewsAdmin() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="جستجو در نام یا متن نقد…"
-            className="w-44 bg-transparent text-xs text-cream placeholder:text-sage/50 focus:outline-none sm:w-56"
+            className="w-44 bg-transparent text-xs text-cream placeholder:text-sage/75 focus:outline-none sm:w-56"
           />
         </label>
       </div>
@@ -253,7 +253,7 @@ export default function ReviewsAdmin() {
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       placeholder="پاسخ شما به مشتری… (خالی بگذارید تا پاسخ حالی حذف شود)"
-                      className="w-full rounded-xl glass-input px-3.5 py-2.5 text-sm leading-7 text-cream placeholder:text-sage/40 focus:border-gold focus:outline-none"
+                      className="w-full rounded-xl glass-input px-3.5 py-2.5 text-sm leading-7 text-cream placeholder:text-sage/75 focus:border-gold focus:outline-none"
                     />
                     <div className="mt-2 flex items-center gap-2">
                       <button

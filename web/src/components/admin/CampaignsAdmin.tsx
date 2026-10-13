@@ -25,7 +25,7 @@ import {
 import { DEFAULT_SETTINGS, type SiteSettingsMap } from "@/lib/settings";
 
 const inputCls =
-  "w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/40 focus:border-gold focus:outline-none";
+  "w-full rounded-xl glass-input px-3.5 py-2.5 text-sm text-cream placeholder:text-sage/75 focus:border-gold focus:outline-none";
 const selCls =
   "rounded-lg glass-input px-2 py-1.5 text-xs text-cream focus:border-gold focus:outline-none";
 
@@ -82,7 +82,8 @@ function JalaliTimerInput({ value, onChange }: { value: string; onChange: (v: st
         تایمر پایان جشنواره داشته باشد
       </label>
       {enabled ? (
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <select value={cur.jy} onChange={(e) => setPart({ jy: +e.target.value })} className={selCls}>
             {years.map((y) => (
               <option key={y} value={y}>{faDigits(y)}</option>
@@ -110,11 +111,15 @@ function JalaliTimerInput({ value, onChange }: { value: string; onChange: (v: st
               <option key={i} value={i}>{faDigits(String(i).padStart(2, "0"))}</option>
             ))}
           </select>
-          <span className="text-[10px] text-sage/70">به وقت تهران</span>
+          <span className="text-[10px] text-sage/90">به وقت تهران</span>
         </div>
+          <p className="mt-2 text-[10.5px] leading-5 text-[#241a22]">
+            با رسیدن به این زمان، بنر خودکار خاموش می‌شود، محصولات از جشنواره خارج می‌شوند و برچسب/تخفیف قبلی هر محصول بازمی‌گردد.
+          </p>
+        </>
       ) : (
-        <p className="mt-1.5 text-[10.5px] leading-5 text-sage/70">
-          بدون تایمر ⇒ بنر جشنواره همیشگی است و products همیشه در جشنواره می‌مانند.
+        <p className="mt-1.5 text-[10.5px] leading-5 text-sage/90">
+          بدون تایمر ⇒ بنر و عضویت محصولات در جشنواره خودکار پایان نمی‌یابد؛ برای پایان، محصولات را دستی حذف کنید.
         </p>
       )}
     </div>
@@ -162,7 +167,7 @@ function ProductPicker({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="جستجوی محصول…"
-          className="w-full bg-transparent text-xs text-cream placeholder:text-sage/40 focus:outline-none"
+          className="w-full bg-transparent text-xs text-cream placeholder:text-sage/75 focus:outline-none"
         />
       </div>
       <div className="max-h-[420px] space-y-1.5 overflow-y-auto p-2">
@@ -609,7 +614,7 @@ export default function CampaignsAdmin() {
           {/* ── تخفیف خرید اول + باکس VIP (منتقل‌شده از تنظیمات سایت) ── */}
           <section className="gold-ring rounded-2xl glass-panel p-5">
             <h2 className="text-sm font-black text-gold">تخفیف خرید اول و باکس VIP</h2>
-            <label className="mt-3 flex items-center gap-2 text-xs font-bold text-sage">
+            <label className="mt-3 flex items-center gap-2 text-[13px] font-bold text-sage">
               <input
                 type="checkbox"
                 checked={form.firstPurchaseDiscountEnabled === "1"}
@@ -618,17 +623,51 @@ export default function CampaignsAdmin() {
               />
               فعال‌بودن تخفیف خرید اول مشتری
             </label>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[11px] font-bold text-sage">درصد تخفیف (۰ تا ۹۰)</span>
-              <input
-                value={form.firstPurchasePercent}
-                onChange={(e) => set("firstPurchasePercent", e.target.value)}
-                type="number"
-                min={0}
-                max={90}
-                className={inputCls}
-              />
-            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-[13px] font-bold text-sage">نوع تخفیف خرید اول</span>
+                <select
+                  value={form.firstPurchaseDiscountType || "percent"}
+                  onChange={(e) => set("firstPurchaseDiscountType", e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="percent">درصدی</option>
+                  <option value="amount">مبلغ ثابت (تومان)</option>
+                </select>
+              </label>
+              {form.firstPurchaseDiscountType === "amount" ? (
+                <label className="block">
+                  <span className="mb-1 block text-[13px] font-bold text-sage">مبلغ ثابت تخفیف (تومان)</span>
+                  <input
+                    value={form.firstPurchaseAmount}
+                    onChange={(e) => set("firstPurchaseAmount", e.target.value || "0")}
+                    type="number"
+                    min={0}
+                    max={1000000000000}
+                    step={1}
+                    dir="ltr"
+                    className={inputCls}
+                  />
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="mb-1 block text-[13px] font-bold text-sage">درصد تخفیف (۰ تا ۹۰)</span>
+                  <input
+                    value={form.firstPurchasePercent}
+                    onChange={(e) => set("firstPurchasePercent", e.target.value || "0")}
+                    type="number"
+                    min={0}
+                    max={90}
+                    step={1}
+                    dir="ltr"
+                    className={inputCls}
+                  />
+                </label>
+              )}
+            </div>
+            <p className="mt-2 text-[12px] leading-6 text-sage">
+              تخفیف ثابت از جمع کالاها بیشتر نخواهد شد؛ کوپن و مزایای وفاداری طبق قاعدهٔ «بیشترین تخفیف» حفظ می‌شوند.
+            </p>
             <div className="mt-4 border-t border-gold/10 pt-3">
               <label className="flex items-center gap-2 text-xs font-bold text-sage">
                 <input
@@ -764,7 +803,7 @@ export default function CampaignsAdmin() {
             />
             فعال‌بودن کدهای تخفیف
           </label>
-          <p className="mt-1 text-[10.5px] leading-5 text-sage/70">
+          <p className="mt-1 text-[10.5px] leading-5 text-sage/90">
             هر کد می‌تواند درصدی (۱ تا ۹۰٪) یا مبلغی (تومان) باشد و تا پایان «تاریخ انقضای
             شمسی» معتبر است؛ خالی‌گذاشتن تاریخ یعنی بدون انقضا.
           </p>

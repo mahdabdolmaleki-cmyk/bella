@@ -104,6 +104,14 @@ function isCartLine(value: unknown): value is CartLine {
   );
 }
 
+type GiftOption = {
+  id: number;
+  name: string;
+  image: string | null;
+  subType: string;
+  inStock: boolean;
+};
+
 const CartCtx = createContext<Ctx | null>(null);
 export const useCart = () => {
   const c = useContext(CartCtx);
@@ -292,6 +300,9 @@ export function CartDrawer() {
 
   // تایید قوانین و مقررات برای پرداخت
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // هدیهٔ وفاداری: استخرِ محصولاتِ هدیه + انتخابِ خودِ مشتری (فقط وقتی مشمول باشد).
+  const [giftOptions, setGiftOptions] = useState<GiftOption[]>([]);
+  const [giftId, setGiftId] = useState<number | null>(null);
 
   // ── v33: حالت به‌روزرسانی سایت ──────────────────────
   // تنظیمات عمومی هر بار که سبد باز می‌شود خوانده می‌شود، تا اگر مدیر
@@ -393,6 +404,29 @@ export function CartDrawer() {
   const freeshipTitle = freeshipPerk ? perkTitle("freeship") : "";
   const vipboxTitle = vipboxPerk ? perkTitle("vipbox") : "";
   const giftTitle = giftPerk ? perkTitle("gift") : "";
+  // بارگذاریِ استخرِ هدیه فقط وقتی مشتری مشمولِ هدیه باشد.
+  useEffect(() => {
+    if (!giftPerk) {
+      setGiftOptions([]);
+      setGiftId(null);
+      return;
+    }
+    let alive = true;
+    fetch("/api/products/gifts")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive) return;
+        const opts: GiftOption[] = Array.isArray(d?.gifts) ? d.gifts : [];
+        setGiftOptions(opts);
+        // هدیهٔ دیفالت: اولین گزینهٔ موجود پیش‌انتخاب می‌شود تا خریدِ با هدیه
+        // هرگز خالی نماند (مشتری می‌تواند انتخابش را عوض کند).
+        setGiftId((cur) => cur ?? opts.find((g) => g.inStock)?.id ?? opts[0]?.id ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [giftPerk]);
   // با مزیتِ ستاره، باکس VIP رایگان و خودکار اعمال می‌شود (حتی بدونِ انتخاب).
   const vipFee = vipboxPerk ? 0 : vipOn && vipSetting.enabled ? vipSetting.fee : 0;
   // با مزیتِ ستاره، ارسال رایگان می‌شود (سرور هم همین را اعمال می‌کند).
@@ -562,6 +596,8 @@ export function CartDrawer() {
           shippingCod: codOn,
           couponCode: coupon.trim(),
           vipBox: vipOn && vipSetting.enabled,
+          // انتخابِ هدیهٔ وفاداری توسط مشتری (سرور مشمول‌بودن را دوباره بررسی می‌کند).
+          giftId: giftPerk ? giftId : null,
           termsAccepted: true,
           items: items.map((i) => ({ id: i.id, qty: i.qty })),
         }),
@@ -679,7 +715,7 @@ export function CartDrawer() {
               </div>
             ) : items.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gold/25 text-gold/60">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gold/25 text-gold/90">
                   <BasketIcon size={34} />
                 </div>
                 <p className="text-sm text-sage">سبد خرید شما هنوز خالی است.</p>
@@ -721,7 +757,7 @@ export function CartDrawer() {
                         <div className="flex flex-col items-end gap-2">
                           <button
                             onClick={() => remove(i.id)}
-                            className="text-sage/60 transition-colors hover:text-red-400"
+                            className="text-sage/90 transition-colors hover:text-red-400"
                             aria-label="حذف"
                           >
                             <Trash2 size={15} />
@@ -768,7 +804,7 @@ export function CartDrawer() {
                       </p>
                       <button
                         disabled
-                        className="w-full cursor-not-allowed rounded-full border border-gold/20 py-3.5 text-sm font-bold text-sage/70"
+                        className="w-full cursor-not-allowed rounded-full border border-gold/20 py-3.5 text-sm font-bold text-sage/90"
                       >
                         ثبت سفارش موقتاً غیرفعال است
                       </button>
@@ -983,7 +1019,7 @@ export function CartDrawer() {
                           </p>
                         )}
                         {quote && (
-                          <p className="px-1 text-[10px] text-sage/70">
+                          <p className="px-1 text-[10px] text-sage/90">
                             وزن تخمینی مرسوله: {toFa(quote.billableKg)} کیلوگرم
                             {quote.freeRemaining > 0 && (
                               <> · تا ارسال رایگان {formatToman(quote.freeRemaining)} دیگر</>
@@ -1052,7 +1088,7 @@ export function CartDrawer() {
                                 {vipSetting.desc}
                               </span>
                             </span>
-                            <Gem size={16} className="shrink-0 text-gold/70" />
+                            <Gem size={16} className="shrink-0 text-gold/90" />
                           </button>
                         )}
                       </div>
@@ -1069,7 +1105,7 @@ export function CartDrawer() {
                       onChange={(e) => setCoupon(e.target.value.toUpperCase())}
                       placeholder="مثلاً BELLA15"
                       dir="ltr"
-                      className="w-full rounded-lg border border-gold/25 bg-transparent px-3 py-2 text-sm text-cream placeholder:text-sage/40 focus:border-gold focus:outline-none"
+                      className="w-full rounded-lg border border-gold/25 bg-transparent px-3 py-2 text-sm text-cream placeholder:text-sage/75 focus:border-gold focus:outline-none"
                     />
                     {coupon.trim() && quote?.coupon?.applied && (
                       <p className="mt-1.5 text-[10.5px] font-bold text-emerald-300">
@@ -1097,7 +1133,7 @@ export function CartDrawer() {
                       <span>
                         جمع سبد خرید{" "}
                         {campaignDiscount > 0 && (
-                          <s className="text-sage/50">{formatToman(originalSubtotal)}</s>
+                          <s className="text-sage/90">{formatToman(originalSubtotal)}</s>
                         )}
                       </span>
                       <span className="text-cream">{formatToman(subtotal)}</span>
@@ -1124,7 +1160,9 @@ export function CartDrawer() {
                               ? qDiscount.percent
                                 ? `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.percent)}٪)`
                                 : `کد تخفیف ${qDiscount.code} (${toFa(qDiscount.fixed ?? 0)} تومان)`
-                              : `تخفیف خرید اول (${toFa(qDiscount.percent)}٪)`}
+                              : qDiscount.percent
+                                ? `تخفیف خرید اول (${toFa(qDiscount.percent)}٪)`
+                                : `تخفیف خرید اول (${toFa(qDiscount.fixed ?? discountAmount)} تومان)`}
                         </span>
                         <span>−{formatToman(discountAmount)}</span>
                       </div>
@@ -1164,12 +1202,52 @@ export function CartDrawer() {
                       )}
                     </div>
                     {giftPerk && (
-                      <div className="flex items-center justify-between text-xs text-emerald-300">
-                        <span className="flex items-center gap-1">
-                          <Gem size={12} className="text-gold" /> هدیهٔ وفاداری
-                          {giftTitle ? ` — از مزایای ${giftTitle}` : ""}
-                        </span>
-                        <span>رایگان</span>
+                      <div className="rounded-xl border border-gold/20 bg-gold/[0.05] p-3">
+                        <div className="flex items-center justify-between text-xs text-emerald-300">
+                          <span className="flex items-center gap-1">
+                            <Gem size={12} className="text-gold" /> هدیهٔ وفاداری
+                            {giftTitle ? ` — از مزایای ${giftTitle}` : ""}
+                          </span>
+                          <span>رایگان</span>
+                        </div>
+                        {giftOptions.length > 0 ? (
+                          <>
+                            <p className="mt-2 text-[10px] leading-5 text-sage">
+                              شما مشمولِ دریافتِ هدیه هستید؛ یکی از محصولاتِ زیر را انتخاب کنید:
+                            </p>
+                            <div className="mt-2 flex flex-col gap-1.5">
+                              {giftOptions.map((g) => (
+                                <button
+                                  key={g.id}
+                                  type="button"
+                                  disabled={!g.inStock}
+                                  onClick={() => setGiftId(giftId === g.id ? null : g.id)}
+                                  className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-right text-[11px] transition ${
+                                    giftId === g.id
+                                      ? "border-gold bg-gold/10 text-cream"
+                                      : "border-sage/25 text-sage hover:border-gold/40"
+                                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                                >
+                                  <input
+                                    type="radio"
+                                    readOnly
+                                    checked={giftId === g.id}
+                                    className="h-3 w-3 accent-[#d4af7c]"
+                                  />
+                                  <span className="flex-1">
+                                    {g.name}
+                                    {g.subType ? ` (${g.subType})` : ""}
+                                  </span>
+                                  {!g.inStock && <span className="text-[9px] text-red-400">ناموجود</span>}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <p className="mt-2 text-[10px] text-sage">
+                            هدیهٔ شما به‌صورت خودکار همراه سفارش ارسال می‌شود.
+                          </p>
+                        )}
                       </div>
                     )}
                     <div className="flex items-center justify-between border-t border-gold/15 pt-2">

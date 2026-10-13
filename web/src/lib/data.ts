@@ -12,6 +12,8 @@ export type ProductDTO = {
   nameEn: string;
   /** نوع محصول: ادکلن/عطر یا سایر محصولات (خوشبوکننده، اسپری و…). */
   productType?: "perfume" | "general";
+  /** زیرنوعِ محصولاتِ «سایر» — مثلاً «خوشبوکننده»، «اسپری»، «خوشبوکنندهٔ خودرو». */
+  subType?: string;
   tagline: string;
   description: string;
   topNotes: string;
@@ -30,6 +32,8 @@ export type ProductDTO = {
   /** عضویت در کمپین جشنواره / تخفیف (ادمین تعیین می‌کند). */
   festival?: boolean;
   discount?: boolean;
+  /** قابل انتخاب به‌عنوان هدیهٔ وفاداری هنگامِ پرداخت. */
+  gift?: boolean;
   /** نوع تخفیف اعمال‌شده: "percent" | "amount" | "" و مقدار آن (درصد یا تومان). */
   discountType?: "" | "percent" | "amount";
   discountValue?: number | null;
@@ -55,6 +59,9 @@ export type ProductDTO = {
   descriptionBlocks?: ProductDescriptionBlock[];
   // نمادها و متن‌های ویژهٔ صفحهٔ محصول — آیکن از پکیج /icons + متن کوتاه.
   highlights?: ProductHighlight[];
+  // ویژگی‌های دلخواه (برچسب + مقدار) که ادمین در فرم محصول اضافه/حذف می‌کند و
+  // در تب «ویژگی‌های محصول» نمایش داده می‌شوند.
+  attributes?: ProductAttribute[];
   longDescription?: string;
   gallery?: string[];
 };
@@ -62,6 +69,12 @@ export type ProductDTO = {
 export type ProductHighlight = {
   icon: string;
   text: string;
+};
+
+/** ویژگیِ دلخواه (برچسب + مقدار) که ادمین در فرم محصول اضافه/حذف می‌کند. */
+export type ProductAttribute = {
+  label: string;
+  value: string;
 };
 
 // NOTE: the old SEED_PRODUCTS constant lived here. It duplicated the real

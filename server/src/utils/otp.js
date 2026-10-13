@@ -9,7 +9,8 @@ import { normalizePhone } from "../config/superAdmin.js";
 // A new code can only be requested once every 60 seconds per identity+purpose.
 export const OTP_RESEND_SECONDS = 60;
 // Max codes per identity+purpose per hour (anti SMS-bombing / cost abuse).
-const OTP_HOURLY_MAX = 5;
+// Doubled alongside the API rate-limit quotas to reduce overly aggressive blocks.
+const OTP_HOURLY_MAX = 10;
 // A verified OTP only authorises its final action for this long.
 const OTP_TICKET_TTL_MS = 10 * 60 * 1000;
 

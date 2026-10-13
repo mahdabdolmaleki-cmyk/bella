@@ -12,7 +12,9 @@ export const SETTING_KEYS = [
   "discountsBoxTitle",
   "discountsBoxSubtitle",
   "firstPurchaseDiscountEnabled",
+  "firstPurchaseDiscountType",
   "firstPurchasePercent",
+  "firstPurchaseAmount",
   "couponEnabled",
   "couponCodesJson",
   "vipBoxEnabled",
@@ -34,6 +36,8 @@ export const SETTING_KEYS = [
   "referralSmsTemplate",
   "tierDiamondSpend",
   "shippingFreeThreshold",
+  "homeIntroTitle",
+  "homeIntroBody",
   "journeyStages",
   "journeyBottleGlass",
   "journeyBottleLiquid",
@@ -97,8 +101,12 @@ export type SiteSettingsMap = {
   discountsBoxSubtitle: string;
   /** "1" = تخفیف خرید اول فعال. */
   firstPurchaseDiscountEnabled: string;
-  /** درصد تخفیف خرید اول (۰ تا ۰). */
+  /** نوع تخفیف خرید اول؛ مقدار پیش‌فرض برای اسناد قدیمی «percent» است. */
+  firstPurchaseDiscountType: "percent" | "amount" | string;
+  /** درصد تخفیف خرید اول (۰ تا ۹۰). */
   firstPurchasePercent: string;
+  /** مبلغ ثابت تخفیف خرید اول به تومان. */
+  firstPurchaseAmount: string;
   /** "1" = کدهای تخفیف فعال‌اند (v40). */
   couponEnabled: string;
   /** JSON لیست کدها: [{code,percent,until}] */
@@ -130,6 +138,10 @@ export type SiteSettingsMap = {
   tierDiamondSpend: string;
   /** حداقل مبلغ کالاها برای ارسال رایگان، به تومان. */
   shippingFreeThreshold: string;
+  /** تیتر SEO صفحهٔ اصلی، درست بالای بخش «چرا بلا؟». */
+  homeIntroTitle: string;
+  /** متن معرفی/SEO صفحهٔ اصلی، درست بالای بخش «چرا بلا؟». */
+  homeIntroBody: string;
   /** "1" = نمایش زمان تحویل به خریدار فعال است؛ "" = مخفی. */
   deliveryEstimateEnabled: string;
   /** مدت تحویل پست معمولی / پیشتاز (مثلاً "7" یا "5 تا 7"). */
@@ -432,7 +444,9 @@ export const DEFAULT_SETTINGS: SiteSettingsMap = {
   discountsBoxTitle: "تخفیف‌های بلا",
   discountsBoxSubtitle: "ادکلن‌های مشمول تخفیف را ببینید",
   firstPurchaseDiscountEnabled: "",
+  firstPurchaseDiscountType: "percent",
   firstPurchasePercent: "25",
+  firstPurchaseAmount: "0",
   couponEnabled: "",
   couponCodesJson: "[]",
   vipBoxEnabled: "",
@@ -464,6 +478,8 @@ export const DEFAULT_SETTINGS: SiteSettingsMap = {
   shippingPishtazEnabled: "1",
   shippingChaparEnabled: "1",
   shippingPeykEnabled: "1",
+  homeIntroTitle: "خرید عطر اورجینال و ادکلن لوکس از مزون بلا پرفیوم",
+  homeIntroBody: "بلا پرفیوم مزون تخصصی عطرهای اورینتال و فرانسوی است؛ کلکسیونی از ادکلن اورجینال، اسانس عطر و دکنت‌های لوکس با ضمانت اصالت، بسته‌بندی مخملی و ارسال سریع به سراسر ایران. برای انتخاب دقیق‌تر رایحه، آموزش‌های آکادمی بلا را بخوانید و تازه‌های کلکسیون را در فروشگاه عطر بلا ببینید.",
   // Empty = keep the built-in default story text and bottle colours.
   journeyStages: "",
   journeyBottleGlass: "#0d3b26",

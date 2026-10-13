@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -22,15 +22,28 @@ import { faDate, type TutorialCard } from "@/lib/tutorials";
  * دسته‌ها از خود مطالب می‌آیند (سرور distinct می‌گیرد)، پس هر دستهٔ تازه‌ای
  * که ادمین در پنل تایپ کند خودبه‌خود اینجا ظاهر می‌شود.
  */
-export default function TutorialList() {
-  const [rows, setRows] = useState<TutorialCard[] | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
+// SSR (v45): فهرست آموزش‌ها از صفحهٔ سرور داخل HTML اولیه می‌آید.
+export default function TutorialList({
+  initialTutorials = null,
+  initialCategories = null,
+}: {
+  initialTutorials?: TutorialCard[] | null;
+  initialCategories?: string[] | null;
+} = {}) {
+  const [rows, setRows] = useState<TutorialCard[] | null>(initialTutorials);
+  const [categories, setCategories] = useState<string[]>(initialCategories ?? []);
+  const firstLoad = useRef(true);
   const [category, setCategory] = useState("همه");
   const [q, setQ] = useState("");
   const [error, setError] = useState(false);
 
   const load = useCallback(
     (signal?: AbortSignal) => {
+      // SSR: اولین بار با دستهٔ پیش‌فرض، دادهٔ سرور کافی است.
+      if (firstLoad.current) {
+        firstLoad.current = false;
+        if (initialTutorials && category === "همه" && !q.trim()) return;
+      }
       setError(false);
       const params = new URLSearchParams();
       if (category !== "همه") params.set("category", category);
@@ -51,7 +64,7 @@ export default function TutorialList() {
           if ((err as { name?: string })?.name !== "AbortError") setError(true);
         });
     },
-    [category, q],
+    [category, q, initialTutorials],
   );
 
   useEffect(() => {
@@ -86,12 +99,12 @@ export default function TutorialList() {
 
         <Reveal delay={0.1} className="mx-auto mt-5 max-w-md">
           <div className="flex items-center gap-2 rounded-full glass-panel px-4 py-2.5 transition-colors focus-within:border-gold/60">
-            <Search size={15} className="text-gold/70" />
+            <Search size={15} className="text-gold/90" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="جستجو در آموزش‌ها…"
-              className="w-full bg-transparent text-sm text-cream placeholder:text-sage/40 focus:outline-none"
+              className="w-full bg-transparent text-sm text-cream placeholder:text-sage/75 focus:outline-none"
             />
           </div>
         </Reveal>
@@ -114,7 +127,7 @@ export default function TutorialList() {
           </div>
         ) : rows.length === 0 ? (
           <div className="mt-16 text-center">
-            <GraduationCap size={40} className="mx-auto text-gold/40" />
+            <GraduationCap size={40} className="mx-auto text-gold/90" />
             <p className="mt-4 text-sm text-sage">
               هنوز آموزشی در این بخش منتشر نشده است.
             </p>
@@ -142,7 +155,7 @@ export default function TutorialList() {
                     />
                   ) : (
                     <span className="flex h-full items-center justify-center bg-gradient-to-br from-moss/60 to-night">
-                      <BookOpen size={34} className="text-gold/50" />
+                      <BookOpen size={34} className="text-gold/90" />
                     </span>
                   )}
                   <span className="absolute top-3 right-3 rounded-full bg-night/80 px-3 py-1 text-[10px] font-bold text-gold-soft backdrop-blur">

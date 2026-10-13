@@ -64,7 +64,7 @@ const BLOCK_ICON: Record<TutorialBlockType, typeof Type> = {
 };
 
 const inputCls =
-  "w-full rounded-xl glass-input px-3 py-2.5 text-sm text-cream placeholder:text-sage/40 focus:outline-none";
+  "w-full rounded-xl glass-input px-3 py-2.5 text-sm text-cream placeholder:text-sage/75 focus:outline-none";
 
 export default function TutorialsAdmin() {
   const [tab, setTab] = useState<"posts" | "comments">("posts");
@@ -226,7 +226,7 @@ function PostsTab() {
                       unoptimized />
                 ) : (
                   <span className="flex h-full items-center justify-center">
-                    <GraduationCap size={18} className="text-gold/40" />
+                    <GraduationCap size={18} className="text-gold/90" />
                   </span>
                 )}
               </div>
@@ -410,7 +410,7 @@ function Editor({
               placeholder="مثلاً: نگهداری عطر"
               list="tutorial-categories"
             />
-            <span className="mt-1 block text-[10px] text-sage/70">
+            <span className="mt-1 block text-[10px] text-sage/90">
               هر نام تازه‌ای که بنویسید، خودبه‌خود یک دستهٔ تازه در صفحهٔ آموزش می‌سازد.
             </span>
           </label>
@@ -512,7 +512,7 @@ function Editor({
                       unoptimized />
             ) : (
               <span className="flex h-full items-center justify-center">
-                <ImagePlus size={18} className="text-gold/40" />
+                <ImagePlus size={18} className="text-gold/90" />
               </span>
             )}
           </div>
@@ -626,7 +626,7 @@ function Editor({
                       unoptimized />
                         ) : (
                           <span className="flex h-full items-center justify-center">
-                            <ImagePlus size={16} className="text-gold/40" />
+                            <ImagePlus size={16} className="text-gold/90" />
                           </span>
                         )}
                       </div>
